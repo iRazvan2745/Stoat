@@ -26,7 +26,9 @@
     "evlog": "^2.26.0",
     "nuqs-svelte": "^1.2.2",
     "openapi-fetch": "^0.17.0",
-    "openapi-typescript-fetch": "^2.2.1"
+    "openapi-typescript-fetch": "^2.2.1",
+    "simple-git": "^3.36.0",
+    "valibot": "^1.4.2"
   },
   "devDependencies": {
     "@fontsource-variable/google-sans-flex": "^5.3.1",

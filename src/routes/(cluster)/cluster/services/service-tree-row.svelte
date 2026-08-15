@@ -108,9 +108,4 @@
   <div class="text-on-surface text-sm">
     {service.containers.length}
   </div>
-
-  <!-- Hooks -->
-  <div class="text-on-surface text-sm">
-    {service.hookContainers.length}
-  </div>
 </div>

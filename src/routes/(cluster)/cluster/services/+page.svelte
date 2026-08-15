@@ -11,6 +11,18 @@
   const tree = $derived(toServiceTree(services.current?.items ?? []));
 </script>
 
+<div class="flex items-center justify-between gap-4 p-5">
+  <div>
+    <h1 class="text-on-surface text-lg font-medium">Services</h1>
+
+    <p class="text-on-surface-variant mt-0.5 text-sm">
+      {services.current?.items.length ?? 0}
+      {(services.current?.items.length ?? 0) === 1 ? "service" : "services"}
+    </p>
+  </div>
+
+  <Button onclick={() => services.refresh()}>Refresh</Button>
+</div>
 <Card variant="outlined" id="services-card">
   {#if services.loading}
     <div class="flex min-h-32 items-center justify-center">
@@ -21,39 +33,23 @@
       {services.error.message}
     </div>
   {:else}
-    <!-- toolbar -->
-    <div class="flex items-center justify-between gap-4 p-5">
-      <div>
-        <h1 class="text-on-surface text-lg font-medium">Services</h1>
-
-        <p class="text-on-surface-variant mt-0.5 text-sm">
-          {services.current?.items.length ?? 0}
-          {(services.current?.items.length ?? 0) === 1 ? "service" : "services"}
-        </p>
-      </div>
-
-      <Button onclick={() => services.refresh()}>Refresh</Button>
-    </div>
-
-    <Divider />
-
     <div class="overflow-x-auto">
       <!-- table header -->
       <div
         class="
           text-on-surface-variant
-          grid min-w-275
-          grid-cols-[minmax(260px,1.4fr)_130px_240px_110px_110px]
-          items-center gap-4
-          px-5 py-3
-          text-xs font-medium
+          bg-surface-container-high grid
+          min-w-275
+          grid-cols-[minmax(260px,1.4fr)_130px_240px_110px] items-center
+          gap-4 px-5
+          py-3 text-xs
+          font-medium
         "
       >
         <span>Service</span>
         <span>Mode</span>
         <span>Machines</span>
         <span>Containers</span>
-        <span>Hooks</span>
       </div>
 
       <Divider />
@@ -76,7 +72,8 @@
 </Card>
 
 <style>
-  #services-card :global(.m3-container) {
-    @apply p-0;
+  :global(#services-card.m3-container) {
+    padding: 0;
+    overflow-x: hidden;
   }
 </style>

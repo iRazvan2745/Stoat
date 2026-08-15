@@ -1,4 +1,5 @@
 <script lang="ts">
+  // oxlint-disable func-style
   import {
     Button,
     Card,
@@ -11,7 +12,6 @@
 
   const machines = getMachines();
 
-  // oxlint-disable-next-line func-style
   function stateClasses(state: string) {
     switch (state.toLowerCase()) {
       case "running":
@@ -34,7 +34,19 @@
   }
 </script>
 
-<Card variant="outlined" class="overflow-hidden">
+<div class="flex items-center justify-between gap-4 p-5">
+  <div>
+    <h1 class="text-on-surface text-lg font-medium">Machines</h1>
+
+    <p class="text-on-surface-variant mt-0.5 text-sm">
+      {machines.current?.items.length ?? 0}
+      {(machines.current?.items.length ?? 0) === 1 ? "machine" : "machines"}
+    </p>
+  </div>
+
+  <Button onclick={() => machines.refresh()}>Refresh</Button>
+</div>
+<Card variant="outlined" id="machines-card">
   {#if machines.loading}
     <div class="flex min-h-32 items-center justify-center">
       <LoadingIndicator aria-label="Loading machines" />
@@ -45,16 +57,13 @@
     </div>
   {:else}
     <div class="overflow-x-auto">
-      <div class="mb-4 flex w-full items-center justify-between">
-        <h1 class="text-lg">Machines</h1>
-        <Button onclick={() => getMachines().refresh()}>Refresh</Button>
-      </div>
-      <!-- tablle header -->
+      <!-- table header -->
       <div
         class="
-          text-on-surface-variant grid
+          text-on-surface-variant
+          bg-surface-container-high grid
           min-w-275
-          grid-cols-[minmax(180px,1.4fr)_150px_150px_240px_110px_150px_150px_110px] items-center
+          grid-cols-[minmax(240px,1.4fr)_150px_150px_240px_110px_150px_150px_110px] items-center
           gap-4 px-5
           py-3 text-xs
           font-medium
@@ -72,14 +81,15 @@
 
       <Divider />
 
+      <!-- table rows -->
       {#each machines.current?.items ?? [] as machine, index (machine.id)}
         <div
           class="
-            hover:bg-surface-container-low grid
-            min-w-275
-            grid-cols-[minmax(240px,1.4fr)_150px_150px_240px_110px_150px_150px_110px] items-center
-            gap-4 px-5
-            py-4
+            border-outline-variant
+            grid min-w-275
+            grid-cols-[minmax(240px,1.4fr)_150px_150px_240px_110px_150px_150px_110px]
+            items-center gap-4
+            border-b px-5 py-3
             transition-colors
           "
         >
@@ -87,7 +97,7 @@
           <div class="flex min-w-0 items-center gap-2">
             <div
               class={[
-                "inline-flex items-center rounded-full px-2.5 py-1",
+                "inline-flex items-center rounded-full p-1.5",
                 "text-xs font-medium capitalize",
                 stateClasses(machine.state),
               ]}
@@ -102,8 +112,8 @@
               </svg>
             </div>
 
-            <div>
-              <div class="text-on-surface truncate font-medium">
+            <div class="min-w-0">
+              <div class="text-on-surface truncate text-sm font-medium">
                 {machine.name}
               </div>
 
@@ -130,7 +140,7 @@
               ?.toLowerCase() === "debian"}
               <img src="/debian.svg" alt="debian" height="24" width="24" />
             {/if}
-            <div>
+            <div class="min-w-0">
               <div class="text-on-surface truncate text-sm">
                 {machine.osPrettyName ?? "—"}
               </div>
@@ -144,7 +154,7 @@
           </div>
 
           <!-- arch -->
-          <div class="text-on-surface text-sm">
+          <div class="text-on-surface truncate text-sm">
             {machine.arch ?? "—"}
           </div>
 
@@ -176,6 +186,19 @@
           <Divider />
         {/if}
       {/each}
+
+      {#if (machines.current?.items.length ?? 0) === 0}
+        <div class="text-on-surface-variant px-5 py-10 text-center text-sm">
+          No machines found.
+        </div>
+      {/if}
     </div>
   {/if}
 </Card>
+
+<style>
+  :global(#machines-card.m3-container) {
+    padding: 0;
+    overflow-x: hidden;
+  }
+</style>

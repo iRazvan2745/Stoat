@@ -247,7 +247,6 @@ export interface paths {
         trace?: never;
     };
 }
-export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         ConfigSpec: {
@@ -296,7 +295,6 @@ export interface components {
         };
         LogMetadata: {
             containerId?: string;
-            hook?: string;
             machineId?: string;
             machineName?: string;
             serviceId?: string;
@@ -352,7 +350,6 @@ export interface components {
         };
         Service: {
             containers: components["schemas"]["ServiceContainer"][];
-            hookContainers: components["schemas"]["ServiceContainer"][];
             id: string;
             mode: string;
             name: string;

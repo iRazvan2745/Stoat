@@ -1,5 +1,5 @@
 // oxlint-disable func-style
-import type { getServices } from "#lib/api/services.remote";
+import type { getServices } from "#lib/api/cluster/services.remote";
 
 export type Service = NonNullable<
   ReturnType<typeof getServices>["current"]
