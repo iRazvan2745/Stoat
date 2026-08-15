@@ -1,0 +1,66 @@
+diff --git a/src/runtime/client/remote-functions/form.svelte.js b/src/runtime/client/remote-functions/form.svelte.js
+index e2b7fb0944fe079a273bc280de0ae17882da1ae4..acc0b2b34d2f0a7369c87aed1e1dd239a50468e2 100644
+--- a/src/runtime/client/remote-functions/form.svelte.js
++++ b/src/runtime/client/remote-functions/form.svelte.js
+@@ -359,7 +359,7 @@ export function form(id) {
+ 		instance.method = 'POST';
+ 		instance.action = action;
+ 
+-		instance[createAttachmentKey()] = (/** @type {HTMLFormElement} */ form) => {
++		instance[createAttachmentKey()] = (form) => {
+ 			if (element) {
+ 				let message = `A form object can only be attached to a single \`<form>\` element`;
+ 				if (DEV && !key) {
+diff --git a/src/runtime/client/remote-functions/query/instance.svelte.js b/src/runtime/client/remote-functions/query/instance.svelte.js
+index af9520beab1288b01650c15776776c32d3cb4c86..1efa9e61e4ad4f624f11dda105c3d1710ee81f21 100644
+--- a/src/runtime/client/remote-functions/query/instance.svelte.js
++++ b/src/runtime/client/remote-functions/query/instance.svelte.js
+@@ -158,7 +158,7 @@ export class Query {
+ 	get catch() {
+ 		this.start();
+ 		this.#then;
+-		return (/** @type {any} */ reject) => {
++		return (reject) => {
+ 			return this.#then(undefined, reject);
+ 		};
+ 	}
+@@ -166,7 +166,7 @@ export class Query {
+ 	get finally() {
+ 		this.start();
+ 		this.#then;
+-		return (/** @type {any} */ fn) => {
++		return (fn) => {
+ 			return this.#then(
+ 				(value) => {
+ 					fn();
+diff --git a/src/runtime/client/remote-functions/query-live/instance.svelte.js b/src/runtime/client/remote-functions/query-live/instance.svelte.js
+index b8a563c0291eadb6e1244bb7e2160a08ce68ea42..ac294a1c6f6417e24827a599b719c5daf894c497 100644
+--- a/src/runtime/client/remote-functions/query-live/instance.svelte.js
++++ b/src/runtime/client/remote-functions/query-live/instance.svelte.js
+@@ -232,7 +232,7 @@ export class LiveQuery {
+ 		void this.#interrupt?.();
+ 	};
+ 
+-	#on_pageshow = (/** @type {PageTransitionEvent} */ e) => {
++	#on_pageshow = (e) => {
+ 		if (e.persisted) {
+ 			this.#on_online();
+ 		}
+@@ -299,7 +299,7 @@ export class LiveQuery {
+ 	get catch() {
+ 		this.#start();
+ 		this.#then;
+-		return (/** @type {any} */ reject) => {
++		return (reject) => {
+ 			return this.#then(undefined, reject);
+ 		};
+ 	}
+@@ -307,7 +307,7 @@ export class LiveQuery {
+ 	get finally() {
+ 		this.#start();
+ 		this.#then;
+-		return (/** @type {any} */ fn) => {
++		return (fn) => {
+ 			return this.#then(
+ 				(value) => {
+ 					fn();

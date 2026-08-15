@@ -1,0 +1,21 @@
+{
+  "extends": "./.svelte-kit/tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "#lib": ["./src/lib/index.ts"],
+      "#lib/assets/*": ["./src/lib/assets/*"],
+      "#lib/*": ["./src/lib/*"]
+    },
+    "rewriteRelativeImportExtensions": true,
+    "sourceMap": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true
+  },
+  "include": [
+    ".svelte-kit/ambient.d.ts",
+    ".svelte-kit/env.d.ts",
+    ".svelte-kit/non-ambient.d.ts",
+    "src",
+    "drizzle.config.ts"
+  ]
+}

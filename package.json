@@ -1,0 +1,65 @@
+{
+  "name": "stoat",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#lib": "./src/lib/index",
+    "#lib/assets/*": "./src/lib/assets/*",
+    "#lib/*": "./src/lib/*"
+  },
+  "scripts": {
+    "dev": "vp dev",
+    "build": "vp build",
+    "preview": "vp preview",
+    "prepare": "vp config && svelte-kit sync || echo ''",
+    "check": "ultracite check",
+    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "db:push": "drizzle-kit push",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "auth:schema": "auth generate --config src/lib/server/auth.ts --output src/lib/server/db/auth.schema.ts --yes",
+    "fix": "ultracite fix"
+  },
+  "dependencies": {
+    "evlog": "^2.26.0",
+    "nuqs-svelte": "^1.2.2",
+    "openapi-fetch": "^0.17.0",
+    "openapi-typescript-fetch": "^2.2.1"
+  },
+  "devDependencies": {
+    "@fontsource-variable/google-sans-flex": "^5.3.1",
+    "@ktibow/iconset-material-symbols": "^0.0.1764827375",
+    "@libsql/client": "^0.17.3",
+    "@sveltejs/adapter-auto": "latest",
+    "@sveltejs/kit": "latest",
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "@tailwindcss/vite": "^4.3.0",
+    "@types/node": "^24",
+    "auth": "^1.6.23",
+    "better-auth": "^1.6.23",
+    "drizzle-kit": "^0.31.10",
+    "drizzle-orm": "^0.45.2",
+    "lefthook": "^2.1.10",
+    "m3-svelte": "^7.2.0",
+    "openapi-typescript": "^7.13.0",
+    "oxfmt": "^0.63.0",
+    "oxlint": "^1.78.0",
+    "svelte": "^5.56.1",
+    "svelte-check": "^4.6.0",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^6.0.3",
+    "ultracite": "7.10.3",
+    "vite": "catalog:",
+    "vite-plugin-functions-mixins": "^0.4.1",
+    "vite-plus": "catalog:"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.21.0",
+      "onFail": "download"
+    }
+  }
+}

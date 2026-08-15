@@ -1,0 +1,5 @@
+pre-commit:
+  commands:
+    check:
+      run: vp staged
+      stage_fixed: true
