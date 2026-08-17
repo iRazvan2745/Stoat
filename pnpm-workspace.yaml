@@ -8,6 +8,7 @@ overrides:
   vite: "catalog:"
 patchedDependencies:
   "@sveltejs/kit@2.70.2": patches/@sveltejs__kit@2.70.2.patch
+  m3-svelte: patches/m3-svelte.patch
 peerDependencyRules:
   allowAny:
     - vite

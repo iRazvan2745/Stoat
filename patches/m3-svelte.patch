@@ -1,0 +1,646 @@
+diff --git a/package/containers/ExpressiveMenu.svelte b/package/containers/ExpressiveMenu.svelte
+new file mode 100755
+index 0000000000000000000000000000000000000000..267dd4429424c0dde753d973a9813070316ac12e
+--- /dev/null
++++ b/package/containers/ExpressiveMenu.svelte
+@@ -0,0 +1,188 @@
++<script lang="ts">
++  import { easeEmphasizedDecel } from "../misc/easing";
++  import type { Snippet } from "svelte";
++  import { fade, slide } from "svelte/transition";
++
++  let {
++    children,
++    vibrant = false,
++    open = true,
++    submenu = false,
++    anchored = false,
++    label,
++    x,
++    y,
++  }: {
++    children: Snippet;
++    vibrant?: boolean;
++    open?: boolean;
++    label?: string;
++    submenu?: boolean;
++    anchored?: boolean;
++    x?: "start" | "end";
++    y?: "down" | "up";
++  } = $props();
++
++  let focused = $state<boolean>();
++
++  // support for nested submenus
++  const getParents = (node: HTMLDivElement) => {
++    const parent = node.parentElement?.closest(".m3-container.expressive-menu") as HTMLDivElement;
++    const parents: HTMLDivElement[] = [];
++
++    if (parent?.contains(node)) {
++      parents.push(parent);
++      parents.push(...getParents(parent as HTMLDivElement));
++    }
++
++    return parents;
++  };
++
++  // hacky but it works
++  const focusEffect = (node: HTMLDivElement) => {
++    const parents = getParents(node);
++
++    const mouseEnter = () => (focused = false);
++    const mouseLeave = () => {
++      focused = true;
++
++      for (const parent of parents) {
++        if (parent.matches(":hover"))
++          parent?.dispatchEvent(
++            new MouseEvent("mouseenter", {
++              relatedTarget: node,
++            }),
++          );
++      }
++    };
++
++    node.addEventListener("mouseleave", mouseLeave);
++    node.addEventListener("mouseenter", mouseEnter);
++
++    for (const parent of parents) parent?.addEventListener("mouseenter", mouseEnter);
++
++    return {
++      destroy: () => {
++        node.removeEventListener("mouseleave", mouseLeave);
++        node.removeEventListener("mouseenter", mouseEnter);
++
++        for (const parent of parents) parent?.removeEventListener("mouseenter", mouseEnter);
++      },
++    };
++  };
++</script>
++
++{#if open}
++  <div
++    class="m3-container expressive-menu{x ? ' anchor-' + x : ''}{y ? ' anchor-' + y : ''}"
++    class:vibrant
++    class:focused
++    class:submenu
++    class:anchored
++    in:slide={{
++      easing: easeEmphasizedDecel,
++      axis: "y",
++      duration: 200,
++    }}
++    out:fade={{
++      duration: 100,
++    }}
++    use:focusEffect
++  >
++    {#if label}
++      <span class="label">{label}</span>
++    {/if}
++
++    <div>
++      {@render children()}
++    </div>
++  </div>
++{/if}
++
++<style>
++  .m3-container {
++    --m3-menuitem-text: var(--m3c-on-surface);
++    --m3-menuitem-icon: var(--m3c-on-surface-variant);
++    --m3-menuitem-selected: var(--m3c-tertiary-container-subtle);
++    --m3-menuitem-on-selected: var(--m3c-on-tertiary-container-subtle);
++
++    display: flex;
++    flex-direction: column;
++    padding: 4px;
++    background-color: var(--m3c-surface-container-low);
++    border-radius: var(--m3-shape-small);
++    z-index: 2;
++    box-shadow: var(--m3-elevation-3);
++
++    overflow: hidden auto;
++    scrollbar-width: thin;
++    scroll-behavior: smooth;
++    scrollbar-color: var(--m3-menuitem-icon) transparent;
++    transition: border-radius var(--m3-easing-fast-spatial);
++  }
++
++  .m3-container.focused:not(:has(.m3-container.expressive-menu.focused)):is(:has(:global(.submenu)), .submenu),
++  .m3-container:not(:has(:global(.m3-container.expressive-menu:hover))):is(:has(:global(.submenu)), .submenu):hover,
++  :global(:not(.m3-container.expressive-menu)) .m3-container:not(.submenu) {
++    border-radius: var(--m3-shape-large);
++  }
++
++  .m3-container > div {
++    min-width: 156px;
++    width: auto;
++    display: flex;
++    gap: 4px;
++    flex-direction: column;
++  }
++
++  .m3-container.anchored,
++  .m3-container.submenu {
++    position: fixed;
++    position-anchor: --m3-menu-anchor;
++  }
++
++  .m3-container.submenu {
++    left: anchor(end);
++    top: anchor(start);
++  }
++
++  .m3-container.anchor-up {
++    bottom: anchor(start);
++  }
++
++  .m3-container.anchor-down {
++    top: anchor(end);
++  }
++
++  .m3-container.anchor-end {
++    right: anchor(end);
++  }
++
++  .m3-container.anchor-start {
++    left: anchor(start);
++  }
++
++  .m3-container.vibrant,
++  .m3-container.vibrant :global(.m3-container.expressive-menu) {
++    --m3-menuitem-background: light-dark(
++      var(--m3c-tertiary-container),
++      var(--m3c-tertiary-container-subtle)
++    );
++    --m3-menuitem-text: light-dark(
++      var(--m3c-on-tertiary-container),
++      var(--m3c-on-tertiary-container-subtle)
++    );
++    --m3-menuitem-icon: var(--m3-menuitem-text);
++    --m3-menuitem-selected: var(--m3-menuitem-text);
++    --m3-menuitem-on-selected: var(--m3-menuitem-background);
++
++    background-color: var(--m3c-tertiary-container-subtle);
++  }
++
++  .label {
++    @apply --m3-label-large;
++    color: var(--m3-menuitem-icon);
++    font-weight: 500;
++    padding: 8px 12px 8px;
++  }
++</style>
+diff --git a/package/containers/ExpressiveMenu.svelte.d.ts b/package/containers/ExpressiveMenu.svelte.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..9a35ab4b8fc798cb0f2b521a2c597570c796167b
+--- /dev/null
++++ b/package/containers/ExpressiveMenu.svelte.d.ts
+@@ -0,0 +1,14 @@
++import type { Snippet } from "svelte";
++type $$ComponentProps = {
++    children: Snippet;
++    vibrant?: boolean;
++    open?: boolean;
++    label?: string;
++    submenu?: boolean;
++    anchored?: boolean;
++    x?: "start" | "end";
++    y?: "down" | "up";
++};
++declare const ExpressiveMenu: import("svelte").Component<$$ComponentProps, {}, "">;
++type ExpressiveMenu = ReturnType<typeof ExpressiveMenu>;
++export default ExpressiveMenu;
+diff --git a/package/containers/ExpressiveMenuGroup.svelte b/package/containers/ExpressiveMenuGroup.svelte
+new file mode 100755
+index 0000000000000000000000000000000000000000..7a388d90ee07a46201854e8f38474386752b8db5
+--- /dev/null
++++ b/package/containers/ExpressiveMenuGroup.svelte
+@@ -0,0 +1,36 @@
++<script lang="ts">
++  import type { Snippet } from "svelte";
++
++  let {
++    children,
++  }: {
++    children: Snippet;
++  } = $props();
++</script>
++
++<div class="menu-group">
++  {@render children()}
++</div>
++
++<style>
++  .menu-group {
++    display: flex;
++    flex-direction: column;
++    gap: 2px;
++  }
++
++  .menu-group > :global(.m3-container.expressive-menu) {
++    border-radius: var(--m3-shape-small) !important;
++    width: auto;
++  }
++
++  .menu-group > :global(.m3-container.expressive-menu):first-child {
++    border-top-left-radius: var(--m3-shape-large) !important;
++    border-top-right-radius: var(--m3-shape-large) !important;
++  }
++
++  .menu-group > :global(.m3-container.expressive-menu):last-child {
++    border-bottom-left-radius: var(--m3-shape-large) !important;
++    border-bottom-right-radius: var(--m3-shape-large) !important;
++  }
++</style>
+diff --git a/package/containers/ExpressiveMenuGroup.svelte.d.ts b/package/containers/ExpressiveMenuGroup.svelte.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..45a298e2cbf6a93899717d3f5a924b2d7d9abc84
+--- /dev/null
++++ b/package/containers/ExpressiveMenuGroup.svelte.d.ts
+@@ -0,0 +1,7 @@
++import type { Snippet } from "svelte";
++type $$ComponentProps = {
++    children: Snippet;
++};
++declare const ExpressiveMenuGroup: import("svelte").Component<$$ComponentProps, {}, "">;
++type ExpressiveMenuGroup = ReturnType<typeof ExpressiveMenuGroup>;
++export default ExpressiveMenuGroup;
+diff --git a/package/containers/ExpressiveMenuItem.svelte b/package/containers/ExpressiveMenuItem.svelte
+new file mode 100755
+index 0000000000000000000000000000000000000000..e2ae9a54c268817dd9df98327fccad21febb128a
+--- /dev/null
++++ b/package/containers/ExpressiveMenuItem.svelte
+@@ -0,0 +1,211 @@
++<script lang="ts">
++  import type { Snippet } from "svelte";
++  import type { IconifyIcon } from "@iconify/types";
++
++  import iconArrowRight from "@ktibow/iconset-material-symbols/arrow-right";
++  import { easeEmphasized } from "../misc/easing";
++  import { slide } from "svelte/transition";
++  import Icon from "../misc/Icon.svelte";
++
++  let {
++    leadingIcon,
++    trailingIcon,
++    disabled = false,
++    selected = false,
++    label,
++    details,
++    submenuOpen = $bindable(false),
++    badge,
++    submenu,
++    trailing,
++    onclick,
++  }: {
++    leadingIcon?: IconifyIcon;
++    trailingIcon?: IconifyIcon;
++    disabled?: boolean;
++    selected?: boolean;
++    label: string;
++    details?: string;
++    submenuOpen?: boolean;
++    badge?: Snippet;
++    submenu?: Snippet<[boolean]>;
++    trailing?: Snippet;
++    onclick?: (e: MouseEvent) => unknown;
++  } = $props();
++
++  const autoclose = (node: HTMLDivElement) => {
++    const close = (e: MouseEvent) => {
++      if (!node.contains(e.target as HTMLElement)) submenuOpen = false;
++    };
++
++    window.addEventListener("click", close);
++
++    return {
++      destroy() {
++        window.removeEventListener("click", close);
++      },
++    };
++  };
++</script>
++
++<div class="m3-container" use:autoclose>
++  <button
++    type="button"
++    class="item m3-layer"
++    class:selected
++    {disabled}
++    onclick={(e: MouseEvent) => {
++      onclick?.(e);
++
++      if (submenu) {
++        submenuOpen = !submenuOpen;
++        e.stopPropagation();
++      }
++    }}
++  >
++    {#if leadingIcon}
++      <span
++        class="icon"
++        transition:slide={{
++          easing: easeEmphasized,
++          axis: "x",
++          duration: 200,
++        }}
++      >
++        <Icon icon={leadingIcon} size={20} />
++      </span>
++    {/if}
++
++    <div class="label">
++      <span>{label}</span>
++
++      {#if details}
++        <span>{details}</span>
++      {/if}
++    </div>
++
++    {#if badge}
++      {@render badge()}
++    {/if}
++
++    {#if trailing && !submenu}
++      <div class="trailing">
++        {@render trailing()}
++      </div>
++    {/if}
++
++    {#if trailingIcon || submenu}
++      <span
++        class="icon"
++        transition:slide={{
++          easing: easeEmphasized,
++          axis: "x",
++          duration: 200,
++        }}
++      >
++        <Icon icon={submenu ? iconArrowRight : (trailingIcon as IconifyIcon)} size={20} />
++      </span>
++    {/if}
++  </button>
++
++  {#if submenu}
++    <div class="menu">
++      {@render submenu(submenuOpen)}
++    </div>
++  {/if}
++</div>
++
++<style>
++  .m3-container {
++    anchor-scope: --m3-menu-anchor;
++    anchor-name: --m3-menu-anchor;
++  }
++
++  .item {
++    @apply --m3-label-large;
++    @apply --m3-focus-inward;
++    border-radius: var(--m3-shape-extra-small);
++    display: flex;
++    align-items: center;
++    justify-content: center;
++    height: --m3-density(3rem);
++    padding: 0 12px;
++    gap: 8px;
++    width: 100%;
++    white-space: nowrap;
++
++    border: none;
++
++    background-color: transparent;
++    color: var(--m3-menuitem-text);
++
++    cursor: pointer;
++    user-select: none;
++    transition:
++      border-radius var(--m3-easing-fast-spatial),
++      background-color var(--m3-easing-fast),
++      color var(--m3-easing-fast);
++  }
++
++  .trailing {
++    color: var(--m3-menuitem-icon);
++  }
++
++  .item.selected {
++    background-color: var(--m3-menuitem-selected);
++    color: var(--m3-menuitem-on-selected);
++    border-radius: var(--m3-shape-medium);
++  }
++
++  .item.selected .icon {
++    color: var(--m3-menuitem-on-selected);
++  }
++
++  .m3-container:first-child > .item {
++    border-top-left-radius: var(--m3-shape-medium);
++    border-top-right-radius: var(--m3-shape-medium);
++  }
++
++  .m3-container:last-child > .item {
++    border-bottom-left-radius: var(--m3-shape-medium);
++    border-bottom-right-radius: var(--m3-shape-medium);
++  }
++
++  .label {
++    flex: auto;
++    display: flex;
++    flex-direction: column;
++    text-align: left;
++  }
++
++  .label > span:first-child:has(+ span:nth-child(2)) {
++    margin-bottom: -1px;
++  }
++
++  .label > span:nth-child(2) {
++    @apply --m3-label-medium;
++    color: var(--m3-menuitem-icon);
++    margin-top: -1px;
++  }
++
++  .item.selected .label > span:nth-child(2) {
++    color: var(--m3-menuitem-on-selected);
++  }
++
++  .icon {
++    width: 20px;
++    height: 20px;
++  }
++  .icon {
++    color: var(--m3-menuitem-icon);
++  }
++
++  .item:disabled {
++    color: --translucent(var(--m3-menuitem-text), 0.38);
++    cursor: auto;
++  }
++
++  .item:disabled > .icon > :global(svg) {
++    color: --translucent(var(--m3-menuitem-text), 0.38);
++  }
++</style>
+diff --git a/package/containers/ExpressiveMenuItem.svelte.d.ts b/package/containers/ExpressiveMenuItem.svelte.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..4d6ea56d4c65887df5e44c2e94570764086383f3
+--- /dev/null
++++ b/package/containers/ExpressiveMenuItem.svelte.d.ts
+@@ -0,0 +1,18 @@
++import type { Snippet } from "svelte";
++import type { IconifyIcon } from "@iconify/types";
++type $$ComponentProps = {
++    leadingIcon?: IconifyIcon;
++    trailingIcon?: IconifyIcon;
++    disabled?: boolean;
++    selected?: boolean;
++    label: string;
++    details?: string;
++    submenuOpen?: boolean;
++    badge?: Snippet;
++    submenu?: Snippet<[boolean]>;
++    trailing?: Snippet;
++    onclick?: (e: MouseEvent) => unknown;
++};
++declare const ExpressiveMenuItem: import("svelte").Component<$$ComponentProps, {}, "">;
++type ExpressiveMenuItem = ReturnType<typeof ExpressiveMenuItem>;
++export default ExpressiveMenuItem;
+diff --git a/package/containers/Menu.svelte b/package/containers/Menu.svelte
+index 7b5bc63c0d22fba6574ab0845881bb56e74a7d6b..fa625dd9811891319c7a969fb8e4e6acda876837 100644
+--- a/package/containers/Menu.svelte
++++ b/package/containers/Menu.svelte
+@@ -1,12 +1,26 @@
+ <script lang="ts">
+   import type { Snippet } from "svelte";
+ 
+-  let { children }: { children: Snippet } = $props();
++  let {
++    children,
++    anchored,
++    open = true,
++    x,
++    y,
++  }: {
++    children: Snippet;
++    anchored?: boolean;
++    open?: boolean;
++    x?: "start" | "end";
++    y?: "down" | "up";
++  } = $props();
+ </script>
+ 
+-<div class="m3-container">
+-  {@render children()}
+-</div>
++{#if open}
++  <div class="m3-container{x ? ' anchor-' + x : ''}{y ? ' anchor-' + y : ''}" class:anchored>
++    {@render children()}
++  </div>
++{/if}
+ 
+ <style>
+   @layer tokens {
+@@ -26,4 +40,25 @@
+     z-index: 2;
+     box-shadow: var(--m3-elevation-2);
+   }
++
++  .m3-container.anchored {
++    position: fixed;
++    position-anchor: --m3-menu-anchor;
++  }
++
++  .m3-container.anchor-up {
++    bottom: anchor(start);
++  }
++
++  .m3-container.anchor-down {
++    top: anchor(end);
++  }
++
++  .m3-container.anchor-end {
++    right: anchor(end);
++  }
++
++  .m3-container.anchor-start {
++    left: anchor(start);
++  }
+ </style>
+diff --git a/package/containers/Menu.svelte.d.ts b/package/containers/Menu.svelte.d.ts
+index 086d8069494f222417b4bd1ef101b682dd9f9d71..e97479b3bd0b2123884c3a0e5e52644bca5cb74c 100644
+--- a/package/containers/Menu.svelte.d.ts
++++ b/package/containers/Menu.svelte.d.ts
+@@ -1,6 +1,10 @@
+ import type { Snippet } from "svelte";
+ type $$ComponentProps = {
+     children: Snippet;
++    anchored?: boolean;
++    open?: boolean;
++    x?: "start" | "end";
++    y?: "down" | "up";
+ };
+ declare const Menu: import("svelte").Component<$$ComponentProps, {}, "">;
+ type Menu = ReturnType<typeof Menu>;
+diff --git a/package/containers/MenuDivider.svelte b/package/containers/MenuDivider.svelte
+new file mode 100755
+index 0000000000000000000000000000000000000000..ec6ca9c6ab3c8bd765f9d19cfba78bb193f21409
+--- /dev/null
++++ b/package/containers/MenuDivider.svelte
+@@ -0,0 +1,10 @@
++<span></span>
++
++<style>
++  span {
++    height: 2px;
++    margin: 2px 8px;
++    background: var(--m3-menuitem-text);
++    opacity: 0.2;
++  }
++</style>
+diff --git a/package/containers/MenuDivider.svelte.d.ts b/package/containers/MenuDivider.svelte.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..9c076896b0b631ef3dd4b766fa95af8a9e9de1f0
+--- /dev/null
++++ b/package/containers/MenuDivider.svelte.d.ts
+@@ -0,0 +1,4 @@
++type $$ComponentProps = {};
++declare const MenuDivider: import("svelte").Component<$$ComponentProps, {}, "">;
++type MenuDivider = ReturnType<typeof MenuDivider>;
++export default MenuDivider;
+diff --git a/package/index.d.ts b/package/index.d.ts
+index 78b8a6de3e6fd012c1eeae984b7643b8baca7ac8..89d74a1db8734bb41f10b6aeac5496c3be5dd7f0 100644
+--- a/package/index.d.ts
++++ b/package/index.d.ts
+@@ -13,8 +13,12 @@ export { default as SplitButton } from "./buttons/SplitButton.svelte";
+ export { default as BottomSheet } from "./containers/BottomSheet.svelte";
+ export { default as Card } from "./containers/Card.svelte";
+ export { default as Dialog } from "./containers/Dialog.svelte";
++export { default as ExpressiveMenu } from "./containers/ExpressiveMenu.svelte";
++export { default as ExpressiveMenuGroup } from "./containers/ExpressiveMenuGroup.svelte";
++export { default as ExpressiveMenuItem } from "./containers/ExpressiveMenuItem.svelte";
+ export { default as ListItem } from "./containers/ListItem.svelte";
+ export { default as Menu } from "./containers/Menu.svelte";
++export { default as MenuDivider } from "./containers/MenuDivider.svelte";
+ export { default as MenuItem } from "./containers/MenuItem.svelte";
+ export { default as Snackbar, snackbar } from "./containers/Snackbar.svelte";
+ export { default as SnackbarItem } from "./containers/SnackbarItem.svelte";
+diff --git a/package/index.js b/package/index.js
+index 78b8a6de3e6fd012c1eeae984b7643b8baca7ac8..89d74a1db8734bb41f10b6aeac5496c3be5dd7f0 100644
+--- a/package/index.js
++++ b/package/index.js
+@@ -13,8 +13,12 @@ export { default as SplitButton } from "./buttons/SplitButton.svelte";
+ export { default as BottomSheet } from "./containers/BottomSheet.svelte";
+ export { default as Card } from "./containers/Card.svelte";
+ export { default as Dialog } from "./containers/Dialog.svelte";
++export { default as ExpressiveMenu } from "./containers/ExpressiveMenu.svelte";
++export { default as ExpressiveMenuGroup } from "./containers/ExpressiveMenuGroup.svelte";
++export { default as ExpressiveMenuItem } from "./containers/ExpressiveMenuItem.svelte";
+ export { default as ListItem } from "./containers/ListItem.svelte";
+ export { default as Menu } from "./containers/Menu.svelte";
++export { default as MenuDivider } from "./containers/MenuDivider.svelte";
+ export { default as MenuItem } from "./containers/MenuItem.svelte";
+ export { default as Snackbar, snackbar } from "./containers/Snackbar.svelte";
+ export { default as SnackbarItem } from "./containers/SnackbarItem.svelte";

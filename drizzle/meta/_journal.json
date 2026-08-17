@@ -1,19 +1,40 @@
 {
   "version": "7",
-  "dialect": "sqlite",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
-      "version": "6",
-      "when": 1786827683403,
-      "tag": "0000_free_harry_osborn",
+      "version": "7",
+      "when": 1786887702580,
+      "tag": "0000_wooden_senator_kelly",
       "breakpoints": true
     },
     {
       "idx": 1,
-      "version": "6",
-      "when": 1786828297549,
-      "tag": "0001_wealthy_leper_queen",
+      "version": "7",
+      "when": 1786937636930,
+      "tag": "0001_puzzling_titanium_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786944303174,
+      "tag": "0002_curious_the_call",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786944358539,
+      "tag": "0003_overjoyed_shocker",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786944874054,
+      "tag": "0004_flowery_frightful_four",
       "breakpoints": true
     }
   ]

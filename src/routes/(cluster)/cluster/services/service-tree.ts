@@ -1,9 +1,7 @@
 // oxlint-disable func-style
 import type { getServices } from "#lib/api/cluster/services.remote";
 
-export type Service = NonNullable<
-  ReturnType<typeof getServices>["current"]
->["items"][number];
+export type Service = NonNullable<ReturnType<typeof getServices>["current"]>["items"][number];
 
 export interface ServiceTreeLeaf {
   type: "service";
@@ -85,10 +83,7 @@ export function toServiceTree(services: Service[]): ServiceTreeNode[] {
          * forgejo            -> forgejo
          * forgejo-runner-dind-1 -> runner-dind-1
          */
-        name:
-          service.name === groupName
-            ? service.name
-            : service.name.slice(groupName.length + 1),
+        name: service.name === groupName ? service.name : service.name.slice(groupName.length + 1),
 
         service,
         type: "service",

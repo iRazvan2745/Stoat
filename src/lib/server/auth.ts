@@ -8,7 +8,7 @@ import { db } from "#lib/server/db";
 
 export const auth = betterAuth({
   baseURL: ORIGIN,
-  database: drizzleAdapter(db, { provider: "sqlite" }),
+  database: drizzleAdapter(db, { provider: "pg" }),
   emailAndPassword: { enabled: true },
   plugins: [
     // Keep the cookie plugin last in the array.

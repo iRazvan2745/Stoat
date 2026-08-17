@@ -8,7 +8,7 @@ import { createEvlogHooks } from "evlog/sveltekit";
 import { auth } from "#lib/server/auth";
 
 initLogger({
-  env: { service: "stoat" },
+  env: { service: "app" },
   redact: true,
 });
 

@@ -1,0 +1,1 @@
+ALTER TABLE "workspace" ALTER COLUMN "slug" SET NOT NULL;

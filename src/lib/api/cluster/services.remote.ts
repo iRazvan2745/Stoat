@@ -3,9 +3,7 @@ import { query } from "$app/server";
 import { ucClient } from "#lib/api/client";
 
 const getErrorMessage = (error: unknown): string =>
-  error instanceof Error && error.message
-    ? error.message
-    : "Unable to load machines.";
+  error instanceof Error && error.message ? error.message : "Unable to load machines.";
 
 export const getServices = query(async () => {
   try {

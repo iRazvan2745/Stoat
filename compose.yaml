@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: stoat
+      POSTGRES_PASSWORD: stoat
+      POSTGRES_USER: stoat
+    healthcheck:
+      interval: 5s
+      retries: 5
+      test: ["CMD-SHELL", "pg_isready -U stoat"]
+      timeout: 3s
+    ports:
+      # Host-side tooling (pnpm dev, drizzle-kit) reaches the DB here.
+      # Inside the network, the app container uses the db service name instead.
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+
+volumes:
+  pgdata:

@@ -3,9 +3,7 @@ import { query } from "$app/server";
 import { ucClient } from "#lib/api/client";
 
 const getErrorMessage = (error: unknown): string =>
-  error instanceof Error && error.message
-    ? error.message
-    : "Unable to load volumes.";
+  error instanceof Error && error.message ? error.message : "Unable to load volumes.";
 
 export const getVolumes = query(async () => {
   try {

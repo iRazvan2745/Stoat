@@ -6,6 +6,24 @@ import { defineConfig, lazyPlugins } from "vite-plus";
 
 export default defineConfig({
   fmt: { ignorePatterns: ["**/schema.d.ts"] },
+  optimizeDeps: {
+    exclude: [
+      "@codemirror/autocomplete",
+      "@codemirror/commands",
+      "@codemirror/lang-yaml",
+      "@codemirror/language",
+      "@codemirror/lint",
+      "@codemirror/search",
+      "@codemirror/state",
+      "@codemirror/view",
+      "@lezer/common",
+      "@lezer/highlight",
+      "@lezer/lr",
+      "@lezer/yaml",
+      "codemirror",
+      "svelte-codemirror-editor",
+    ],
+  },
   lint: {
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     options: { typeAware: true, typeCheck: true },
