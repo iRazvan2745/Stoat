@@ -2,16 +2,16 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { query } from "$app/server";
+import { command, query } from "$app/server";
 import { eq } from "drizzle-orm";
 import * as v from "valibot";
-import YAML, { isMap, isScalar } from "yaml";
 
-import { createDataSourceFolder, getDataDir } from "#lib/server/data-source";
+import { createDataSourceFolder } from "#lib/server/data-source";
 import { dataSource, services, workspace } from "#lib/server/db/schema";
 import { uniqueSlug } from "#lib/server/slugs";
 
 import { db } from "../server/db";
+import { deployService as runDeployment } from "./deployments";
 
 export const getServicesInWorkspace = query(
   v.string(),
@@ -80,7 +80,7 @@ const UpdateComposeInput = v.object({
   id: v.string(),
 });
 
-export const updateCompose = query(UpdateComposeInput, async ({ compose, id }) => {
+export const updateCompose = command(UpdateComposeInput, async ({ compose, id }) => {
   const op = await db
     .update(services)
     .set({ value: compose })
@@ -124,63 +124,4 @@ export const getService = query(v.string(), async (id) => {
   return op;
 });
 
-async function getDatasourceFromWorkspace(id: string) {
-  const [wrk] = await db.select().from(workspace).where(eq(workspace.id, id));
-  if (!wrk) {
-    throw new Error("workspace not found");
-  }
-  const [ds] = await db.select().from(dataSource).where(eq(dataSource.id, wrk.dataSourceId));
-
-  if (!ds) {
-    throw new Error("data source not found");
-  }
-
-  return ds;
-}
-
-async function getWorkspace(id: string) {
-  const [wrk] = await db.select().from(workspace).where(eq(workspace.id, id));
-  if (!wrk) {
-    throw new Error("workspace not found");
-  }
-  return wrk;
-}
-
-export const deployService = query(v.string(), async (id) => {
-  const [svc] = await db.select().from(services).where(eq(services.id, id));
-
-  if (!svc?.value) {
-    throw new Error("the compose is invalid");
-  }
-
-  const doc = YAML.parseDocument(svc.value);
-
-  if (doc.errors.length > 0) {
-    throw new Error(`Invalid compose YAML`);
-  }
-
-  const serviceMap = doc.get("services", true);
-
-  if (!isMap(serviceMap)) {
-    throw new Error('Compose must contain a "services" map');
-  }
-
-  for (const pair of serviceMap.items) {
-    if (!isScalar(pair.key) || typeof pair.key.value !== "string") {
-      throw new Error("Invalid service name");
-    }
-
-    pair.key.value = `${svc.slug}-${pair.key.value}`;
-  }
-
-  const compose = doc.toString();
-
-  const wrk = await getWorkspace(svc.workspaceId);
-  const ds = await getDatasourceFromWorkspace(svc.workspaceId);
-
-  const serviceDir = path.join(getDataDir(), ds.id, wrk.slug, svc.slug ?? svc.id);
-
-  await fs.mkdir(serviceDir, { recursive: true });
-
-  await fs.writeFile(path.join(serviceDir, "compose.yaml"), compose, "utf-8");
-});
+export const deployService = command(v.string(), async (id) => await runDeployment(id));

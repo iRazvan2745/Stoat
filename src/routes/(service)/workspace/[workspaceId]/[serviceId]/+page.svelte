@@ -30,6 +30,28 @@
     let actionsMenuOpen = $state(false);
     let deleteDialogOpen = $state(false);
     let deleting = $state(false);
+    let deploying = $state(false);
+
+    const deploy = async (): Promise<void> => {
+        if (!svc || deploying) {
+            return;
+        }
+
+        deploying = true;
+
+        try {
+            await deployService(svc.id);
+            snackbar("Deployment queued");
+        } catch (error) {
+            snackbar(
+                error instanceof Error
+                    ? error.message
+                    : "Unable to deploy service"
+            );
+        } finally {
+            deploying = false;
+        }
+    };
 
     const remove = async (): Promise<void> => {
         if (!svc) {
@@ -55,7 +77,7 @@
 
 <main class="space-y-4 p-4">
     {#if svc}
-        <Card variant="outlined">
+        <Card variant="elevated">
             <div class="flex items-center justify-between">
                 <!-- Service -->
                 <div class="flex min-w-0 items-center gap-3">
@@ -105,8 +127,8 @@
                 <div class="flex shrink-0 items-center gap-1">
                     <Button
                         aria-label="Edit service"
-                        onclick={async () => await deployService(svc.id)}
-                        >Deploy</Button
+                        disabled={deploying}
+                        onclick={deploy}>Deploy</Button
                     >
 
                     <div class="relative">

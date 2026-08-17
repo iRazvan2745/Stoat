@@ -6,6 +6,11 @@ import { defineConfig, lazyPlugins } from "vite-plus";
 
 export default defineConfig({
   fmt: { ignorePatterns: ["**/schema.d.ts"] },
+  lint: {
+    jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
+    options: { typeAware: true, typeCheck: true },
+    rules: { "vite-plus/prefer-vite-plus-imports": "error" },
+  },
   optimizeDeps: {
     exclude: [
       "@codemirror/autocomplete",
@@ -23,11 +28,6 @@ export default defineConfig({
       "codemirror",
       "svelte-codemirror-editor",
     ],
-  },
-  lint: {
-    jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
-    options: { typeAware: true, typeCheck: true },
-    rules: { "vite-plus/prefer-vite-plus-imports": "error" },
   },
   plugins: lazyPlugins(() => [
     tailwindcss(),
@@ -54,6 +54,11 @@ export default defineConfig({
       name: "stoat-m3-css",
     },
   ]),
+  server: {
+    watch: {
+      ignored: ["**/data/**", "**/infra/**"],
+    },
+  },
   staged: {
     "*": "vp check --fix",
   },

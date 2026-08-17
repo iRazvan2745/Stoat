@@ -31,6 +31,7 @@
     "nuqs-svelte": "^1.2.2",
     "openapi-fetch": "^0.17.0",
     "openapi-typescript-fetch": "^2.2.1",
+    "pg-boss": "^12.27.0",
     "postgres": "^3.4.9",
     "simple-git": "^3.36.0",
     "svelte-codemirror-editor": "^2.1.0",

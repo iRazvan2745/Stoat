@@ -93,7 +93,7 @@
     };
 </script>
 
-<Card variant="outlined">
+<Card variant="elevated">
     <p class="text-on-surface-variant mb-2 text-sm">Compose YAML</p>
 
     <div
