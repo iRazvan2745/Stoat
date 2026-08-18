@@ -1,14 +1,26 @@
 <script lang="ts">
     // oxlint-disable func-style default-case
     import deploymentsIcon from "@ktibow/iconset-material-symbols/deployed-code-outline";
-    import { Card, Icon } from "m3-svelte";
+    import { Button, Card, Dialog, Icon, LoadingIndicator } from "m3-svelte";
+    import { parseAsString, useQueryState } from "nuqs-svelte";
 
-    import { getDeployments } from "#lib/api/deployments.remote";
+    import {
+        getDeploymentLogs,
+        getDeployments,
+    } from "#lib/api/deployments.remote";
 
     let { params } = $props();
 
     // svelte-ignore state_referenced_locally
-    const deployments = await getDeployments(params.serviceId);
+    const deploymentsQuery = getDeployments(params.serviceId);
+    const deployments = $derived(deploymentsQuery.current ?? []);
+
+    const view = useQueryState("view", parseAsString.withDefault(""));
+    const deploymentLogsQuery = $derived.by(() => {
+        const deploymentId = view.current;
+
+        return deploymentId ? getDeploymentLogs(deploymentId) : undefined;
+    });
 
     type Deployment = (typeof deployments)[number];
     type DeploymentStatus = "pending" | "queued" | "started" | "finished";
@@ -208,24 +220,14 @@
 </script>
 
 <div class="mx-auto w-full max-w-6xl">
-    <header
-        class="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"
-    >
+    <header class="mb-4 flex items-center justify-between gap-4">
         <div>
-            <h1
-                class="text-on-surface text-[32px] leading-10 font-medium tracking-[-0.02em]"
-            >
-                Deployments
-            </h1>
-
-            <p class="text-on-surface-variant mt-1 text-sm">
-                Build and deployment history for this service
-            </p>
+            <h1 class="text-on-surface text-[28px]">Deployments</h1>
         </div>
 
         {#if deployments.length > 0}
             <div
-                class="bg-secondary-container text-on-secondary-container w-fit rounded-full px-3.5 py-1.5 text-sm font-medium"
+                class="bg-secondary-container text-on-secondary-container shrink-0 rounded-full px-3 py-1 text-xs font-medium"
             >
                 {deployments.length} total
             </div>
@@ -233,16 +235,22 @@
     </header>
 
     <main>
-        {#if deployments.length === 0}
-            <Card variant="filled">
-                <div class="px-6 py-14 text-center">
+        {#if deploymentsQuery.loading}
+            <Card variant="elevated">
+                <div class="flex min-h-32 items-center justify-center">
+                    <LoadingIndicator aria-label="Loading deployments" />
+                </div>
+            </Card>
+        {:else if deployments.length === 0}
+            <Card variant="elevated">
+                <div class="px-6 py-10 text-center">
                     <div
-                        class="bg-secondary-container text-on-secondary-container mx-auto mb-4 flex size-14 items-center justify-center rounded-[20px]"
+                        class="bg-secondary-container text-on-secondary-container mx-auto mb-3 flex size-12 items-center justify-center rounded-xl"
                     >
-                        <Icon icon={deploymentsIcon} size={28} />
+                        <Icon icon={deploymentsIcon} size={36} />
                     </div>
 
-                    <p class="text-on-surface text-base font-medium">
+                    <p class="text-on-surface text-sm font-medium">
                         No deployments yet
                     </p>
 
@@ -256,124 +264,100 @@
             </Card>
         {:else}
             <section
-                class="bg-surface-container-low overflow-hidden rounded-[28px]"
+                class="bg-surface-container-low overflow-hidden rounded-[20px]"
                 aria-label="Deployment history"
             >
                 {#each deployments as deployment (deployment.id)}
                     {@const status = getStatus(deployment)}
-                    {@const statusIndex = getStatusIndex(status)}
-                    {@const timeline = getTimeline(deployment)}
                     {@const duration = getDuration(deployment)}
                     {@const statusClasses = getStatusClasses(status)}
                     {@const iconClasses = getIconClasses(status)}
 
                     <article
-                        class="border-outline-variant/40 border-b px-5 py-5 last:border-b-0 sm:px-6"
+                        class="border-outline-variant/40 flex items-center justify-between border-b px-4 py-3 last:border-b-0 sm:px-5"
                     >
-                        <!-- Header -->
-                        <div class="flex items-start gap-4">
+                        <div class="flex items-center gap-3">
                             <div
-                                class="flex size-12 shrink-0 items-center justify-center rounded-[18px] {iconClasses}"
+                                class="flex size-9 shrink-0 items-center justify-center rounded-[14px] {iconClasses}"
                             >
-                                <Icon icon={deploymentsIcon} size={26} />
+                                <Icon icon={deploymentsIcon} size={20} />
                             </div>
 
-                            <div class="min-w-0 flex-1">
-                                <div
-                                    class="flex flex-wrap items-center gap-x-2 gap-y-1"
-                                >
-                                    <h2
-                                        class="text-on-surface text-base font-medium"
+                            <div
+                                class="flex min-w-0 flex-1 flex-row gap-2 sm:items-center"
+                            >
+                                <div>
+                                    <!-- Identity -->
+                                    <div
+                                        class="flex min-w-0 items-baseline gap-1.5 sm:w-56"
                                     >
-                                        Deployment
-                                    </h2>
+                                        <span
+                                            class="text-on-surface text-sm font-medium"
+                                        >
+                                            Deployment
+                                        </span>
 
+                                        <span
+                                            class="text-on-surface-variant truncate font-mono text-xs"
+                                        >
+                                            #{getShortId(deployment.id)}
+                                        </span>
+                                    </div>
+
+                                    <!-- Created -->
                                     <span
-                                        class="text-on-surface-variant font-mono text-sm"
+                                        class="text-on-surface-variant text-xs sm:flex-1"
                                     >
-                                        #{getShortId(deployment.id)}
+                                        {formatDate(deployment.createdAt)}
                                     </span>
                                 </div>
 
-                                <p
-                                    class="text-on-surface-variant mt-0.5 text-sm"
-                                >
-                                    {formatDate(deployment.createdAt)}
-                                </p>
-
-                                <!-- Main status -->
-                            </div>
-                        </div>
-
-                        <!-- Lifecycle timeline -->
-                        <div class="mt-6 sm:ml-16">
-                            <div
-                                class="grid grid-cols-4"
-                                aria-label="Deployment lifecycle"
-                            >
-                                {#each timeline as step, index}
-                                    {@const reached = step.date !== null}
-                                    {@const current = index === statusIndex}
-
-                                    <div
-                                        class="relative flex min-w-0 flex-col items-center"
+                                <!-- Status -->
+                                <div class="flex shrink-0 items-center gap-2">
+                                    <span
+                                        class="rounded-full px-2.5 py-1 text-xs font-medium {statusClasses}"
                                     >
-                                        <!--
-                    Connector runs from the center of this stage
-                    to the center of the next one.
+                                        {getStatusLabel(status)}
+                                    </span>
 
-                    The pills sit above it, hiding the line underneath
-                    themselves so it visually connects pill-to-pill.
-                -->
-                                        {#if index < timeline.length - 1}
-                                            <div
-                                                class={[
-                                                    "absolute top-[17px] left-1/2 h-0.5 w-full",
-                                                    index < statusIndex
-                                                        ? "bg-primary"
-                                                        : "bg-outline-variant",
-                                                ]}
-                                                aria-hidden="true"
-                                            ></div>
-                                        {/if}
-
-                                        <!-- Stage pill -->
-                                        <div
-                                            class={[
-                                                "relative z-10 flex h-9 items-center justify-center",
-                                                "rounded-full px-4 text-sm font-medium",
-                                                "whitespace-nowrap transition-colors",
-
-                                                current
-                                                    ? "bg-primary text-on-primary"
-                                                    : reached
-                                                      ? "bg-primary-container text-on-primary-container"
-                                                      : "bg-surface-container-high text-on-surface-variant",
-                                            ]}
-                                        >
-                                            {step.label}
-                                        </div>
-
-                                        <!-- Timestamp -->
+                                    {#if duration}
                                         <span
-                                            class={[
-                                                "mt-2 text-center text-xs tabular-nums",
-                                                reached
-                                                    ? "text-on-surface-variant"
-                                                    : "text-on-surface-variant/50",
-                                            ]}
+                                            class="text-on-surface-variant min-w-8 text-right text-xs tabular-nums"
                                         >
-                                            {step.date
-                                                ? formatTime(step.date)
-                                                : "—"}
+                                            {duration}
                                         </span>
-                                    </div>
-                                {/each}
+                                    {/if}
+                                </div>
                             </div>
                         </div>
+
+                        <Button onclick={() => view.set(deployment.id)}
+                            >View logs</Button
+                        >
                     </article>
                 {/each}
             </section>
         {/if}
     </main>
 </div>
+
+<Dialog
+    headline="Deployment Logs"
+    open={!!view.current}
+    onclose={() => view.set("")}
+>
+    {#if deploymentLogsQuery?.loading}
+        Loading logs...
+    {:else if deploymentLogsQuery?.error}
+        {deploymentLogsQuery.error.message}
+    {:else if (deploymentLogsQuery?.current?.length ?? 0) === 0}
+        No logs yet.
+    {:else}
+        {#each deploymentLogsQuery?.current ?? [] as log (log.id)}
+            <pre>{log.message}</pre>
+        {/each}
+    {/if}
+    {#snippet buttons()}
+        <Button variant="tonal">OK</Button>
+    {/snippet}
+</Dialog>
