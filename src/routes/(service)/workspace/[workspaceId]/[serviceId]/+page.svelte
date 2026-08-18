@@ -1,6 +1,7 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
     import deleteIcon from "@ktibow/iconset-material-symbols/delete";
+    import deployedCodeIcon from "@ktibow/iconset-material-symbols/deployed-code";
     import moreVertIcon from "@ktibow/iconset-material-symbols/more-vert";
     import {
         Button,
@@ -18,6 +19,7 @@
         deleteService,
         deployService,
         getService,
+        getServiceContainers,
     } from "#lib/api/services.remote";
 
     import ComposeEditor from "./compose-editor.svelte";
@@ -26,12 +28,36 @@
 
     // svelte-ignore state_referenced_locally
     const service = getService(params.serviceId);
+    // svelte-ignore state_referenced_locally
+    const containers = getServiceContainers(params.serviceId);
 
     const svc = await service;
     let actionsMenuOpen = $state(false);
     let deleteDialogOpen = $state(false);
     let deleting = $state(false);
     let deploying = $state(false);
+
+    const containerItems = $derived(containers.current?.items ?? []);
+
+    const statusClasses = (status: string): string => {
+        switch (status.toLowerCase()) {
+            case "healthy":
+            case "running": {
+                return "bg-primary-container text-on-primary-container";
+            }
+
+            case "dead":
+            case "exited":
+            case "failed":
+            case "unhealthy": {
+                return "bg-error-container text-on-error-container";
+            }
+
+            default: {
+                return "bg-secondary-container text-on-secondary-container";
+            }
+        }
+    };
 
     const deploy = async (): Promise<void> => {
         if (!svc || deploying) {
@@ -181,6 +207,80 @@
                 </div>
             </div>
         </Card>
+
+        <Card variant="elevated">
+            <div class="flex items-center justify-between gap-3">
+                <h2 class="text-on-surface text-base font-semibold">
+                    Containers
+                </h2>
+
+                {#if !containers.loading && containerItems.length > 0}
+                    <p class="text-on-surface-variant text-xs">
+                        {containerItems.length}
+                        {containerItems.length === 1
+                            ? "container"
+                            : "containers"}
+                    </p>
+                {/if}
+            </div>
+
+            {#if containers.loading}
+                <div class="flex min-h-24 items-center justify-center">
+                    <LoadingIndicator aria-label="Loading containers" />
+                </div>
+            {:else if containers.error}
+                <p class="text-error text-sm">{containers.error.message}</p>
+            {:else if containers.current?.error}
+                <p class="text-error text-sm">{containers.current.error}</p>
+            {:else if containerItems.length === 0}
+                <p class="text-on-surface-variant text-sm">
+                    No running containers. Deploy this service to start them.
+                </p>
+            {:else}
+                <ul class="flex flex-col">
+                    {#each containerItems as container (container.id)}
+                        <li
+                            class="border-outline-variant flex items-center justify-between gap-3 border-b py-3 last:border-b-0"
+                        >
+                            <div class="flex min-w-0 items-center gap-3">
+                                <div
+                                    class={[
+                                        "inline-flex shrink-0 items-center rounded-full p-1.5",
+                                        statusClasses(container.status),
+                                    ]}
+                                >
+                                    <Icon icon={deployedCodeIcon} size={18} />
+                                </div>
+
+                                <div class="min-w-0">
+                                    <p
+                                        class="text-on-surface truncate text-sm font-medium"
+                                    >
+                                        {container.name}
+                                    </p>
+                                    <p
+                                        class="text-on-surface-variant truncate text-xs"
+                                    >
+                                        {container.image} · {container.machineName}
+                                        · {container.shortId}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <span
+                                class={[
+                                    "inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-medium capitalize",
+                                    statusClasses(container.status),
+                                ]}
+                            >
+                                {container.status}
+                            </span>
+                        </li>
+                    {/each}
+                </ul>
+            {/if}
+        </Card>
+
         <ComposeEditor serviceId={svc.id} initialCompose={svc.value} />
     {/if}
 </main>

@@ -13,7 +13,6 @@ export const variables = defineEnvVars({
     description: "The app origin (base URL), e.g. `http://localhost:5173`.",
   },
   UNCLOUD_API: {
-    description:
-      "The Uncloud API origin, without the `/api/v1` path, for example `https://cluster.example.com`.",
+    description: "The Uncloud API origin, without the `/api/v1` path`.",
   },
 });

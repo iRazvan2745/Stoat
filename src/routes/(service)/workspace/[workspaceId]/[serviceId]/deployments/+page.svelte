@@ -1,15 +1,40 @@
 <script lang="ts">
     // oxlint-disable func-style default-case
     import logsIcon from "@ktibow/iconset-material-symbols/article-outline";
+    import cancelIcon from "@ktibow/iconset-material-symbols/cancel";
+    import deleteIcon from "@ktibow/iconset-material-symbols/delete";
     import deploymentsIcon from "@ktibow/iconset-material-symbols/deployed-code-outline";
     import errorIcon from "@ktibow/iconset-material-symbols/error-circle-rounded-outline";
-    import { Button, Card, Dialog, Icon, LoadingIndicator } from "m3-svelte";
+    import moreVertIcon from "@ktibow/iconset-material-symbols/more-vert";
+    import {
+        Button,
+        Card,
+        Dialog,
+        ExpressiveMenu,
+        ExpressiveMenuItem,
+        Icon,
+        LoadingIndicator,
+        Snackbar,
+        snackbar,
+    } from "m3-svelte";
     import { parseAsString, useQueryState } from "nuqs-svelte";
 
     import {
+        cancelDeployment,
+        deleteDeployment,
         getDeploymentLogs,
         getDeployments,
     } from "#lib/api/deployments.remote";
+    import { detectDeploymentFailure } from "#lib/deployment-failure";
+    import type { LogHighlightKind } from "#lib/deployment-logs";
+    import {
+        buildDeploymentLogEntries,
+        highlightLogMessage,
+    } from "#lib/deployment-logs";
+    import { attachFollowScroll } from "#lib/follow-scroll";
+
+    import DeploymentLogBanner from "./deployment-log-banner.svelte";
+    import DeploymentLogProgress from "./deployment-log-progress.svelte";
 
     let { params } = $props();
 
@@ -46,48 +71,37 @@
         return logs.filter((log) => log.stream === logFilter);
     });
 
+    const visibleLogEntries = $derived(buildDeploymentLogEntries(visibleLogs));
+
     const BOTTOM_STICK_THRESHOLD = 48;
     const CHANGE_SUMMARY_PATTERN =
         /^Changes: (?<changes>\d+), insertions: (?<insertions>\d+), deletions: (?<deletions>\d+)$/u;
 
     let logContainer: HTMLDivElement | undefined = $state();
-    let previousDeploymentId = "";
-    let previousLogsCount = 0;
-
-    $effect(() => {
-        const container = logContainer;
-        const count = logsCount;
-        const deploymentId = view.current ?? "";
-
-        if (deploymentId !== previousDeploymentId) {
-            previousDeploymentId = deploymentId;
-            previousLogsCount = 0;
-            logFilter = "all";
-            followLatest = true;
-        }
-
-        const wasEmpty = previousLogsCount === 0;
-        previousLogsCount = count;
-
-        if (!container || count === 0) {
-            return;
-        }
-
-        const distanceFromBottom =
-            container.scrollHeight -
-            container.scrollTop -
-            container.clientHeight;
-
-        if (
-            wasEmpty ||
-            (followLatest && distanceFromBottom < BOTTOM_STICK_THRESHOLD)
-        ) {
-            container.scrollTop = container.scrollHeight;
-        }
-    });
+    const followLogs = attachFollowScroll(() => followLatest);
 
     type Deployment = (typeof deployments)[number];
-    type DeploymentStatus = "pending" | "queued" | "started" | "finished";
+    type DeploymentPhase = "pending" | "queued" | "started" | "finished";
+    type DeploymentDisplayStatus =
+        | DeploymentPhase
+        | "cancelled"
+        | "deployed"
+        | "failed";
+
+    let actionsMenuOpenFor = $state<string | null>(null);
+    const actionsMenuDeployment = $derived(
+        deployments.find((deployment) => deployment.id === actionsMenuOpenFor)
+    );
+    const actionsMenuDeploymentActive = $derived(
+        actionsMenuDeployment
+            ? // oxlint-disable-next-line no-use-before-define
+              isDeploymentActive(actionsMenuDeployment)
+            : false
+    );
+    let cancelDialogDeploymentId = $state<string | null>(null);
+    let deleteDialogDeploymentId = $state<string | null>(null);
+    let cancelling = $state(false);
+    let deleting = $state(false);
 
     const dateFormatter = new Intl.DateTimeFormat("en", {
         day: "numeric",
@@ -102,7 +116,7 @@
         second: "2-digit",
     });
 
-    function getStatus(deployment: Deployment): DeploymentStatus {
+    function getPhase(deployment: Deployment): DeploymentPhase {
         if (deployment.finishedAt) {
             return "finished";
         }
@@ -118,25 +132,59 @@
         return "pending";
     }
 
+    function getDisplayStatus(deployment: Deployment): DeploymentDisplayStatus {
+        if (deployment.outcome === "cancelled") {
+            return "cancelled";
+        }
+
+        if (deployment.outcome === "failed") {
+            return "failed";
+        }
+
+        const selectedLogs = view.current === deployment.id ? logs : undefined;
+
+        if (selectedLogs && detectDeploymentFailure(selectedLogs)) {
+            return "failed";
+        }
+
+        const phase = getPhase(deployment);
+
+        if (phase !== "finished") {
+            return phase;
+        }
+
+        return "deployed";
+    }
+
+    function isDeploymentActive(deployment: Deployment): boolean {
+        return (
+            getPhase(deployment) !== "finished" &&
+            getDisplayStatus(deployment) !== "failed"
+        );
+    }
+
     const selectedDeployment = $derived.by(() => {
         const deploymentId = view.current;
 
         return deployments.find((deployment) => deployment.id === deploymentId);
     });
 
-    const selectedStatus = $derived(
-        selectedDeployment ? getStatus(selectedDeployment) : undefined
-    );
     const deploymentIsActive = $derived(
-        selectedStatus === "pending" ||
-            selectedStatus === "queued" ||
-            selectedStatus === "started"
+        selectedDeployment ? isDeploymentActive(selectedDeployment) : false
     );
 
-    function getStatusLabel(status: DeploymentStatus) {
+    function getStatusLabel(status: DeploymentDisplayStatus) {
         switch (status) {
-            case "finished": {
+            case "deployed": {
                 return "Deployed";
+            }
+
+            case "failed": {
+                return "Failed";
+            }
+
+            case "cancelled": {
+                return "Cancelled";
             }
 
             case "started": {
@@ -150,13 +198,25 @@
             case "pending": {
                 return "Pending";
             }
+
+            case "finished": {
+                return "Finished";
+            }
         }
     }
 
-    function getStatusClasses(status: DeploymentStatus) {
+    function getStatusClasses(status: DeploymentDisplayStatus) {
         switch (status) {
-            case "finished": {
+            case "deployed": {
                 return "bg-primary-container text-on-primary-container";
+            }
+
+            case "failed": {
+                return "bg-error-container-subtle text-on-error-container-subtle";
+            }
+
+            case "cancelled": {
+                return "bg-surface-container-high text-on-surface-variant";
             }
 
             case "started": {
@@ -167,87 +227,58 @@
                 return "bg-secondary-container text-on-secondary-container";
             }
 
-            case "pending": {
+            case "pending":
+            case "finished": {
                 return "bg-surface-container-high text-on-surface-variant";
             }
         }
     }
 
-    function getIconClasses(status: DeploymentStatus) {
-        switch (status) {
-            case "finished": {
-                return "bg-primary-container text-on-primary-container";
-            }
-
-            case "started": {
-                return "bg-tertiary-container text-on-tertiary-container";
-            }
-
-            case "queued": {
-                return "bg-secondary-container text-on-secondary-container";
-            }
-
-            case "pending": {
-                return "bg-surface-container-high text-on-surface-variant";
-            }
-        }
-    }
-
-    function getStatusIndex(status: DeploymentStatus) {
-        switch (status) {
-            case "pending": {
-                return 0;
-            }
-
-            case "queued": {
-                return 1;
-            }
-
-            case "started": {
-                return 2;
-            }
-
-            case "finished": {
-                return 3;
-            }
-        }
-    }
-
-    function getTimeline(deployment: Deployment) {
+    function getLogFilterButtonClasses(active: boolean) {
         return [
-            {
-                date: deployment.createdAt,
-                label: "Created",
-            },
-            {
-                date: deployment.queuedAt,
-                label: "Queued",
-            },
-            {
-                date: deployment.startedAt,
-                label: "Started",
-            },
-            {
-                date: deployment.finishedAt,
-                label: "Finished",
-            },
-        ];
+            "inline-flex cursor-pointer items-center gap-1.5 rounded-full border-0 px-3 py-1.5 text-xs leading-4 font-medium transition-colors",
+            "text-on-surface-variant focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+            active
+                ? "bg-secondary-container text-on-secondary-container"
+                : "bg-transparent hover:bg-surface-container-high",
+        ].join(" ");
     }
 
-    function getTimelineClasses(
-        index: number,
-        currentIndex: number,
-        reached: boolean
-    ) {
-        if (index === currentIndex) {
-            return "bg-primary-container text-on-primary-container";
-        }
+    function getLogRowClasses(isError: boolean) {
+        return [
+            "grid min-h-6 grid-cols-[5.25rem_minmax(0,1fr)] items-start gap-4 rounded-md px-4 py-2 font-mono text-xs/5 transition-colors",
+            isError
+                ? "bg-error-container-subtle/16 text-error hover:bg-error-container-subtle/28"
+                : "text-on-surface hover:bg-surface-container-high",
+        ].join(" ");
+    }
 
-        if (reached) {
-            return "bg-secondary-container text-on-secondary-container";
-        }
+    function getLogSegmentClasses(kind: LogHighlightKind) {
+        switch (kind) {
+            case "keyword": {
+                return "font-semibold text-primary";
+            }
 
-        return "bg-surface-container-high text-on-surface-variant opacity-50";
+            case "info": {
+                return "font-medium text-tertiary";
+            }
+
+            case "path": {
+                return "text-on-secondary-container";
+            }
+
+            case "success": {
+                return "font-semibold text-primary";
+            }
+
+            case "number": {
+                return "font-medium text-secondary";
+            }
+
+            default: {
+                return "";
+            }
+        }
     }
 
     function formatDate(date: Date | null) {
@@ -324,6 +355,8 @@
     }
 
     function closeLogs(): void {
+        logFilter = "all";
+        followLatest = true;
         void view.set("");
     }
 
@@ -349,7 +382,109 @@
             top: logContainer.scrollHeight,
         });
     }
+
+    function closeActionsMenu(): void {
+        actionsMenuOpenFor = null;
+    }
+
+    function toggleActionsMenu(deploymentId: string): void {
+        actionsMenuOpenFor =
+            actionsMenuOpenFor === deploymentId ? null : deploymentId;
+    }
+
+    function handleWindowPointerDown(event: PointerEvent): void {
+        if (!actionsMenuOpenFor) {
+            return;
+        }
+
+        const { target } = event;
+
+        if (!(target instanceof Element)) {
+            return;
+        }
+
+        if (
+            target.closest("[data-deployment-actions-trigger]") ||
+            target.closest(".m3-container.expressive-menu")
+        ) {
+            return;
+        }
+
+        closeActionsMenu();
+    }
+
+    function openCancelDialog(deploymentId: string): void {
+        closeActionsMenu();
+        cancelDialogDeploymentId = deploymentId;
+    }
+
+    function openDeleteDialog(deploymentId: string): void {
+        closeActionsMenu();
+        deleteDialogDeploymentId = deploymentId;
+    }
+
+    const cancelDialogDeployment = $derived(
+        deployments.find(
+            (deployment) => deployment.id === cancelDialogDeploymentId
+        )
+    );
+    const deleteDialogDeployment = $derived(
+        deployments.find(
+            (deployment) => deployment.id === deleteDialogDeploymentId
+        )
+    );
+
+    const forceCancel = async (): Promise<void> => {
+        if (!cancelDialogDeploymentId || cancelling) {
+            return;
+        }
+
+        cancelling = true;
+
+        try {
+            await cancelDeployment(cancelDialogDeploymentId);
+            cancelDialogDeploymentId = null;
+            snackbar("Deployment cancelled");
+        } catch (error) {
+            snackbar(
+                error instanceof Error
+                    ? error.message
+                    : "Unable to cancel deployment"
+            );
+        } finally {
+            cancelling = false;
+        }
+    };
+
+    const removeDeployment = async (): Promise<void> => {
+        if (!deleteDialogDeploymentId || deleting) {
+            return;
+        }
+
+        deleting = true;
+
+        try {
+            await deleteDeployment(deleteDialogDeploymentId);
+
+            if (view.current === deleteDialogDeploymentId) {
+                closeLogs();
+            }
+
+            deleteDialogDeploymentId = null;
+            snackbar("Deployment deleted");
+        } catch (error) {
+            snackbar(
+                error instanceof Error
+                    ? error.message
+                    : "Unable to delete deployment"
+            );
+        } finally {
+            deleting = false;
+        }
+    };
 </script>
+
+<svelte:window onpointerdown={handleWindowPointerDown} />
 
 <div class="mx-auto w-full max-w-6xl">
     <header class="mb-4 flex items-center justify-between gap-4">
@@ -396,24 +531,25 @@
             </Card>
         {:else}
             <section
-                class="bg-surface-container-low overflow-hidden rounded-[20px]"
+                class="bg-surface-container-low rounded-[20px]"
                 aria-label="Deployment history"
             >
                 {#each deployments as deployment (deployment.id)}
-                    {@const status = getStatus(deployment)}
+                    {@const displayStatus = getDisplayStatus(deployment)}
                     {@const duration = getDuration(deployment)}
-                    {@const statusClasses = getStatusClasses(status)}
-                    {@const iconClasses = getIconClasses(status)}
+                    {@const statusClasses = getStatusClasses(displayStatus)}
                     {@const logsLoading =
                         view.current === deployment.id &&
                         deploymentLogsQuery?.loading === true}
+                    {@const actionsMenuOpen =
+                        actionsMenuOpenFor === deployment.id}
 
                     <article
-                        class="border-outline-variant/40 flex items-center justify-between border-b px-4 py-3 last:border-b-0 sm:px-5"
+                        class="border-outline-variant/40 flex items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0 sm:px-5"
                     >
-                        <div class="flex items-center gap-3">
+                        <div class="flex min-w-0 flex-1 items-center gap-3">
                             <div
-                                class="flex size-9 shrink-0 items-center justify-center rounded-[14px] {iconClasses}"
+                                class="flex size-9 shrink-0 items-center justify-center rounded-[14px] {statusClasses}"
                             >
                                 <Icon icon={deploymentsIcon} size={20} />
                             </div>
@@ -452,7 +588,7 @@
                                     <span
                                         class="rounded-full px-2.5 py-1 text-xs font-medium {statusClasses}"
                                     >
-                                        {getStatusLabel(status)}
+                                        {getStatusLabel(displayStatus)}
                                     </span>
 
                                     {#if duration}
@@ -466,22 +602,44 @@
                             </div>
                         </div>
 
-                        <Button
-                            disabled={logsLoading}
-                            aria-busy={logsLoading}
-                            onclick={() => openLogs(deployment.id)}
-                        >
-                            {#if logsLoading}
-                                <LoadingIndicator
-                                    size={18}
-                                    center={false}
-                                    aria-label="Loading deployment logs"
-                                />
-                                Loading...
-                            {:else}
-                                View logs
-                            {/if}
-                        </Button>
+                        <div class="flex shrink-0 items-center gap-2">
+                            <Button
+                                disabled={logsLoading}
+                                aria-busy={logsLoading}
+                                onclick={() => openLogs(deployment.id)}
+                            >
+                                {#if logsLoading}
+                                    <LoadingIndicator
+                                        size={18}
+                                        center={false}
+                                        aria-label="Loading deployment logs"
+                                    />
+                                    Loading...
+                                {:else}
+                                    View logs
+                                {/if}
+                            </Button>
+
+                            <span
+                                class="relative inline-flex"
+                                data-deployment-actions-trigger
+                                style={actionsMenuOpen
+                                    ? "anchor-name: --m3-menu-anchor"
+                                    : undefined}
+                            >
+                                <Button
+                                    variant="tonal"
+                                    square
+                                    aria-label="Deployment actions"
+                                    aria-expanded={actionsMenuOpen}
+                                    aria-haspopup="menu"
+                                    onclick={() =>
+                                        toggleActionsMenu(deployment.id)}
+                                >
+                                    <Icon icon={moreVertIcon} />
+                                </Button>
+                            </span>
+                        </div>
                     </article>
                 {/each}
             </section>
@@ -489,9 +647,30 @@
     </main>
 </div>
 
-<div class="logs-dialog">
+{#if actionsMenuDeployment}
+    <div class="[&_:global(.m3-container.expressive-menu.anchored)]:z-20">
+        <ExpressiveMenu anchored x="end" y="down" label="Deployment actions">
+            {#if actionsMenuDeploymentActive}
+                <ExpressiveMenuItem
+                    leadingIcon={cancelIcon}
+                    label="Force cancel"
+                    onclick={() => openCancelDialog(actionsMenuDeployment.id)}
+                />
+            {/if}
+
+            <ExpressiveMenuItem
+                leadingIcon={deleteIcon}
+                label="Delete"
+                onclick={() => openDeleteDialog(actionsMenuDeployment.id)}
+            />
+        </ExpressiveMenu>
+    </div>
+{/if}
+
+<div class="max-w-none">
     <Dialog
         headline="Deployment Logs"
+        id="deployment-logs-dialog"
         open={!!view.current}
         onclose={closeLogs}
     >
@@ -536,7 +715,7 @@
                     >
                         <span
                             class="size-1.5 rounded-full {deploymentIsActive
-                                ? 'animate-pulse bg-green-400'
+                                ? 'bg-tertiary animate-pulse'
                                 : 'bg-primary'}"
                             aria-hidden="true"
                         ></span>
@@ -550,17 +729,13 @@
                 </div>
 
                 {#if !followLatest}
-                    <button
-                        class="bg-primary-container text-on-primary-container inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition hover:shadow-sm"
-                        type="button"
-                        onclick={jumpToLatest}
-                    >
+                    <Button variant="tonal" square onclick={jumpToLatest}>
                         <span
                             class="size-1.5 rounded-full bg-current"
                             aria-hidden="true"
                         ></span>
                         Jump to latest
-                    </button>
+                    </Button>
                 {/if}
             </div>
 
@@ -570,40 +745,37 @@
                 aria-label="Filter deployment logs"
             >
                 <button
-                    class="log-filter-button"
-                    class:active={logFilter === "all"}
+                    class={getLogFilterButtonClasses(logFilter === "all")}
                     type="button"
                     aria-pressed={logFilter === "all"}
                     onclick={() => (logFilter = "all")}
                 >
                     All
-                    <span>{logsCount}</span>
+                    <span class="tabular-nums opacity-72">{logsCount}</span>
                 </button>
 
                 <button
-                    class="log-filter-button"
-                    class:active={logFilter === "stdout"}
+                    class={getLogFilterButtonClasses(logFilter === "stdout")}
                     type="button"
                     aria-pressed={logFilter === "stdout"}
                     onclick={() => (logFilter = "stdout")}
                 >
                     Output
-                    <span>{stdoutCount}</span>
+                    <span class="tabular-nums opacity-72">{stdoutCount}</span>
                 </button>
 
                 <button
-                    class="log-filter-button"
-                    class:active={logFilter === "stderr"}
+                    class={getLogFilterButtonClasses(logFilter === "stderr")}
                     type="button"
                     aria-pressed={logFilter === "stderr"}
                     onclick={() => (logFilter = "stderr")}
                 >
                     Errors
-                    <span>{stderrCount}</span>
+                    <span class="tabular-nums opacity-72">{stderrCount}</span>
                 </button>
             </div>
 
-            {#if visibleLogs.length === 0}
+            {#if visibleLogEntries.length === 0}
                 <div
                     class="bg-surface-container-lowest border-outline-variant/40 mt-2 flex min-h-32 items-center justify-center rounded-xl border px-4 text-center"
                 >
@@ -616,162 +788,233 @@
             {:else}
                 <div
                     bind:this={logContainer}
-                    class="bg-surface-container-lowest border-outline-variant/40 mt-2 max-h-[55vh] overflow-y-auto rounded-xl border p-1 font-mono text-xs/5"
+                    class="bg-surface-container-lowest border-outline-variant/40 text-on-surface mt-2 max-h-[70vh] w-full overflow-y-auto rounded-xl border px-1 py-2"
                     role="log"
                     aria-label="Deployment log output"
                     aria-live="polite"
                     onscroll={handleLogScroll}
                 >
-                    {#each visibleLogs as log (log.id)}
-                        {@const isError = log.stream === "stderr"}
-                        {@const changeSummary = getChangeSummary(log.message)}
+                    <div {@attach followLogs}>
+                        {#if logFilter !== "stderr"}
+                            <DeploymentLogBanner
+                                serviceId={selectedDeployment?.serviceId ?? ""}
+                            />
+                        {/if}
 
-                        {#if changeSummary}
-                            <div
-                                class="log-line change-summary flex gap-3 px-2 py-0.5 {isError
-                                    ? 'log-line-error text-error'
-                                    : 'text-on-surface'}"
-                            >
-                                <span
-                                    class="text-on-surface-variant shrink-0 tabular-nums select-none"
-                                >
-                                    {formatTime(log.createdAt)}
-                                </span>
+                        {#each visibleLogEntries as entry (entry.kind === "text" ? entry.log.id : entry.key)}
+                            {@const log = entry.log}
+                            {@const isError = log.stream === "stderr"}
+                            {@const changeSummary =
+                                entry.kind === "text"
+                                    ? getChangeSummary(log.message)
+                                    : null}
 
-                                <span class="flex flex-wrap gap-x-1.5 gap-y-1">
-                                    <span>
-                                        Changes: {changeSummary.changes},
+                            {#if entry.kind === "progress"}
+                                <DeploymentLogProgress
+                                    createdAt={log.createdAt}
+                                    {formatTime}
+                                    {isError}
+                                    progress={entry.progress}
+                                />
+                            {:else if changeSummary}
+                                <div class={getLogRowClasses(isError)}>
+                                    <span
+                                        class="text-on-surface-variant shrink-0 pt-0.5 text-right text-[0.6875rem] tabular-nums select-none"
+                                    >
+                                        {formatTime(log.createdAt)}
                                     </span>
 
                                     <span
-                                        class="change-marks text-green-400"
-                                        aria-label={`${changeSummary.insertions} insertions`}
-                                        title={`${changeSummary.insertions} insertions`}
+                                        class="flex min-w-0 flex-wrap gap-x-1.5 gap-y-1 wrap-break-word"
                                     >
-                                        {"+".repeat(changeSummary.insertions)}
-                                    </span>
+                                        <span>
+                                            Changes: {changeSummary.changes},
+                                        </span>
 
-                                    {#if changeSummary.deletions > 0}
                                         <span
-                                            class="change-marks text-red-400"
-                                            aria-label={`${changeSummary.deletions} deletions`}
-                                            title={`${changeSummary.deletions} deletions`}
+                                            class="text-primary font-bold tracking-wider"
+                                            aria-label={`${changeSummary.insertions} insertions`}
+                                            title={`${changeSummary.insertions} insertions`}
                                         >
-                                            {"-".repeat(
-                                                changeSummary.deletions
+                                            {"+".repeat(
+                                                changeSummary.insertions
                                             )}
                                         </span>
-                                    {/if}
-                                </span>
-                            </div>
-                        {:else}
-                            {#each log.message.split("\n") as line, lineIndex (`${log.id}-${lineIndex}`)}
-                                <div
-                                    class="log-line flex gap-3 px-2 py-0.5 {isError
-                                        ? 'log-line-error text-error'
-                                        : 'text-on-surface'}"
-                                >
-                                    <span
-                                        class="text-on-surface-variant shrink-0 tabular-nums select-none"
-                                    >
-                                        {#if lineIndex === 0}
-                                            {formatTime(log.createdAt)}
+
+                                        {#if changeSummary.deletions > 0}
+                                            <span
+                                                class="text-error font-bold tracking-wider"
+                                                aria-label={`${changeSummary.deletions} deletions`}
+                                                title={`${changeSummary.deletions} deletions`}
+                                            >
+                                                {"-".repeat(
+                                                    changeSummary.deletions
+                                                )}
+                                            </span>
                                         {/if}
                                     </span>
-
-                                    <span
-                                        class="min-w-0 wrap-break-word whitespace-pre-wrap"
-                                    >
-                                        {line || " "}
-                                    </span>
                                 </div>
-                            {/each}
-                        {/if}
-                    {/each}
+                            {:else}
+                                {#each entry.lines as line, lineIndex (`${log.id}-${lineIndex}`)}
+                                    <div class={getLogRowClasses(isError)}>
+                                        <span
+                                            class="text-on-surface-variant shrink-0 pt-0.5 text-right text-[0.6875rem] tabular-nums select-none"
+                                        >
+                                            {#if lineIndex === 0}
+                                                {formatTime(log.createdAt)}
+                                            {/if}
+                                        </span>
+
+                                        <span
+                                            class="min-w-0 wrap-break-word whitespace-pre-wrap"
+                                        >
+                                            {#each highlightLogMessage(line) as segment, segmentIndex (`${log.id}-${lineIndex}-${segmentIndex}`)}
+                                                <span
+                                                    class={getLogSegmentClasses(
+                                                        segment.kind
+                                                    )}
+                                                >
+                                                    {segment.text}
+                                                </span>
+                                            {/each}
+                                        </span>
+                                    </div>
+                                {/each}
+                            {/if}
+                        {/each}
+                    </div>
                 </div>
             {/if}
         {/if}
 
         {#snippet buttons()}
+            {#if selectedDeployment && deploymentIsActive}
+                <Button
+                    variant="text"
+                    disabled={cancelling}
+                    onclick={() => openCancelDialog(selectedDeployment.id)}
+                >
+                    Force cancel
+                </Button>
+            {/if}
+
+            {#if selectedDeployment}
+                <Button
+                    variant="text"
+                    disabled={deleting}
+                    onclick={() => openDeleteDialog(selectedDeployment.id)}
+                >
+                    Delete
+                </Button>
+            {/if}
+
             <Button variant="tonal" onclick={closeLogs}>OK</Button>
         {/snippet}
     </Dialog>
 </div>
 
+<Dialog
+    headline="Force cancel deployment"
+    open={cancelDialogDeploymentId !== null}
+    onclose={() => (cancelDialogDeploymentId = null)}
+>
+    <div class="flex flex-col gap-2">
+        <p class="text-on-surface">
+            Cancel deployment
+            {#if cancelDialogDeployment}
+                <span class="font-mono text-sm">
+                    #{getShortId(cancelDialogDeployment.id)}
+                </span>
+            {/if}?
+        </p>
+
+        <p class="text-on-surface-variant text-sm">
+            This marks the deployment as cancelled. Any in-flight work may
+            continue briefly in the background.
+        </p>
+    </div>
+
+    {#snippet buttons()}
+        <Button
+            variant="text"
+            disabled={cancelling}
+            onclick={() => (cancelDialogDeploymentId = null)}
+        >
+            Keep running
+        </Button>
+
+        <Button
+            disabled={cancelling}
+            aria-busy={cancelling}
+            onclick={forceCancel}
+        >
+            {#if cancelling}
+                <LoadingIndicator
+                    size={18}
+                    center={false}
+                    aria-label="Cancelling deployment"
+                />
+                Cancelling...
+            {:else}
+                Force cancel
+            {/if}
+        </Button>
+    {/snippet}
+</Dialog>
+
+<Dialog
+    headline="Delete deployment"
+    open={deleteDialogDeploymentId !== null}
+    onclose={() => (deleteDialogDeploymentId = null)}
+>
+    <div class="flex flex-col gap-2">
+        <p class="text-on-surface">
+            Delete deployment
+            {#if deleteDialogDeployment}
+                <span class="font-mono text-sm">
+                    #{getShortId(deleteDialogDeployment.id)}
+                </span>
+            {/if}?
+        </p>
+
+        <p class="text-on-surface-variant text-sm">
+            This permanently removes the deployment and all of its logs.
+        </p>
+    </div>
+
+    {#snippet buttons()}
+        <Button
+            variant="text"
+            disabled={deleting}
+            onclick={() => (deleteDialogDeploymentId = null)}
+        >
+            Cancel
+        </Button>
+
+        <Button
+            disabled={deleting}
+            aria-busy={deleting}
+            onclick={removeDeployment}
+        >
+            {#if deleting}
+                <LoadingIndicator
+                    size={18}
+                    center={false}
+                    aria-label="Deleting deployment"
+                />
+                Deleting...
+            {:else}
+                Delete
+            {/if}
+        </Button>
+    {/snippet}
+</Dialog>
+
+<Snackbar />
+
 <style>
-    .logs-dialog :global(dialog.m3-container) {
-        width: 100%;
-        max-width: min(52rem, calc(100vw - 2rem));
-    }
-
-    .log-filter-button {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.375rem;
-        border: 0;
-        border-radius: 999px;
-        background: transparent;
-        padding: 0.375rem 0.75rem;
-        color: var(--m3c-on-surface-variant);
-        cursor: pointer;
-        font-size: 0.75rem;
-        font-weight: 500;
-        line-height: 1rem;
-        transition:
-            background-color var(--m3-easing-fast),
-            color var(--m3-easing-fast);
-    }
-
-    .log-filter-button:hover:not(.active) {
-        background-color: var(--m3c-surface-container-high);
-    }
-
-    .log-filter-button.active {
-        background-color: var(--m3c-secondary-container);
-        color: var(--m3c-on-secondary-container);
-    }
-
-    .log-filter-button:focus-visible {
-        outline: 2px solid var(--m3c-primary);
-        outline-offset: 2px;
-    }
-
-    .log-filter-button span {
-        opacity: 0.72;
-        font-variant-numeric: tabular-nums;
-    }
-
-    .log-line {
-        min-height: 1.5rem;
-        border-radius: 0.375rem;
-        transition: background-color var(--m3-easing-fast);
-    }
-
-    .log-line:hover {
-        background-color: var(--m3c-surface-container-high);
-    }
-
-    .log-line-error {
-        background-color: --translucent(
-            var(--m3c-error-container-subtle),
-            0.16
-        );
-    }
-
-    .log-line-error:hover {
-        background-color: --translucent(
-            var(--m3c-error-container-subtle),
-            0.28
-        );
-    }
-
-    .change-summary {
-        align-items: baseline;
-        flex-wrap: wrap;
-    }
-
-    .change-marks {
-        letter-spacing: 0.08em;
-        font-weight: 700;
+    :global(#deployment-logs-dialog.m3-container) {
+        width: min(70rem, calc(100vw - 2rem));
+        max-width: none;
     }
 </style>

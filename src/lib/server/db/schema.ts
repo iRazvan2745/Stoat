@@ -75,6 +75,8 @@ export const deployments = pgTable("deployments", {
   queuedAt: timestamp("queued_at", { withTimezone: true }),
   startedAt: timestamp("started_at", { withTimezone: true }),
   finishedAt: timestamp("finished_at", { withTimezone: true }),
+  outcome: text("outcome"),
+  jobId: text("job_id"),
 });
 
 export const deploymentLogs = pgTable(

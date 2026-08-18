@@ -1,4 +1,4 @@
-import { UNCLOUD_API } from "$app/env/public";
+import { UNCLOUD_API } from "$app/env/private";
 import createClient from "openapi-fetch";
 
 import type { paths } from "../../../schema";

@@ -1,5 +1,6 @@
 <script lang="ts">
     import addIcon from "@ktibow/iconset-material-symbols/add";
+    import computerIcon from "@ktibow/iconset-material-symbols/computer-outline";
     import databaseIcon from "@ktibow/iconset-material-symbols/database";
     import hiveIcon from "@ktibow/iconset-material-symbols/hive-outline";
     import houseOutlineIcon from "@ktibow/iconset-material-symbols/house-outline";
@@ -59,6 +60,12 @@
             href="/data-sources"
             label="Data Sources"
             icon={databaseIcon}
+        />
+
+        <NavigationRailItem
+            href="/machines"
+            label="Machines"
+            icon={computerIcon}
         />
 
         <NavigationRailItem href="/cluster" label="Cluster" icon={hiveIcon} />

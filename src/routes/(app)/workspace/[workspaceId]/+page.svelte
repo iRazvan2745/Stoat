@@ -4,6 +4,7 @@
     import deleteIcon from "@ktibow/iconset-material-symbols/delete";
     import moreVertIcon from "@ktibow/iconset-material-symbols/more-vert";
     import refreshIcon from "@ktibow/iconset-material-symbols/refresh";
+    import widgetsIcon from "@ktibow/iconset-material-symbols/widgets-outline";
     import {
         Button,
         Card,
@@ -186,7 +187,14 @@
                     onclick={() =>
                         goto(`/workspace/${params.workspaceId}/${service.id}`)}
                 >
-                    <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-4">
+                        <div>
+                            <Icon
+                                icon={widgetsIcon}
+                                size={48}
+                                class="bg-primary-container rounded-md p-2"
+                            />
+                        </div>
                         <div class="min-w-0">
                             <p
                                 class="text-on-surface truncate text-sm font-medium"
@@ -202,7 +210,7 @@
                         </div>
                     </div>
 
-                    <pre class="service-compose">{service.value ?? "—"}</pre>
+                    <!-- <pre class="service-compose">{service.value ?? "—"}</pre> -->
                 </Card>
             {/each}
         </div>
@@ -265,19 +273,5 @@
         gap: 0.5rem;
         padding: 0.75rem;
         border-radius: var(--m3-shape-medium);
-    }
-
-    .service-compose {
-        margin: 0;
-        padding: 0.75rem;
-        border-radius: var(--m3-shape-small);
-        background-color: var(--m3c-surface-container);
-        color: var(--m3c-on-surface);
-        font-family: var(--m3-font-mono, monospace);
-        font-size: 0.75rem;
-        line-height: 1.4;
-        overflow: auto;
-        max-height: 12rem;
-        white-space: pre;
     }
 </style>

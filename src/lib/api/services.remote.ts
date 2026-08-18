@@ -2,16 +2,19 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { command, query } from "$app/server";
+import { command, getRequestEvent, query } from "$app/server";
 import { eq } from "drizzle-orm";
 import * as v from "valibot";
 
 import { createDataSourceFolder, resolveDataSourcePath } from "#lib/server/data-source";
 import { dataSource, services, workspace } from "#lib/server/db/schema";
 import { uniqueSlug } from "#lib/server/slugs";
+import { isAbortError } from "#lib/server/sse";
 
 import { db } from "../server/db";
-import { deployService as runDeployment } from "./deployments";
+import { deployService as runDeployment } from "../server/deployments/deployments";
+import { listServiceContainers } from "../server/service/service-containers";
+import { streamServiceContainerLogs } from "../server/service/service-logs";
 
 export const getServicesInWorkspace = query(
   v.string(),
@@ -125,3 +128,26 @@ export const getService = query(v.string(), async (id) => {
 });
 
 export const deployService = command(v.string(), async (id) => await runDeployment(id));
+
+export const getServiceContainers = query(
+  v.string(),
+  async (id) => await listServiceContainers(id),
+);
+
+const streamServiceContainerLogsRemote = async function* streamServiceContainerLogsRemote(
+  serviceId: string,
+) {
+  const { request } = getRequestEvent();
+
+  try {
+    yield* streamServiceContainerLogs(serviceId, request.signal);
+  } catch (error) {
+    if (isAbortError(error)) {
+      return;
+    }
+
+    throw error;
+  }
+};
+
+export const getServiceContainerLogs = query.live(v.string(), streamServiceContainerLogsRemote);

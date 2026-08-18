@@ -1,6 +1,7 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
     import refreshIcon from "@ktibow/iconset-material-symbols/arrow-back";
+    import logsIcon from "@ktibow/iconset-material-symbols/article-outline";
     import dashboardIcon from "@ktibow/iconset-material-symbols/dashboard";
     import environmentOutlineIcon from "@ktibow/iconset-material-symbols/data-object";
     import deploymentsIcon from "@ktibow/iconset-material-symbols/rocket-launch-outline";
@@ -46,6 +47,12 @@
                 label="Deployments"
                 id="deployments-rail-button"
                 icon={deploymentsIcon}
+            />
+            <NavigationRailItem
+                href={hrefRoute + "logs"}
+                label="Logs"
+                id="logs-rail-button"
+                icon={logsIcon}
             />
         </NavigationRail>
     </div>

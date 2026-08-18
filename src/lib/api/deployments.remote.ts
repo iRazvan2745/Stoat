@@ -1,11 +1,16 @@
 // oxlint-disable no-await-in-loop
 import { setTimeout as wait } from "node:timers/promises";
 
-import { query } from "$app/server";
+import { command, query } from "$app/server";
 import { asc, desc, eq } from "drizzle-orm";
 import * as v from "valibot";
 
 import { deploymentLogs, deployments } from "#lib/server/db/schema";
+import {
+  reconcileFailedDeployments,
+  cancelDeployment as runCancelDeployment,
+  deleteDeployment as runDeleteDeployment,
+} from "#lib/server/deployments/deployments";
 
 import { db } from "../server/db";
 
@@ -15,6 +20,8 @@ const streamDeployments = async function* streamDeployments(serviceId: string) {
   let previousSnapshot: string | undefined;
 
   while (true) {
+    await reconcileFailedDeployments(serviceId);
+
     const currentDeployments = await db
       .select()
       .from(deployments)
@@ -54,3 +61,11 @@ const streamDeploymentLogs = async function* streamDeploymentLogs(deploymentId: 
 };
 
 export const getDeploymentLogs = query.live(v.string(), streamDeploymentLogs);
+
+export const cancelDeployment = command(v.string(), async (deploymentId) => {
+  await runCancelDeployment(deploymentId);
+});
+
+export const deleteDeployment = command(v.string(), async (deploymentId) => {
+  await runDeleteDeployment(deploymentId);
+});

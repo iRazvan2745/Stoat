@@ -31,7 +31,8 @@
             backgroundColor: "var(--m3c-primary-container)",
         },
         ".cm-activeLine, .cm-activeLineGutter": {
-            backgroundColor: "var(--m3c-surface-container-high)",
+            backgroundColor:
+                "color-mix(in srgb, var(--m3c-primary) 12%, transparent)",
         },
         ".cm-content": { padding: "1rem 0" },
         ".cm-cursor, .cm-dropCursor": {
