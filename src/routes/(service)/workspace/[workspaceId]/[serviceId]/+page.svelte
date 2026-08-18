@@ -9,6 +9,7 @@
         ExpressiveMenu,
         ExpressiveMenuItem,
         Icon,
+        LoadingIndicator,
         Snackbar,
         snackbar,
     } from "m3-svelte";
@@ -40,7 +41,10 @@
         deploying = true;
 
         try {
-            await deployService(svc.id);
+            const deployment = await deployService(svc.id);
+            await goto(
+                `/workspace/${params.workspaceId}/${params.serviceId}/deployments?view=${deployment.deploymentId}`
+            );
             snackbar("Deployment queued");
         } catch (error) {
             snackbar(
@@ -126,10 +130,22 @@
                 <!-- Actions -->
                 <div class="flex shrink-0 items-center gap-1">
                     <Button
-                        aria-label="Edit service"
+                        aria-label="Deploy service"
                         disabled={deploying}
-                        onclick={deploy}>Deploy</Button
+                        aria-busy={deploying}
+                        onclick={deploy}
                     >
+                        {#if deploying}
+                            <LoadingIndicator
+                                size={18}
+                                center={false}
+                                aria-label="Deploying service"
+                            />
+                            Deploying...
+                        {:else}
+                            Deploy
+                        {/if}
+                    </Button>
 
                     <div class="relative">
                         <Button
@@ -181,11 +197,26 @@
     </div>
 
     {#snippet buttons()}
-        <Button variant="text" onclick={() => (deleteDialogOpen = false)}>
+        <Button
+            variant="text"
+            disabled={deleting}
+            onclick={() => (deleteDialogOpen = false)}
+        >
             Cancel
         </Button>
 
-        <Button disabled={deleting} onclick={remove}>Delete</Button>
+        <Button disabled={deleting} aria-busy={deleting} onclick={remove}>
+            {#if deleting}
+                <LoadingIndicator
+                    size={18}
+                    center={false}
+                    aria-label="Deleting service"
+                />
+                Deleting...
+            {:else}
+                Delete
+            {/if}
+        </Button>
     {/snippet}
 </Dialog>
 

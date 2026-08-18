@@ -1,4 +1,4 @@
-// oxlint-disable func-style no-await-in-loop
+// oxlint-disable func-style no-await-in-loop no-use-before-define
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -8,7 +8,6 @@ import { PgBoss, fromDrizzle } from "pg-boss";
 import * as v from "valibot";
 import YAML, { isMap, isScalar } from "yaml";
 
-import { getDataDir } from "#lib/server/data-source";
 import {
   dataSource,
   deploymentLogs,
@@ -17,6 +16,7 @@ import {
   workspace,
 } from "#lib/server/db/schema";
 import { getRepo } from "#lib/server/git";
+import { getService } from "#lib/server/services";
 
 import { db } from "../server/db";
 
@@ -34,6 +34,11 @@ interface DeploymentJob {
 const boss = new PgBoss(DATABASE_URL);
 boss.on("error", (error) => {
   console.error("pg-boss error", error);
+});
+
+const { hot } = import.meta as { hot?: { dispose: (fn: () => void) => void } };
+hot?.dispose(() => {
+  void boss.stop();
 });
 
 async function addDeploymentLog(
@@ -68,9 +73,11 @@ async function processDeployment({
   });
 
   try {
-    await prepareDeployment(serviceId);
+    await prepareDeployment(serviceId, deploymentId);
 
-    const finishedMessage = `Deployment completed for service ${serviceId}`;
+    const svc = await getService(serviceId);
+
+    const finishedMessage = `Deployment completed for service ${svc?.slug}`;
     await db.transaction(async (tx) => {
       await tx
         .update(deployments)
@@ -176,7 +183,10 @@ async function getWorkspace(id: string) {
   return wrk;
 }
 
-async function prepareDeployment(id: string): Promise<void> {
+async function prepareDeployment(id: string, deploymentId: string): Promise<void> {
+  const log = (stream: "stdout" | "stderr", message: string) =>
+    addDeploymentLog(deploymentId, stream, message);
+
   const [svc] = await db.select().from(services).where(eq(services.id, id));
 
   if (!svc?.value) {
@@ -208,47 +218,52 @@ async function prepareDeployment(id: string): Promise<void> {
   const compose = doc.toString();
   const wrk = await getWorkspace(svc.workspaceId);
   const ds = await getDatasourceFromWorkspace(svc.workspaceId);
-  const dataWorkspacePath = path.resolve(getDataDir(), wrk.id);
   const repoPath = path.resolve(ds.path);
-  const servicePath = path.join(wrk.slug, serviceSlug);
-  const dataServiceDir = path.join(dataWorkspacePath, serviceSlug);
-  const repoServiceDir = path.join(repoPath, servicePath);
+  const servicePath = path.join(wrk.id, serviceSlug);
+  const dataServiceDir = path.join(repoPath, servicePath);
   const repo = await getRepo({ repoPath, repoUrl: ds.url });
 
-  await fs.mkdir(dataServiceDir, { recursive: true });
-  await fs.writeFile(path.join(dataServiceDir, "compose.yaml"), compose, "utf-8");
+  await log("stdout", `Preparing deployment for service ${svc.name} (${serviceSlug})`);
+  await log("stdout", `Parsed compose file with ${serviceMap.items.length} services`);
 
-  // A data source can use a separate checkout for git. Keep the generated
-  // compose in DATA_DIR as the deployment artifact and mirror it there.
-  if (repoPath !== dataWorkspacePath) {
-    await fs.mkdir(repoServiceDir, { recursive: true });
-    await fs.writeFile(path.join(repoServiceDir, "compose.yaml"), compose, "utf-8");
-  }
+  await fs.mkdir(dataServiceDir, { recursive: true });
+  const dataComposePath = path.join(dataServiceDir, "compose.yaml");
+  await fs.writeFile(dataComposePath, compose, "utf-8");
+  await log("stdout", `Wrote compose file to ${dataComposePath}`);
 
   const composeRepoPath = path.join(servicePath, "compose.yaml");
+  await log("stdout", `Checking git status in ${repoPath}`);
 
   const status = await repo.status();
-  const composeChanged = status.files.some((file) => file.path === composeRepoPath);
-  if (composeChanged) {
-    console.log("adding changes", {
-      files: status.files.filter((file) => file.path === composeRepoPath),
-    });
+  const changedFiles = status.files.filter((file) => file.path === composeRepoPath);
+  if (changedFiles.length > 0) {
+    const fileList = changedFiles.map((file) => `  ${file.path}`).join("\n");
+    await log("stdout", `Changes detected:\n${fileList}`);
+
     await repo.add(composeRepoPath);
-    console.log("committing changes");
+    await log("stdout", `Added ${composeRepoPath} to git index`);
+
     const commit = await repo.commit(
       `Committing new changes on Service ${svc.name} before deploying`,
     );
-    console.log("committed changes", { commit: commit.commit });
+    await log("stdout", `Committed changes: ${commit.commit}`);
+    await log(
+      "stdout",
+      `Changes: ${commit.summary.changes}, insertions: ${commit.summary.insertions}, deletions: ${commit.summary.deletions}`,
+    );
   } else {
-    console.log("no changes to commit");
+    await log("stdout", "No changes to commit — compose file is already up to date");
   }
 
-  console.log("pushing changes");
+  await log("stdout", `Pushing changes to ${ds.url}`);
   const push = await repo.push();
-  console.log("pushed changes", {
-    pushed: push.pushed,
-    update: push.update,
-  });
+  if (push.pushed.length > 0) {
+    for (const detail of push.pushed) {
+      await log("stdout", `  Pushed ${detail.local} -> ${detail.remote}`);
+    }
+  } else {
+    await log("stdout", "Nothing to push — remote is already up to date");
+  }
 }
 
 export async function deployService(id: string) {

@@ -11,6 +11,10 @@ export async function getRepo({ repoPath, repoUrl }: { repoPath: string; repoUrl
   } catch {
     console.log(`Cloning repo`, { repoPath, repoUrl });
     await simpleGit().clone(repoUrl, repoPath);
+    return simpleGit(repoPath);
   }
-  return simpleGit(repoPath);
+
+  const repo = simpleGit(repoPath);
+  await repo.pull();
+  return repo;
 }
