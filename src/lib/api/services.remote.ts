@@ -6,7 +6,7 @@ import { command, query } from "$app/server";
 import { eq } from "drizzle-orm";
 import * as v from "valibot";
 
-import { createDataSourceFolder } from "#lib/server/data-source";
+import { createDataSourceFolder, resolveDataSourcePath } from "#lib/server/data-source";
 import { dataSource, services, workspace } from "#lib/server/db/schema";
 import { uniqueSlug } from "#lib/server/slugs";
 
@@ -63,7 +63,7 @@ export const createService = query(CreateServiceInput, async ({ workspaceId, nam
 
   try {
     await createDataSourceFolder(
-      workspaceRecord.dataSourcePath,
+      resolveDataSourcePath(workspaceRecord.dataSourcePath),
       workspaceRecord.slug,
       created.slug ?? slug,
     );
@@ -110,7 +110,7 @@ export const deleteService = query(v.string(), async (id) => {
 
   const op = await db.delete(services).where(eq(services.id, id)).returning();
 
-  await fs.rm(path.join(ds.path, wrk.slug, svc.slug ?? svc.id), {
+  await fs.rm(path.join(resolveDataSourcePath(ds.path), wrk.slug, svc.slug ?? svc.id), {
     force: true,
     recursive: true,
   });

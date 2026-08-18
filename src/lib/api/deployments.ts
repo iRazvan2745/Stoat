@@ -8,6 +8,7 @@ import { PgBoss, fromDrizzle } from "pg-boss";
 import * as v from "valibot";
 import YAML, { isMap, isScalar } from "yaml";
 
+import { resolveDataSourcePath } from "#lib/server/data-source";
 import {
   dataSource,
   deploymentLogs,
@@ -218,7 +219,7 @@ async function prepareDeployment(id: string, deploymentId: string): Promise<void
   const compose = doc.toString();
   const wrk = await getWorkspace(svc.workspaceId);
   const ds = await getDatasourceFromWorkspace(svc.workspaceId);
-  const repoPath = path.resolve(ds.path);
+  const repoPath = resolveDataSourcePath(ds.path);
   const servicePath = path.join(wrk.id, serviceSlug);
   const dataServiceDir = path.join(repoPath, servicePath);
   const repo = await getRepo({ repoPath, repoUrl: ds.url });

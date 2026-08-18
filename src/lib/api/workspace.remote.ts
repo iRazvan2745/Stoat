@@ -7,7 +7,7 @@ import * as v from "valibot";
 
 import { dataSource, services, workspace } from "#lib/server/db/schema";
 
-import { createDataSourceFolder } from "../server/data-source";
+import { createDataSourceFolder, resolveDataSourcePath } from "../server/data-source";
 import { db } from "../server/db";
 import { uniqueSlug } from "../server/slugs";
 
@@ -54,7 +54,7 @@ export const createWorkspace = query(CreateWorkspaceInput, async ({ dataSourceId
   }
 
   try {
-    await createDataSourceFolder(source.path, created.slug);
+    await createDataSourceFolder(resolveDataSourcePath(source.path), created.slug);
   } catch (error) {
     await db.delete(workspace).where(eq(workspace.id, created.id));
     throw error;
@@ -82,7 +82,7 @@ export const deleteWorkspace = query(v.string(), async (id) => {
     return await tx.delete(workspace).where(eq(workspace.id, id)).returning();
   });
 
-  await fs.rm(path.join(source.path, wrk.slug), {
+  await fs.rm(path.join(resolveDataSourcePath(source.path), wrk.slug), {
     force: true,
     recursive: true,
   });

@@ -1,7 +1,14 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-export const getDataDir = (): string => process.env.DATA_DIR ?? "./data";
+export const getDataDir = (): string => process.env.DATA_DIR ?? "/data";
+
+export const resolveDataSourcePath = (dataSourcePath: string): string => {
+  if (path.isAbsolute(dataSourcePath)) {
+    return dataSourcePath;
+  }
+  return path.resolve(getDataDir(), dataSourcePath);
+};
 
 export const createDataSourceFolder = async (
   dataSourcePath: string,

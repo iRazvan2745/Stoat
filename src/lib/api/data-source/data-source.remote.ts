@@ -1,11 +1,10 @@
 import fs from "node:fs/promises";
-import path from "node:path";
 
 import { query } from "$app/server";
 import { eq } from "drizzle-orm";
 import * as v from "valibot";
 
-import { createDataSourceFolder, getDataDir } from "#lib/server/data-source";
+import { createDataSourceFolder, resolveDataSourcePath } from "#lib/server/data-source";
 import { db } from "#lib/server/db";
 import { dataSource } from "#lib/server/db/schema";
 
@@ -21,7 +20,7 @@ export const listDataSources = query(async () => {
 
 export const createDataSource = query(DataSource, async ({ url }) => {
   const id = crypto.randomUUID();
-  const dataSourcePath = path.join(getDataDir(), id);
+  const dataSourcePath = id;
 
   const [created] = await db
     .insert(dataSource)
@@ -33,7 +32,7 @@ export const createDataSource = query(DataSource, async ({ url }) => {
   }
 
   try {
-    await createDataSourceFolder(dataSourcePath);
+    await createDataSourceFolder(resolveDataSourcePath(dataSourcePath));
   } catch (error) {
     await db.delete(dataSource).where(eq(dataSource.id, created.id));
     throw error;
@@ -49,7 +48,10 @@ export const deleteDataSource = query(v.string(), async (id) => {
     throw new Error("Data source not found");
   }
 
-  await fs.rm(deleted.path, { force: true, recursive: true });
+  await fs.rm(resolveDataSourcePath(deleted.path), {
+    force: true,
+    recursive: true,
+  });
 
   return [deleted];
 });

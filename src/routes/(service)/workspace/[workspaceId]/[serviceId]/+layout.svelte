@@ -16,7 +16,7 @@
     const hrefRoute = `/workspace/${params.workspaceId}/${params.serviceId}/`;
 </script>
 
-<div class="flex h-full min-w-0 w-svw">
+<div class="flex h-full w-svw min-w-0">
     <div class="shrink-0">
         <NavigationRail bind:open={railOpen.current}>
             {#snippet fab(open)}
