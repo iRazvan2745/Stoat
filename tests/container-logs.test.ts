@@ -1,3 +1,5 @@
+import { setImmediate as waitImmediate } from "node:timers/promises";
+
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -7,9 +9,9 @@ import {
   parseContainerLogEvent,
   resolveContainerLabel,
   trimContainerLogs,
-} from "./container-logs";
-import type { ContainerLogRecord } from "./container-logs";
-import { consumeSseJsonStream } from "./server/sse";
+} from "#lib/container-logs";
+import type { ContainerLogRecord } from "#lib/container-logs";
+import { consumeSseJsonStream } from "#lib/server/sse";
 
 const log = (
   partial: Partial<ContainerLogRecord> & Pick<ContainerLogRecord, "id" | "timestamp">,
@@ -27,8 +29,8 @@ describe("composeServiceName", () => {
     expect(composeServiceName("nginx-f7gzq-nginx", "nginx-f7gzq")).toBe("nginx");
   });
 
-  it("returns the uncloud name when the slug does not match", () => {
-    expect(composeServiceName("web", "app-abc12")).toBe("web");
+  it("returns the uncloud name when prefixing is off", () => {
+    expect(composeServiceName("nginx")).toBe("nginx");
   });
 });
 
@@ -166,8 +168,9 @@ describe("consumeSseJsonStream", () => {
     });
     const events: { eventName: string; payload: unknown }[] = [];
 
-    await consumeSseJsonStream(body, async (eventName, payload) => {
+    await consumeSseJsonStream(body, (eventName, payload) => {
       events.push({ eventName, payload });
+      return Promise.resolve();
     });
 
     expect(events).toEqual([
@@ -182,11 +185,11 @@ describe("consumeSseJsonStream", () => {
     const controller = new AbortController();
     const abortError = new DOMException("This operation was aborted", "AbortError");
     const body = new ReadableStream<Uint8Array>({
-      start() {
-        // Keep the stream open until abort cancels it.
-      },
       cancel() {
         return Promise.reject(abortError);
+      },
+      start() {
+        // Keep the stream open until abort cancels it.
       },
     });
     const unhandled: unknown[] = [];
@@ -197,13 +200,11 @@ describe("consumeSseJsonStream", () => {
     process.on("unhandledRejection", onUnhandled);
 
     try {
-      const consume = consumeSseJsonStream(body, async () => undefined, controller.signal);
+      const consume = consumeSseJsonStream(body, () => Promise.resolve(), controller.signal);
 
       controller.abort();
       await consume;
-      await new Promise<void>((resolve) => {
-        setImmediate(resolve);
-      });
+      await waitImmediate();
 
       expect(unhandled).toEqual([]);
     } finally {

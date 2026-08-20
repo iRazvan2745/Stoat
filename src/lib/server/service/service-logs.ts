@@ -12,7 +12,7 @@ import {
 import { formatComposeFile } from "#lib/server/deployments/deployment-compose";
 import type { ServiceContainerInfo } from "#lib/server/service/service-containers";
 import { listServiceContainers } from "#lib/server/service/service-containers";
-import { getService } from "#lib/server/service/services";
+import { getService, serviceComposePrefix } from "#lib/server/service/services";
 import { consumeSseJsonStream, isAbortError } from "#lib/server/sse";
 
 const LOG_TAIL = 200;
@@ -102,7 +102,7 @@ const snapshotOf = (
   logs: [...logs],
 });
 
-const relabelContainers = (containers: ContainerLogSource[], serviceSlug?: string): void => {
+const relabelContainers = (containers: ContainerLogSource[], prefix?: string): void => {
   for (const container of containers) {
     container.label = resolveContainerLabel(
       {
@@ -113,7 +113,7 @@ const relabelContainers = (containers: ContainerLogSource[], serviceSlug?: strin
         shortId: container.id.slice(0, 12),
       },
       containers,
-      serviceSlug,
+      prefix,
     );
   }
 };
@@ -121,10 +121,10 @@ const relabelContainers = (containers: ContainerLogSource[], serviceSlug?: strin
 const toLogSource = (
   container: ServiceContainerInfo,
   siblings: ServiceContainerInfo[],
-  serviceSlug?: string,
+  prefix?: string,
 ): ContainerLogSource => ({
   id: container.id,
-  label: resolveContainerLabel(container, siblings, serviceSlug),
+  label: resolveContainerLabel(container, siblings, prefix),
   machineName: container.machineName,
   name: container.name,
   serviceName: container.serviceName,
@@ -137,7 +137,7 @@ const upsertLogSource = (
     machineName: string;
     serviceName: string;
   },
-  serviceSlug?: string,
+  prefix?: string,
 ): ContainerLogSource => {
   const existing = matchContainerId(containers, event.containerId);
 
@@ -154,7 +154,7 @@ const upsertLogSource = (
   };
 
   containers.push(source);
-  relabelContainers(containers, serviceSlug);
+  relabelContainers(containers, prefix);
 
   return source;
 };
@@ -205,8 +205,8 @@ type PreparedServiceLogs =
       ok: true;
       containers: ContainerLogSource[];
       listedError: string | null;
+      prefix?: string;
       serviceNames: string[];
-      serviceSlug: string;
     };
 
 interface LogQueueState {
@@ -218,8 +218,8 @@ interface LogQueueState {
 interface ConsumeLogContext {
   containers: ContainerLogSource[];
   nextLogId: { value: number };
+  prefix?: string;
   queue: EventQueue;
-  serviceSlug: string;
   signal: AbortSignal;
 }
 
@@ -240,11 +240,11 @@ const prepareServiceLogContext = async (serviceId: string): Promise<PreparedServ
     };
   }
 
-  const serviceSlug = svc.slug ?? svc.id;
+  const prefix = serviceComposePrefix(svc);
   let formatted;
 
   try {
-    formatted = formatComposeFile(svc.value, serviceSlug);
+    formatted = formatComposeFile(svc.value, prefix);
   } catch {
     return {
       ok: false,
@@ -255,11 +255,11 @@ const prepareServiceLogContext = async (serviceId: string): Promise<PreparedServ
   const listed = await listServiceContainers(serviceId);
 
   return {
-    containers: listed.items.map((container) => toLogSource(container, listed.items, serviceSlug)),
+    containers: listed.items.map((container) => toLogSource(container, listed.items, prefix)),
     listedError: listed.error,
     ok: true,
+    prefix,
     serviceNames: formatted.serviceNames,
-    serviceSlug,
   };
 };
 
@@ -288,7 +288,7 @@ const consumeLogResponse = async (
   response: Response,
   context: ConsumeLogContext,
 ): Promise<void> => {
-  const { containers, nextLogId, queue, serviceSlug, signal } = context;
+  const { containers, nextLogId, queue, prefix, signal } = context;
 
   if (!response.body) {
     queue.push(
@@ -311,7 +311,7 @@ const consumeLogResponse = async (
           return Promise.resolve();
         }
 
-        const source = upsertLogSource(containers, parsed, serviceSlug);
+        const source = upsertLogSource(containers, parsed, prefix);
 
         queue.push({
           kind: "log",
@@ -454,7 +454,7 @@ export async function* streamServiceContainerLogs(
       return;
     }
 
-    const { containers, listedError, serviceNames, serviceSlug } = prepared;
+    const { containers, listedError, serviceNames, prefix } = prepared;
 
     yield snapshotOf(containers, logs, false, null);
 
@@ -484,8 +484,8 @@ export async function* streamServiceContainerLogs(
       void consumeLogResponse(response, {
         containers,
         nextLogId,
+        prefix,
         queue,
-        serviceSlug,
         signal: controller.signal,
       });
     }

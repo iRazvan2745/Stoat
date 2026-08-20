@@ -55,6 +55,11 @@
   }
 }
 
+body {
+  font-family: "Google Sans Flex", sans-serif;
+  @apply text-on-surface;
+}
+
 .m3-container input:not(:focus)::placeholder {
   opacity: 0;
 }

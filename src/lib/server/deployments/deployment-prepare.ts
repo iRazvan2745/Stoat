@@ -5,12 +5,18 @@ import path from "node:path";
 import { eq } from "drizzle-orm";
 
 import { ucClient } from "#lib/api/client";
+import { serializeEnvFile } from "#lib/environment";
 import { resolveDataSourcePath } from "#lib/server/data-source";
 import { dataSource, deploymentLogs, workspace } from "#lib/server/db/schema";
-import { formatComposeFile } from "#lib/server/deployments/deployment-compose";
+import {
+  applyEnvironmentVariables,
+  formatComposeFile,
+  inlineEnvironmentVariables,
+} from "#lib/server/deployments/deployment-compose";
 import { consumeDeployStream } from "#lib/server/deployments/deployment-stream";
 import { getRepo } from "#lib/server/git";
-import { getService } from "#lib/server/service/services";
+import { listEnvironmentVariables } from "#lib/server/service/service-environment";
+import { getService, serviceComposePrefix } from "#lib/server/service/services";
 
 import { db } from "../db";
 
@@ -51,7 +57,7 @@ async function getWorkspace(id: string) {
 }
 
 export async function prepareDeployment(id: string, deploymentId: string): Promise<void> {
-  const log = (stream: "stdout" | "stderr", message: string) =>
+  const log = (stream: "debug" | "stderr" | "stdout", message: string) =>
     addDeploymentLog(deploymentId, stream, message);
 
   const svc = await getService(id);
@@ -61,8 +67,10 @@ export async function prepareDeployment(id: string, deploymentId: string): Promi
   }
 
   const serviceSlug = svc.slug ?? svc.id;
-  const formatted = formatComposeFile(svc.value, serviceSlug);
-  const compose = formatted.yaml;
+  const formatted = formatComposeFile(svc.value, serviceComposePrefix(svc));
+  const environment = await listEnvironmentVariables(id);
+  const compose = applyEnvironmentVariables(formatted.yaml, environment);
+  const deployCompose = inlineEnvironmentVariables(formatted.yaml, environment);
   const wrk = await getWorkspace(svc.workspaceId);
   const ds = await getDatasourceFromWorkspace(svc.workspaceId);
   const repoPath = resolveDataSourcePath(ds.path);
@@ -71,50 +79,68 @@ export async function prepareDeployment(id: string, deploymentId: string): Promi
   const repo = await getRepo({ repoPath, repoUrl: ds.url });
 
   await log("stdout", `Preparing deployment for service ${svc.name} (${serviceSlug})`);
-  await log("stdout", `Parsed compose file with ${formatted.serviceCount} services`);
+  await log("debug", `Parsed compose file with ${formatted.serviceCount} services`);
+
+  if (environment.length > 0) {
+    await log("debug", `Applied ${environment.length} environment variables`);
+  }
 
   await fs.mkdir(dataServiceDir, { recursive: true });
   const dataComposePath = path.join(dataServiceDir, "compose.yaml");
+  const dataEnvPath = path.join(dataServiceDir, ".env");
   await fs.writeFile(dataComposePath, compose, "utf-8");
-  await log("stdout", `Wrote compose file to ${dataComposePath}`);
+  await log("debug", `Wrote compose file to ${dataComposePath}`);
+
+  if (environment.length > 0) {
+    await fs.writeFile(dataEnvPath, serializeEnvFile(environment), "utf-8");
+    await log("debug", `Wrote environment file to ${dataEnvPath}`);
+  } else {
+    await fs.rm(dataEnvPath, { force: true });
+  }
 
   const composeRepoPath = path.join(servicePath, "compose.yaml");
-  await log("stdout", `Checking git status in ${repoPath}`);
+  const envRepoPath = path.join(servicePath, ".env");
+  await log("debug", `Checking git status in ${repoPath}`);
 
   const status = await repo.status();
-  const changedFiles = status.files.filter((file) => file.path === composeRepoPath);
+  const changedFiles = status.files.filter(
+    (file) => file.path === composeRepoPath || file.path === envRepoPath,
+  );
   if (changedFiles.length > 0) {
     const fileList = changedFiles.map((file) => `  ${file.path}`).join("\n");
-    await log("stdout", `Changes detected:\n${fileList}`);
+    await log("debug", `Changes detected:\n${fileList}`);
 
-    await repo.add(composeRepoPath);
-    await log("stdout", `Added ${composeRepoPath} to git index`);
+    await repo.add(changedFiles.map((file) => file.path));
+    await log("debug", `Added ${changedFiles.map((file) => file.path).join(", ")} to git index`);
 
     const commit = await repo.commit(
       `Committing new changes on Service ${svc.name} before deploying`,
     );
-    await log("stdout", `Committed changes: ${commit.commit}`);
+    await log("debug", `Committed changes: ${commit.commit}`);
     await log(
-      "stdout",
+      "debug",
       `Changes: ${commit.summary.changes}, insertions: ${commit.summary.insertions}, deletions: ${commit.summary.deletions}`,
     );
+    await log("stdout", "Saved compose changes to git");
   } else {
-    await log("stdout", "No changes to commit — compose file is already up to date");
+    await log("debug", "No changes to commit — compose file is already up to date");
+    await log("stdout", "Compose file is already up to date");
   }
 
-  await log("stdout", `Pushing changes to ${ds.url}`);
+  await log("debug", `Pushing changes to ${ds.url}`);
   const push = await repo.push();
   if (push.pushed.length > 0) {
     for (const detail of push.pushed) {
-      await log("stdout", `  Pushed ${detail.local} -> ${detail.remote}`);
+      await log("debug", `  Pushed ${detail.local} -> ${detail.remote}`);
     }
+    await log("stdout", "Pushed configuration to git remote");
   } else {
-    await log("stdout", "Nothing to push — remote is already up to date");
+    await log("debug", "Nothing to push — remote is already up to date");
   }
 
   const deploy = await ucClient.POST("/api/v1/services/deploy/compose", {
     body: {
-      compose: Buffer.from(compose).toString("base64"),
+      compose: Buffer.from(deployCompose).toString("base64"),
       options: {
         //profiles: [""],
         //recreate: true,

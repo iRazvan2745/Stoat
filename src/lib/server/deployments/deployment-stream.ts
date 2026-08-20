@@ -1,4 +1,6 @@
 // oxlint-disable func-style no-await-in-loop
+import { formatDeployPlanMessage } from "#lib/deployment-logs";
+
 export interface DeployEventPayload {
   type?: string;
   action?: string;
@@ -25,32 +27,10 @@ export function formatDeployStreamEvent(
 ): { stream: "stdout" | "stderr"; message: string; isError: boolean } {
   if (eventName === "plan") {
     const operations = payload.operations ?? [];
-    if (operations.length === 0) {
-      return {
-        isError: false,
-        message: "Deploy plan received with no operations",
-        stream: "stdout",
-      };
-    }
-
-    const details = operations
-      .map((operation) =>
-        [
-          operation.action ?? "unknown-action",
-          operation.service ? `service=${operation.service}` : undefined,
-          operation.machine ? `machine=${operation.machine}` : undefined,
-          operation.image ? `image=${operation.image}` : undefined,
-          operation.containerId ? `container=${operation.containerId}` : undefined,
-          operation.order ? `order=${operation.order}` : undefined,
-        ]
-          .filter(Boolean)
-          .join(" "),
-      )
-      .join(" | ");
 
     return {
       isError: false,
-      message: `Plan: ${details}`,
+      message: formatDeployPlanMessage(operations),
       stream: "stdout",
     };
   }

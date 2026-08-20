@@ -1,6 +1,7 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
     import addIcon from "@ktibow/iconset-material-symbols/add";
+    import codeBlocksIcon from "@ktibow/iconset-material-symbols/code-blocks-outline";
     import deleteIcon from "@ktibow/iconset-material-symbols/delete";
     import moreVertIcon from "@ktibow/iconset-material-symbols/more-vert";
     import refreshIcon from "@ktibow/iconset-material-symbols/refresh";
@@ -17,7 +18,7 @@
         TextField,
         snackbar,
     } from "m3-svelte";
-    import { parseAsBoolean, parseAsString, useQueryState } from "nuqs-svelte";
+    import { parseAsBoolean, useQueryState } from "nuqs-svelte";
 
     import {
         createService,
@@ -28,8 +29,10 @@
         getWorkspace,
         listWorkspaces,
     } from "#lib/api/workspace.remote";
+    import ServiceIcon from "#lib/service-icon.svelte";
 
     import type { PageProps } from "./$types";
+    import TemplatesDialog from "./templates-dialog.svelte";
 
     let { params }: PageProps = $props();
 
@@ -42,40 +45,37 @@
         "createDialogOpen",
         parseAsBoolean.withDefault(false)
     );
-
-    let compose = useQueryState("compose", parseAsString.withDefault(""));
-
-    let serviceName = useQueryState(
-        "serviceName",
-        parseAsString.withDefault("")
-    );
-
-    let submitting = useQueryState(
-        "submitting",
+    let templatesDialogOpen = useQueryState(
+        "templatesDialogOpen",
         parseAsBoolean.withDefault(false)
     );
 
+    let compose = $state("");
+    let serviceName = $state("");
+    let submitting = $state(false);
+
     let actionsMenuOpen = $state(false);
+    let addServiceMenuOpen = $state(false);
     let deleteWorkspaceDialogOpen = $state(false);
     let deletingWorkspace = $state(false);
 
     const create = async (): Promise<void> => {
-        if (!serviceName.current.trim()) {
+        if (!serviceName.trim()) {
             return;
         }
 
-        submitting.current = true;
+        submitting = true;
 
         try {
             await createService({
-                name: serviceName.current.trim(),
-                value: compose.current.trim(),
+                name: serviceName.trim(),
+                value: compose.trim(),
                 workspaceId: params.workspaceId,
             });
 
             createDialogOpen.set(false);
-            serviceName.set("");
-            compose.set("");
+            serviceName = "";
+            compose = "";
 
             snackbar("Service created");
 
@@ -87,7 +87,7 @@
                     : "Unable to create service"
             );
         } finally {
-            submitting.set(false);
+            submitting = false;
         }
     };
 
@@ -117,10 +117,46 @@
     </h1>
 
     <div class="flex items-center gap-2">
-        <Button iconType="left" onclick={() => createDialogOpen.set(true)}>
-            <Icon icon={addIcon} size={18} />
-            Add service
-        </Button>
+        <div class="relative">
+            <Button
+                iconType="left"
+                aria-expanded={addServiceMenuOpen}
+                aria-haspopup="menu"
+                style={addServiceMenuOpen
+                    ? "anchor-name: --m3-menu-anchor"
+                    : undefined}
+                onclick={() => {
+                    actionsMenuOpen = false;
+                    addServiceMenuOpen = !addServiceMenuOpen;
+                }}
+            >
+                <Icon icon={addIcon} size={18} />
+                Add service
+            </Button>
+
+            {#if addServiceMenuOpen}
+                <ExpressiveMenu anchored x="end" y="down" label="Add service">
+                    <ExpressiveMenuItem
+                        leadingIcon={codeBlocksIcon}
+                        label="Compose"
+                        //details="Paste a Docker Compose file"
+                        onclick={() => {
+                            addServiceMenuOpen = false;
+                            createDialogOpen.set(true);
+                        }}
+                    />
+                    <ExpressiveMenuItem
+                        leadingIcon={widgetsIcon}
+                        label="Template"
+                        //details="Start from a packaged app"
+                        onclick={() => {
+                            addServiceMenuOpen = false;
+                            templatesDialogOpen.set(true);
+                        }}
+                    />
+                </ExpressiveMenu>
+            {/if}
+        </div>
 
         <Button
             variant="tonal"
@@ -140,8 +176,13 @@
                 aria-label="More workspace actions"
                 aria-expanded={actionsMenuOpen}
                 aria-haspopup="menu"
-                style="anchor-name: --m3-menu-anchor"
-                onclick={() => (actionsMenuOpen = !actionsMenuOpen)}
+                style={actionsMenuOpen
+                    ? "anchor-name: --m3-menu-anchor"
+                    : undefined}
+                onclick={() => {
+                    addServiceMenuOpen = false;
+                    actionsMenuOpen = !actionsMenuOpen;
+                }}
             >
                 <Icon icon={moreVertIcon} />
             </Button>
@@ -176,7 +217,7 @@
         <div class="text-error p-6 text-sm">{services.error.message}</div>
     {:else if (services.current?.length ?? 0) === 0}
         <div class="text-on-surface-variant px-5 py-10 text-center text-sm">
-            No services found. Paste a docker compose file to get started.
+            No services yet. Add a compose file or start from a template.
         </div>
     {:else}
         <div class="grid grid-cols-3 gap-2 py-2">
@@ -188,11 +229,15 @@
                         goto(`/workspace/${params.workspaceId}/${service.id}`)}
                 >
                     <div class="flex items-center gap-4">
-                        <div>
-                            <Icon
-                                icon={widgetsIcon}
-                                size={48}
-                                class="bg-primary-container rounded-md p-2"
+                        <div
+                            class="bg-surface-container-high text-on-surface grid size-12 shrink-0
+                                place-items-center rounded-lg"
+                        >
+                            <ServiceIcon
+                                icon={service.icon}
+                                type={service.type}
+                                size={28}
+                                alt=""
                             />
                         </div>
                         <div class="min-w-0">
@@ -220,7 +265,7 @@
 <Dialog bind:open={createDialogOpen.current} headline="Add service">
     <div class="flex flex-col gap-4">
         <TextField
-            bind:value={serviceName.current}
+            bind:value={serviceName}
             label="Name"
             required
             placeholder="My Web App"
@@ -232,7 +277,7 @@
             Cancel
         </Button>
 
-        <Button disabled={submitting.current} onclick={create}>Add</Button>
+        <Button disabled={submitting} onclick={create}>Add</Button>
     {/snippet}
 </Dialog>
 
@@ -258,6 +303,12 @@
         >
     {/snippet}
 </Dialog>
+
+<TemplatesDialog
+    bind:open={templatesDialogOpen.current}
+    workspaceId={params.workspaceId}
+    oncreated={() => services.refresh()}
+/>
 
 <Snackbar />
 

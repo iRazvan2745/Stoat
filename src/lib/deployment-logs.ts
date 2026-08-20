@@ -7,6 +7,7 @@ export interface DeploymentLogRecord {
 }
 
 export interface ParsedDeploymentProgress {
+  detail?: string;
   indeterminate: boolean;
   label: string;
   parent?: string;
@@ -16,6 +17,8 @@ export interface ParsedDeploymentProgress {
   target: string;
 }
 
+export type DeploymentLogSection = "complete" | "deploy" | "error" | "git" | "plan" | "prepare";
+
 export type DeploymentLogEntry =
   | {
       kind: "progress";
@@ -24,6 +27,13 @@ export type DeploymentLogEntry =
       progress: ParsedDeploymentProgress;
     }
   | {
+      kind: "section";
+      key: string;
+      section: DeploymentLogSection;
+      title: string;
+    }
+  | {
+      debug: boolean;
       kind: "text";
       lines: string[];
       log: DeploymentLogRecord;
@@ -37,7 +47,7 @@ export interface HighlightedLogSegment {
 }
 
 const LOG_HIGHLIGHT_PATTERN =
-  /(\/(?:[\w./-]+)+|\b(?:complete(?:d)?|success(?:ful)?|started|finished|ready|healthy|running|deployed|updated|removed|created|pulled|built|pushed|restarted|stopped)\b|\b(?:deploying|pulling|creating|starting|stopping|removing|building|pushing|wrote|service|compose|container|image|nginx|docker|machine|workspace|volume|network)\b|\b\d+(?:\.\d+)?(?:ms|[smh]|MB|GB|KB|TB|B|%)\b)/gi;
+  /(?<token>\/(?:[\w./-]+)+|\b(?:complete(?:d)?|success(?:ful)?|started|finished|ready|healthy|running|deployed|updated|removed|created|pulled|built|pushed|restarted|stopped)\b|\b(?:deploying|pulling|creating|starting|stopping|removing|building|pushing|wrote|service|compose|container|image|nginx|docker|machine|workspace|volume|network)\b|\b\d+(?:\.\d+)?(?:ms|[smh]|MB|GB|KB|TB|B|%)\b)/giu;
 
 function classifyHighlight(text: string): LogHighlightKind {
   if (text.startsWith("/")) {
@@ -49,14 +59,14 @@ function classifyHighlight(text: string): LogHighlightKind {
   }
 
   if (
-    /complete|success|started|finished|ready|healthy|running|deployed|updated|removed|created|pulled|built|pushed|restarted|stopped/i.test(
+    /complete|success|started|finished|ready|healthy|running|deployed|updated|removed|created|pulled|built|pushed|restarted|stopped/iu.test(
       text,
     )
   ) {
     return "success";
   }
 
-  if (/deploying|pulling|creating|starting|stopping|removing|building|pushing|wrote/i.test(text)) {
+  if (/deploying|pulling|creating|starting|stopping|removing|building|pushing|wrote/iu.test(text)) {
     return "info";
   }
 
@@ -81,7 +91,12 @@ export function highlightLogMessage(message: string): HighlightedLogSegment[] {
       });
     }
 
-    const text = match[0];
+    const [text] = match;
+
+    if (!text) {
+      continue;
+    }
+
     segments.push({ kind: classifyHighlight(text), text });
     lastIndex = index + text.length;
   }
@@ -92,6 +107,49 @@ export function highlightLogMessage(message: string): HighlightedLogSegment[] {
 
   return segments.length > 0 ? segments : [{ kind: "default", text: message }];
 }
+
+const DEBUG_LOG_PATTERNS: readonly RegExp[] = [
+  /^ {2}Pushed /u,
+  /^Added .+ to git index$/u,
+  /^Changes detected:/u,
+  /^Changes: \d+, insertions:/u,
+  /^Checking git status in /u,
+  /^Committed changes:/u,
+  /^Deployment completed for service /u,
+  /^Deployment queued for service /u,
+  /^Deployment started for service /u,
+  /^No changes to commit/u,
+  /^Nothing to push/u,
+  /^Parsed compose file with /u,
+  /^Pushing changes to /u,
+  /^Wrote compose file to /u,
+];
+
+const PLAN_PREFIX = "Plan: ";
+
+const PLAN_ACTION_LABELS: Record<string, string> = {
+  create: "Create",
+  delete: "Remove",
+  recreate: "Recreate",
+  remove: "Remove",
+  restart: "Restart",
+  run: "Start",
+  start: "Start",
+  stop: "Stop",
+  update: "Update",
+};
+
+const OLD_PLAN_OPERATION_PATTERN =
+  /^(?<action>\S+)(?: service=(?<service>\S+))?(?: machine=(?<machine>\S+))?(?: image=(?<image>\S+))?(?: container=(?<container>\S+))?(?: order=(?<order>\S+))?$/u;
+
+const SECTION_TITLES: Record<DeploymentLogSection, string> = {
+  complete: "Finished",
+  deploy: "Rolling out",
+  error: "Errors",
+  git: "Git",
+  plan: "Plan",
+  prepare: "Preparing",
+};
 
 const BYTE_PROGRESS_PATTERN =
   /^\[(?<bar>[=>\s.]+)\]\s+(?<current>[\d.]+)\s*(?<currentUnit>[KMGT]?B)\/(?<total>[\d.]+)\s*(?<totalUnit>[KMGT]?B)$/u;
@@ -114,6 +172,185 @@ type ProgressKind = "container" | "image" | "layer" | "other";
 interface LayerProgress {
   current: number;
   total: number;
+}
+
+interface ProgressDisplay {
+  detail?: string;
+  label: string;
+}
+
+export function isDebugDeploymentLog(
+  log: Pick<DeploymentLogRecord, "message" | "stream">,
+): boolean {
+  if (log.stream === "stderr") {
+    return false;
+  }
+
+  if (log.stream === "debug") {
+    return true;
+  }
+
+  return DEBUG_LOG_PATTERNS.some((pattern) => pattern.test(log.message));
+}
+
+function formatPlanAction(action: string): string {
+  const mapped = PLAN_ACTION_LABELS[action.toLowerCase()];
+
+  if (mapped) {
+    return mapped;
+  }
+
+  return `${action.charAt(0).toUpperCase()}${action.slice(1)}`;
+}
+
+function formatOldPlanOperation(operation: string): string {
+  const trimmed = operation.trim();
+  const match = OLD_PLAN_OPERATION_PATTERN.exec(trimmed);
+
+  if (!match?.groups?.action || !trimmed.includes("=")) {
+    return trimmed;
+  }
+
+  const parts: string[] = [formatPlanAction(match.groups.action)];
+
+  if (match.groups.service) {
+    parts.push(match.groups.service);
+  } else if (match.groups.container) {
+    parts.push(match.groups.container);
+  }
+
+  if (match.groups.machine) {
+    parts.push(`on machine ${match.groups.machine}`);
+  }
+
+  if (match.groups.image) {
+    parts.push(`(image ${match.groups.image})`);
+  }
+
+  return parts.join(" ");
+}
+
+export function formatDeploymentLogMessage(message: string): string {
+  if (message === "Deploy complete: deployed") {
+    return "Deployment finished";
+  }
+
+  if (message.startsWith("Deploy complete: ")) {
+    return `Deployment finished: ${message.slice("Deploy complete: ".length)}`;
+  }
+
+  if (message.startsWith(PLAN_PREFIX)) {
+    const details = message.slice(PLAN_PREFIX.length);
+    const operations = details.includes("=")
+      ? details.split(" | ").map(formatOldPlanOperation)
+      : details.split(" | ");
+
+    return operations.join("\n");
+  }
+
+  return message;
+}
+
+export function formatDeployPlanMessage(
+  operations: {
+    action?: string;
+    container?: string;
+    containerId?: string;
+    image?: string;
+    machine?: string;
+    service?: string;
+  }[],
+): string {
+  if (operations.length === 0) {
+    return "Deploy plan received with no operations";
+  }
+
+  const lines = operations.map((operation) => {
+    const parts: string[] = [formatPlanAction(operation.action ?? "run")];
+    const target = operation.service ?? operation.container ?? operation.containerId;
+
+    if (target) {
+      parts.push(target);
+    }
+
+    if (operation.machine) {
+      parts.push(`on machine ${operation.machine}`);
+    }
+
+    if (operation.image) {
+      parts.push(`(image ${operation.image})`);
+    }
+
+    return parts.join(" ");
+  });
+
+  return `${PLAN_PREFIX}${lines.join(" | ")}`;
+}
+
+export function getDeploymentLogSection(
+  log: Pick<DeploymentLogRecord, "message" | "stream">,
+): DeploymentLogSection {
+  if (log.stream === "stderr") {
+    return "error";
+  }
+
+  const { message } = log;
+
+  if (
+    /^Deployment queued|^Deployment started|^Parsed compose|^Preparing deployment|^Wrote compose/u.test(
+      message,
+    )
+  ) {
+    return "prepare";
+  }
+
+  if (
+    /^\s+Pushed |^Added .+ to git index|^Changes detected:|^Changes: |^Checking git status|^Committed changes:|^Compose file is already up to date|^No changes to commit|^Nothing to push|^Pushed configuration|^Pushing changes|^Saved compose changes/u.test(
+      message,
+    )
+  ) {
+    return "git";
+  }
+
+  if (/^Deploy plan|^Plan:/u.test(message)) {
+    return "plan";
+  }
+
+  if (
+    /^Deploy complete|^Deployed service|^Deployment completed|^Deployment finished/u.test(message)
+  ) {
+    return "complete";
+  }
+
+  return "deploy";
+}
+
+export function insertLogSectionHeaders(entries: DeploymentLogEntry[]): DeploymentLogEntry[] {
+  const grouped: DeploymentLogEntry[] = [];
+  let currentSection: DeploymentLogSection | undefined;
+
+  for (const [index, entry] of entries.entries()) {
+    if (entry.kind === "section") {
+      grouped.push(entry);
+      continue;
+    }
+
+    const section = entry.kind === "progress" ? "deploy" : getDeploymentLogSection(entry.log);
+
+    if (section !== currentSection) {
+      currentSection = section;
+      grouped.push({
+        key: `section:${section}:${index}`,
+        kind: "section",
+        section,
+        title: SECTION_TITLES[section],
+      });
+    }
+
+    grouped.push(entry);
+  }
+
+  return grouped;
 }
 
 function parseBytes(value: string, unit: string): number {
@@ -187,24 +424,46 @@ function getProgressKind(target: string, parent?: string): ProgressKind {
   return "other";
 }
 
-function formatImageLabel(target: string): string {
-  const match = /^Image (?<image>.+?) on (?<machine>.+)$/u.exec(target);
+const IMAGE_TARGET_PATTERN = /^Image (?<name>.+?) on (?<machine>.+)$/u;
+const CONTAINER_TARGET_PATTERN = /^Container (?<name>.+?) on (?<machine>.+)$/u;
 
-  if (!match?.groups?.image || !match.groups.machine) {
-    return target;
+const CONTAINER_STATUS_LABELS: Record<string, { done: string; pending: string }> = {
+  created: { done: "Created container", pending: "Creating container" },
+  dead: { done: "Container failed", pending: "Container failing" },
+  exited: { done: "Stopped container", pending: "Stopping container" },
+  paused: { done: "Paused container", pending: "Pausing container" },
+  running: { done: "Started container", pending: "Starting container" },
+  stopped: { done: "Stopped container", pending: "Stopping container" },
+};
+
+function formatImageDisplay(target: string, phase: string): ProgressDisplay {
+  const match = IMAGE_TARGET_PATTERN.exec(target);
+
+  if (!match?.groups?.name || !match.groups.machine) {
+    return { label: target };
   }
 
-  return `Pulling ${match.groups.image} on ${match.groups.machine}`;
+  return {
+    detail: `Machine: ${match.groups.machine}`,
+    label:
+      phase === "done" ? `Pulled image ${match.groups.name}` : `Pulling image ${match.groups.name}`,
+  };
 }
 
-function formatContainerLabel(target: string): string {
-  const match = /^Container (?<container>.+?) on (?<machine>.+)$/u.exec(target);
+function formatContainerDisplay(target: string, status: string, phase: string): ProgressDisplay {
+  const match = CONTAINER_TARGET_PATTERN.exec(target);
 
-  if (!match?.groups?.container || !match.groups.machine) {
-    return target;
+  if (!match?.groups?.name || !match.groups.machine) {
+    return { label: target };
   }
 
-  return `${match.groups.container} on ${match.groups.machine}`;
+  const labels = CONTAINER_STATUS_LABELS[status.toLowerCase()];
+  const action = labels ? (phase === "done" ? labels.done : labels.pending) : "Container";
+
+  return {
+    detail: `Machine: ${match.groups.machine}`,
+    label: `${action} ${match.groups.name}`,
+  };
 }
 
 function formatProgressLabel(
@@ -212,20 +471,21 @@ function formatProgressLabel(
   parent: string | undefined,
   status: string,
   kind: ProgressKind,
-): string {
+  phase: string,
+): ProgressDisplay {
   if (kind === "image") {
-    return formatImageLabel(target);
+    return formatImageDisplay(target, phase);
   }
 
   if (kind === "container") {
-    return formatContainerLabel(target);
+    return formatContainerDisplay(target, status, phase);
   }
 
   if (kind === "layer" && parent) {
-    return formatImageLabel(parent);
+    return formatImageDisplay(parent, phase);
   }
 
-  return parent ? `${target} (${parent})` : target;
+  return { label: parent ? `${target} (${parent})` : target };
 }
 
 function parseStatusPercent(
@@ -302,14 +562,15 @@ export function parseDeploymentProgress(message: string): ParsedDeploymentProgre
   const meta = parseProgressMeta(progressMatch.groups.status ?? "");
   const kind = getProgressKind(target, parent);
   const percent = parseStatusPercent(meta.status, meta.percent, meta.current, meta.total);
-  const label = formatProgressLabel(target, parent, meta.status, kind);
+  const display = formatProgressLabel(target, parent, meta.status, kind, phase);
   const isDone = phase === "done";
   const resolvedPercent =
     percent ?? (isDone && (kind === "image" || kind === "container") ? 100 : undefined);
 
   return {
+    detail: display.detail,
     indeterminate: resolvedPercent === undefined && !isDone,
-    label,
+    label: display.label,
     parent,
     percent: resolvedPercent,
     phase,
@@ -360,8 +621,9 @@ export function buildDeploymentLogEntries(logs: DeploymentLogRecord[]): Deployme
 
     if (!parsed) {
       entries.push({
+        debug: isDebugDeploymentLog(log),
         kind: "text",
-        lines: log.message.split("\n"),
+        lines: formatDeploymentLogMessage(log.message).split("\n"),
         log,
       });
       continue;
@@ -390,9 +652,11 @@ export function buildDeploymentLogEntries(logs: DeploymentLogRecord[]): Deployme
       );
 
       const aggregatePercent = aggregateImagePercent(layersByImage.get(parsed.parent));
+      const imageDisplay = formatImageDisplay(parsed.parent, parsed.phase);
       const imageProgress: ParsedDeploymentProgress = {
+        detail: imageDisplay.detail,
         indeterminate: aggregatePercent === undefined && parsed.phase !== "done",
-        label: formatImageLabel(parsed.parent),
+        label: imageDisplay.label,
         parent: parsed.parent,
         percent: aggregatePercent ?? (parsed.phase === "done" ? 100 : undefined),
         phase: parsed.phase,
@@ -420,8 +684,9 @@ export function buildDeploymentLogEntries(logs: DeploymentLogRecord[]): Deployme
 
     if (kind === "other") {
       entries.push({
+        debug: true,
         kind: "text",
-        lines: [log.message],
+        lines: [formatDeploymentLogMessage(log.message)],
         log,
       });
       continue;

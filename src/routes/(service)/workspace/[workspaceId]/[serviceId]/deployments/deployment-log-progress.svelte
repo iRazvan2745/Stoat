@@ -4,14 +4,15 @@
 
     import type { ParsedDeploymentProgress } from "#lib/deployment-logs";
 
+    import { formatTime } from "./deployment";
+
     interface Props {
         createdAt: Date;
-        formatTime: (date: Date | null) => string | null;
         isError: boolean;
         progress: ParsedDeploymentProgress;
     }
 
-    let { createdAt, formatTime, isError, progress }: Props = $props();
+    let { createdAt, isError, progress }: Props = $props();
 
     const isComplete = $derived(
         progress.phase === "done" && !progress.indeterminate
@@ -83,11 +84,21 @@
 
     <div class="min-w-0 py-1 pr-1">
         <div class="mb-2 flex items-start justify-between gap-4">
-            <p
-                class="text-on-surface min-w-0 text-sm leading-snug font-medium break-all"
-            >
-                {progress.label}
-            </p>
+            <div class="min-w-0">
+                <p
+                    class="text-on-surface min-w-0 text-sm leading-snug font-medium break-all"
+                >
+                    {progress.label}
+                </p>
+
+                {#if progress.detail}
+                    <p
+                        class="text-on-surface-variant mt-0.5 text-xs leading-snug"
+                    >
+                        {progress.detail}
+                    </p>
+                {/if}
+            </div>
 
             <span
                 class="inline-flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium capitalize {statusBadgeClass}"

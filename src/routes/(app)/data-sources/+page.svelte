@@ -32,30 +32,24 @@
         "createDialogOpen",
         parseAsBoolean.withDefault(false)
     );
-
-    let url = useQueryState("url", parseAsString.withDefault(""));
-
-    let submitting = useQueryState(
-        "submitting",
-        parseAsBoolean.withDefault(false)
-    );
-
     let deleting = useQueryState("deleting", parseAsString.withDefault(""));
+    let url = $state("");
+    let submitting = $state(false);
 
     const create = async (): Promise<void> => {
-        if (!url.current.trim()) {
+        if (!url.trim()) {
             return;
         }
 
-        submitting.current = true;
+        submitting = true;
 
         try {
             await createDataSource({
-                url: url.current.trim(),
+                url: url.trim(),
             });
 
             createDialogOpen.set(false);
-            url.set("");
+            url = "";
 
             snackbar("Data source added");
 
@@ -67,7 +61,7 @@
                     : "Unable to add data source"
             );
         } finally {
-            submitting.set(false);
+            submitting = false;
         }
     };
 
@@ -214,7 +208,7 @@
 <Dialog bind:open={createDialogOpen.current} headline="Add data source">
     <div class="flex flex-col gap-4">
         <TextField
-            bind:value={url.current}
+            bind:value={url}
             label="URL"
             required
             placeholder="https://example.com/data"
@@ -226,7 +220,7 @@
             Cancel
         </Button>
 
-        <Button disabled={submitting.current} onclick={create}>Add</Button>
+        <Button disabled={submitting} onclick={create}>Add</Button>
     {/snippet}
 </Dialog>
 

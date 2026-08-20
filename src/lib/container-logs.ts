@@ -28,15 +28,31 @@ export interface ParsedContainerLogEvent {
 
 const HEARTBEAT_STREAM = "heartbeat";
 
-export function composeServiceName(uncloudServiceName: string, serviceSlug?: string): string {
-  if (!serviceSlug) {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function compareLogOrder(left: ContainerLogRecord, right: ContainerLogRecord): number {
+  if (left.timestamp === right.timestamp) {
+    return left.id - right.id;
+  }
+
+  return left.timestamp < right.timestamp ? -1 : 1;
+}
+
+export function composeServiceName(uncloudServiceName: string, prefix?: string): string {
+  if (!prefix) {
     return uncloudServiceName;
   }
 
-  const prefix = `${serviceSlug}-`;
+  const prefixWithSeparator = `${prefix}-`;
 
-  if (uncloudServiceName.startsWith(prefix)) {
-    return uncloudServiceName.slice(prefix.length);
+  if (uncloudServiceName.startsWith(prefixWithSeparator)) {
+    return uncloudServiceName.slice(prefixWithSeparator.length);
   }
 
   return uncloudServiceName;
@@ -55,9 +71,9 @@ export function resolveContainerLabel(
     machineName: string;
     serviceName: string;
   }>,
-  serviceSlug?: string,
+  prefix?: string,
 ): string {
-  const base = composeServiceName(container.serviceName, serviceSlug);
+  const base = composeServiceName(container.serviceName, prefix);
   const sameBase: {
     id: string;
     machineName: string;
@@ -65,7 +81,7 @@ export function resolveContainerLabel(
   }[] = [];
 
   for (const sibling of siblings) {
-    if (composeServiceName(sibling.serviceName, serviceSlug) === base) {
+    if (composeServiceName(sibling.serviceName, prefix) === base) {
       sameBase.push(sibling);
     }
   }
@@ -94,12 +110,14 @@ export function parseContainerLogEvent(payload: unknown): ParsedContainerLogEven
     return null;
   }
 
-  const message =
-    typeof payload.message === "string"
-      ? payload.message
-      : typeof payload.error === "string"
-        ? payload.error
-        : "";
+  const { error, message: payloadMessage } = payload;
+  let message = "";
+
+  if (typeof payloadMessage === "string") {
+    message = payloadMessage;
+  } else if (typeof error === "string") {
+    message = error;
+  }
 
   if (!message) {
     return null;
@@ -135,7 +153,7 @@ export function insertLogSorted(logs: ContainerLogRecord[], log: ContainerLogRec
   let high = logs.length;
 
   while (low < high) {
-    const mid = (low + high) >> 1;
+    const mid = Math.floor((low + high) / 2);
     const current = logs[mid];
 
     if (current && compareLogOrder(current, log) <= 0) {
@@ -179,20 +197,4 @@ export function matchContainerId(
       container.id.startsWith(containerId) ||
       containerId.startsWith(container.id),
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function readString(value: unknown): string | undefined {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
-}
-
-function compareLogOrder(left: ContainerLogRecord, right: ContainerLogRecord): number {
-  if (left.timestamp === right.timestamp) {
-    return left.id - right.id;
-  }
-
-  return left.timestamp < right.timestamp ? -1 : 1;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { detectDeploymentFailure } from "./deployment-failure";
+import { detectDeploymentFailure } from "#lib/deployment-failure";
 
 describe("detectDeploymentFailure", () => {
   it("detects unsupported ingress protocol errors", () => {

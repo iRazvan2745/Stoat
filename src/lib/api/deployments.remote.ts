@@ -2,7 +2,7 @@
 import { setTimeout as wait } from "node:timers/promises";
 
 import { command, query } from "$app/server";
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import * as v from "valibot";
 
 import { deploymentLogs, deployments } from "#lib/server/db/schema";
@@ -39,6 +39,17 @@ const streamDeployments = async function* streamDeployments(serviceId: string) {
 };
 
 export const getDeployments = query.live(v.string(), streamDeployments);
+
+export const getLatestSuccessfulDeployment = query(v.string(), async (serviceId) => {
+  const [deployment] = await db
+    .select()
+    .from(deployments)
+    .where(and(eq(deployments.serviceId, serviceId), eq(deployments.outcome, "success")))
+    .orderBy(desc(deployments.finishedAt), desc(deployments.id))
+    .limit(1);
+
+  return deployment ?? null;
+});
 
 const streamDeploymentLogs = async function* streamDeploymentLogs(deploymentId: string) {
   let previousSnapshot: string | undefined;

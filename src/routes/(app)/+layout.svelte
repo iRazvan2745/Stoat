@@ -24,7 +24,7 @@
             <FAB
                 icon={addIcon}
                 color="primary-container"
-                text={open ? "Label" : undefined}
+                text={open ? "New" : undefined}
                 elevation="none"
                 style="anchor-name: --m3-menu-anchor"
                 onclick={() => (fabMenuOpen = !fabMenuOpen)}

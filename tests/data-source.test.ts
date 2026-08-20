@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vite-plus/test";
 
-import { createDataSourceFolder } from "./data-source";
+import { createDataSourceFolder } from "#lib/server/data-source";
 
 describe("data source folders", () => {
   it("creates nested workspace and service folders", async () => {

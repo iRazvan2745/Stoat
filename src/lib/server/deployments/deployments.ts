@@ -9,6 +9,7 @@ import { db } from "#lib/server/db";
 import { deploymentLogs, deployments } from "#lib/server/db/schema";
 import { prepareDeployment } from "#lib/server/deployments/deployment-prepare";
 import { getService } from "#lib/server/service/services";
+import { parseServiceSettings } from "#lib/service-settings";
 
 const StartDeploymentInput = v.object({
   service_id: v.string(),
@@ -56,15 +57,19 @@ async function processDeployment({
   const startedMessage = `Deployment started for service ${serviceId}`;
 
   console.log(startedMessage);
+  const svc = await getService(serviceId);
   await db.transaction(async (tx) => {
     await tx
       .update(deployments)
-      .set({ startedAt: new Date() })
+      .set({
+        settings: parseServiceSettings(svc?.settings),
+        startedAt: new Date(),
+      })
       .where(eq(deployments.id, deploymentId));
     await tx.insert(deploymentLogs).values({
       deploymentId,
       message: startedMessage,
-      stream: "stdout",
+      stream: "debug",
     });
   });
 
@@ -75,8 +80,6 @@ async function processDeployment({
       return;
     }
 
-    const svc = await getService(serviceId);
-
     const finishedMessage = `Deployment completed for service ${svc?.slug}`;
     await db.transaction(async (tx) => {
       await tx
@@ -86,7 +89,7 @@ async function processDeployment({
       await tx.insert(deploymentLogs).values({
         deploymentId,
         message: finishedMessage,
-        stream: "stdout",
+        stream: "debug",
       });
     });
     console.log(finishedMessage);
@@ -167,7 +170,7 @@ export async function startDeployment({ service_id }: v.InferOutput<typeof Start
     await tx.insert(deploymentLogs).values({
       deploymentId: deployment.id,
       message: `Deployment queued for service ${service_id}`,
-      stream: "stdout",
+      stream: "debug",
     });
 
     return { deploymentId: deployment.id, jobId };

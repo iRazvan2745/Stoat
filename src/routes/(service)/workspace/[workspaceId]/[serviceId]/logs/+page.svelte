@@ -1,6 +1,7 @@
 <script lang="ts">
     import logsIcon from "@ktibow/iconset-material-symbols/article-outline";
     import { Chip, Icon, LoadingIndicator } from "m3-svelte";
+    import { parseAsArrayOf, parseAsString, useQueryState } from "nuqs-svelte";
 
     import { getServiceContainerLogs } from "#lib/api/services.remote";
     import { filterContainerLogs, matchContainerId } from "#lib/container-logs";
@@ -18,13 +19,16 @@
     const following = $derived(snapshot?.following ?? false);
     const streamError = $derived(snapshot?.error ?? null);
 
-    let selectedIds = $state<string[]>([]);
+    const selectedIds = useQueryState(
+        "containers",
+        parseAsArrayOf(parseAsString).withDefault([] as string[])
+    );
     let followLatest = $state(true);
     let logContainer: HTMLDivElement | undefined = $state();
     let ignoreProgrammaticScroll = false;
 
     const activeSelectedIds = $derived(
-        selectedIds.filter((id) =>
+        selectedIds.current.filter((id) =>
             containers.some((container) => container.id === id)
         )
     );
@@ -44,7 +48,7 @@
         log.containerLabel;
 
     const selectAll = (): void => {
-        selectedIds = [];
+        selectedIds.set([]);
         followLatest = true;
     };
 
@@ -53,17 +57,17 @@
         const current = activeSelectedIds;
 
         if (current.length === 0) {
-            selectedIds = [id];
+            selectedIds.set([id]);
             return;
         }
 
         if (current.includes(id)) {
-            selectedIds = current.filter((selected) => selected !== id);
+            selectedIds.set(current.filter((selected) => selected !== id));
             return;
         }
 
         const next = [...current, id];
-        selectedIds = next.length === containers.length ? [] : next;
+        selectedIds.set(next.length === containers.length ? [] : next);
     };
 
     const formatTime = (timestamp: string): string => {

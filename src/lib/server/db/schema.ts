@@ -1,5 +1,7 @@
 // oxlint-disable oxc/no-barrel-file sort-keys
-import { bigserial, boolean, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { bigserial, boolean, index, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+
+import type { ServiceSettings } from "../../service-settings";
 
 export const dataSource = pgTable("data_source", {
   id: text("id")
@@ -42,9 +44,12 @@ export const services = pgTable("services", {
   workspaceId: text("workspace_id")
     .notNull()
     .references(() => workspace.id, { onDelete: "restrict" }),
+  type: text("type").default("compose"),
   name: text("name"),
   slug: text("slug"),
+  icon: text("icon"),
   value: text("value"),
+  settings: jsonb("settings").$type<ServiceSettings>().notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -61,7 +66,7 @@ export const deployments = pgTable("deployments", {
 
   serviceId: text("service_id")
     .notNull()
-    .references(() => services.id, { onDelete: "no action" }),
+    .references(() => services.id, { onDelete: "cascade" }),
 
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -77,6 +82,7 @@ export const deployments = pgTable("deployments", {
   finishedAt: timestamp("finished_at", { withTimezone: true }),
   outcome: text("outcome"),
   jobId: text("job_id"),
+  settings: jsonb("settings").$type<ServiceSettings>().notNull().default({}),
 });
 
 export const deploymentLogs = pgTable(
@@ -98,5 +104,23 @@ export const deploymentLogs = pgTable(
   },
   (table) => [index("deployment_logs_deployment_id_id_idx").on(table.deploymentId, table.id)],
 );
+
+export const environmentVariables = pgTable("environment_variables", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  serviceId: text("service_id")
+    .notNull()
+    .references(() => services.id, { onDelete: "restrict" }),
+  name: text("name").notNull(),
+  value: text("value").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .$defaultFn(() => new Date())
+    .$onUpdate(() => new Date()),
+});
 
 export * from "./auth.schema";

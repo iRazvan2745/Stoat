@@ -1,8 +1,10 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
+    import deployIcon from "@ktibow/iconset-material-symbols/anchor";
     import deleteIcon from "@ktibow/iconset-material-symbols/delete";
-    import deployedCodeIcon from "@ktibow/iconset-material-symbols/deployed-code";
+    import deployedCodeIcon from "@ktibow/iconset-material-symbols/deployed-code-outline";
     import moreVertIcon from "@ktibow/iconset-material-symbols/more-vert";
+    import recreateIcon from "@ktibow/iconset-material-symbols/recycling";
     import {
         Button,
         Card,
@@ -13,7 +15,9 @@
         LoadingIndicator,
         Snackbar,
         snackbar,
+        SplitButton,
     } from "m3-svelte";
+    import type { Attachment } from "svelte/attachments";
 
     import {
         deleteService,
@@ -21,8 +25,12 @@
         getService,
         getServiceContainers,
     } from "#lib/api/services.remote";
+    import ServiceIcon from "#lib/service-icon.svelte";
 
     import ComposeEditor from "./compose-editor.svelte";
+    import DatabaseConnection from "./database-connection.svelte";
+
+    const CONTAINER_POLL_INTERVAL_MS = 5000;
 
     const { params } = $props();
 
@@ -38,12 +46,84 @@
     let deploying = $state(false);
 
     const containerItems = $derived(containers.current?.items ?? []);
+    const containersReady = $derived(containers.current !== undefined);
+
+    const isHealthyStatus = (status: string): boolean => {
+        const normalized = status.toLowerCase();
+        return normalized === "healthy" || normalized === "running";
+    };
+
+    const isUnhealthyStatus = (status: string): boolean => {
+        const normalized = status.toLowerCase();
+        return (
+            normalized === "dead" ||
+            normalized === "exited" ||
+            normalized === "failed" ||
+            normalized === "unhealthy"
+        );
+    };
+
+    const serviceHealth = $derived.by(() => {
+        if (!containersReady || containerItems.length === 0) {
+            return "unknown";
+        }
+
+        if (
+            containerItems.every((container) =>
+                isHealthyStatus(container.status)
+            )
+        ) {
+            return "healthy";
+        }
+
+        if (
+            containerItems.some((container) =>
+                isUnhealthyStatus(container.status)
+            )
+        ) {
+            return "unhealthy";
+        }
+
+        return "unknown";
+    });
+
+    const healthLabel = $derived.by(() => {
+        switch (serviceHealth) {
+            case "healthy": {
+                return "Healthy";
+            }
+
+            case "unhealthy": {
+                return "Unhealthy";
+            }
+
+            default: {
+                return "Unknown";
+            }
+        }
+    });
+
+    const healthClasses = $derived.by(() => {
+        switch (serviceHealth) {
+            case "healthy": {
+                return "bg-primary-container text-on-primary-container";
+            }
+
+            case "unhealthy": {
+                return "bg-error-container text-on-error-container";
+            }
+
+            default: {
+                return "bg-secondary-container text-on-secondary-container";
+            }
+        }
+    });
 
     const statusClasses = (status: string): string => {
         switch (status.toLowerCase()) {
             case "healthy":
             case "running": {
-                return "bg-primary-container text-on-primary-container";
+                return "bg-on-primary text-on-primary-container";
             }
 
             case "dead":
@@ -57,6 +137,32 @@
                 return "bg-secondary-container text-on-secondary-container";
             }
         }
+    };
+
+    const pollContainers: Attachment = () => {
+        let cancelled = false;
+        let timeoutId = 0;
+
+        const refresh = async (): Promise<void> => {
+            await containers.refresh();
+
+            if (cancelled) {
+                return;
+            }
+
+            timeoutId = window.setTimeout(() => {
+                void refresh();
+            }, CONTAINER_POLL_INTERVAL_MS);
+        };
+
+        timeoutId = window.setTimeout(() => {
+            void refresh();
+        }, CONTAINER_POLL_INTERVAL_MS);
+
+        return (): void => {
+            cancelled = true;
+            window.clearTimeout(timeoutId);
+        };
     };
 
     const deploy = async (): Promise<void> => {
@@ -105,193 +211,237 @@
     };
 </script>
 
-<main class="space-y-4 p-4">
-    {#if svc}
-        <Card variant="elevated">
-            <div class="flex items-center justify-between">
-                <!-- Service -->
-                <div class="flex min-w-0 items-center gap-3">
+{#if svc}
+    <div
+        class="x:h-full x:overflow-hidden flex min-h-full min-w-0 flex-col gap-4"
+    >
+        <header
+            class="flex min-h-10 flex-wrap items-center justify-between gap-2"
+        >
+            <div class="flex min-w-0 items-center gap-2">
+                <div
+                    class="bg-surface-container-high text-on-surface grid size-16 shrink-0 place-items-center rounded-md"
+                    aria-hidden="true"
+                >
+                    <ServiceIcon
+                        icon={svc.icon}
+                        type={svc.type}
+                        size={48}
+                        alt=""
+                    />
+                </div>
+
+                <div class="min-w-0">
+                    <h1 class="m3-font-title-large text-on-surface truncate">
+                        {svc.name ?? "Unnamed service"}
+                    </h1>
+
                     <div
-                        class="bg-surface-container-high text-on-surface relative grid size-9 shrink-0
-                           place-items-center rounded-lg"
+                        class="mt-0.5 flex min-w-0 flex-wrap items-center gap-2"
                     >
-                        <svg
-                            class="size-5"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="1.8"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            aria-hidden="true"
-                        >
-                            <ellipse cx="12" cy="5" rx="7" ry="3" />
-                            <path d="M5 5v6c0 1.66 3.13 3 7 3s7-1.34 7-3V5" />
-                            <path d="M5 11v6c0 1.66 3.13 3 7 3s7-1.34 7-3v-6" />
-                        </svg>
-
-                        <span
-                            class="border-surface absolute -top-0.5 -right-0.5 size-2.5
-                               rounded-full border-2 bg-green-500"
-                        ></span>
-                    </div>
-
-                    <div class="min-w-0">
-                        <h1
-                            class="text-on-surface truncate text-base leading-tight font-semibold"
-                        >
-                            {svc.name ?? "Unnamed service"}
-                        </h1>
-
                         {#if svc.slug}
                             <p
-                                class="text-on-surface-variant mt-0.5 truncate text-xs"
+                                class="m3-font-label-small text-on-surface-variant truncate font-mono"
                             >
                                 {svc.slug}
                             </p>
                         {/if}
+
+                        <span
+                            class={[
+                                "m3-font-label-small inline-flex h-5 shrink-0 items-center rounded-full px-2",
+                                healthClasses,
+                            ]}
+                        >
+                            {healthLabel}
+                        </span>
                     </div>
                 </div>
+            </div>
 
-                <!-- Actions -->
-                <div class="flex shrink-0 items-center gap-1">
-                    <Button
-                        aria-label="Deploy service"
-                        disabled={deploying}
-                        aria-busy={deploying}
-                        onclick={deploy}
-                    >
-                        {#if deploying}
-                            <LoadingIndicator
-                                size={18}
-                                center={false}
-                                aria-label="Deploying service"
+            <div class="flex shrink-0 items-center gap-2">
+                <SplitButton
+                    aria-label="Deploy service"
+                    disabled={deploying}
+                    aria-busy={deploying}
+                    onclick={deploy}
+                    variant="filled"
+                    x="right"
+                    y="down"
+                >
+                    {#if deploying}
+                        <LoadingIndicator
+                            size={18}
+                            container={true}
+                            aria-label="Deploying service"
+                        />
+                        Deploying... Youre not gonna see this, if you are then your
+                        browser cant redirect or you had it not redirect
+                    {:else}
+                        <Icon icon={deployIcon} />
+                        Deploy
+                    {/if}
+                    {#snippet menu()}
+                        <ExpressiveMenu>
+                            <ExpressiveMenuItem
+                                label="Recreate"
+                                leadingIcon={recreateIcon}
                             />
-                            Deploying...
-                        {:else}
-                            Deploy
-                        {/if}
+                        </ExpressiveMenu>
+                    {/snippet}
+                </SplitButton>
+
+                <div class="relative">
+                    <Button
+                        variant="text"
+                        id="service-actions-menu-button"
+                        square
+                        aria-label="More service actions"
+                        aria-expanded={actionsMenuOpen}
+                        aria-haspopup="menu"
+                        style="anchor-name: --m3-menu-anchor"
+                        onclick={() => (actionsMenuOpen = !actionsMenuOpen)}
+                    >
+                        <Icon icon={moreVertIcon} />
                     </Button>
 
-                    <div class="relative">
-                        <Button
-                            variant="tonal"
-                            square
-                            aria-label="More service actions"
-                            aria-expanded={actionsMenuOpen}
-                            aria-haspopup="menu"
-                            style="anchor-name: --m3-menu-anchor"
-                            onclick={() => (actionsMenuOpen = !actionsMenuOpen)}
+                    {#if actionsMenuOpen}
+                        <ExpressiveMenu
+                            anchored
+                            x="end"
+                            y="down"
+                            label="Service actions"
                         >
-                            <Icon icon={moreVertIcon} />
-                        </Button>
+                            <ExpressiveMenuItem
+                                leadingIcon={deleteIcon}
+                                label="Delete service"
+                                onclick={() => {
+                                    actionsMenuOpen = false;
+                                    deleteDialogOpen = true;
+                                }}
+                            />
+                        </ExpressiveMenu>
+                    {/if}
+                </div>
+            </div>
+        </header>
 
-                        {#if actionsMenuOpen}
-                            <ExpressiveMenu
-                                anchored
-                                x="end"
-                                y="down"
-                                label="Service actions"
-                            >
-                                <ExpressiveMenuItem
-                                    leadingIcon={deleteIcon}
-                                    label="Delete service"
-                                    onclick={() => {
-                                        actionsMenuOpen = false;
-                                        deleteDialogOpen = true;
-                                    }}
-                                />
-                            </ExpressiveMenu>
-                        {/if}
+        <div
+            class="x:grid x:grid-cols-[22.5rem_minmax(0,1fr)] x:items-stretch x:gap-6 flex min-h-0 min-w-0 flex-1 flex-col gap-4"
+            {@attach pollContainers}
+        >
+            <div
+                class="x:h-full x:min-h-0 x:overflow-hidden flex min-w-0 flex-col gap-4"
+            >
+                {#if svc.type === "postgresql"}
+                    <div class="flex-none [&>.m3-container]:w-full">
+                        <DatabaseConnection serviceId={svc.id} />
                     </div>
-                </div>
-            </div>
-        </Card>
-
-        <Card variant="elevated">
-            <div class="flex items-center justify-between gap-3">
-                <h2 class="text-on-surface text-base font-semibold">
-                    Containers
-                </h2>
-
-                {#if !containers.loading && containerItems.length > 0}
-                    <p class="text-on-surface-variant text-xs">
-                        {containerItems.length}
-                        {containerItems.length === 1
-                            ? "container"
-                            : "containers"}
-                    </p>
                 {/if}
+
+                <div
+                    class="x:flex x:min-h-0 x:flex-1 x:flex-col x:overflow-hidden x:[&>.m3-container]:flex-1 x:[&>.m3-container]:overflow-hidden min-w-0 [&>.m3-container]:flex [&>.m3-container]:min-h-0 [&>.m3-container]:w-full [&>.m3-container]:flex-col"
+                >
+                    <Card variant="elevated">
+                        <div
+                            class="flex min-h-10 items-center justify-between gap-2"
+                        >
+                            <h2 class="m3-font-title-small text-on-surface">
+                                Containers
+                            </h2>
+
+                            {#if containersReady && containerItems.length > 0}
+                                <Button variant="tonal" size="xs">
+                                    {containerItems.length}
+                                </Button>
+                            {/if}
+                        </div>
+
+                        {#if !containersReady && containers.loading}
+                            <div class="flex justify-center py-2">
+                                <LoadingIndicator
+                                    aria-label="Loading containers"
+                                />
+                            </div>
+                        {:else if containers.error}
+                            <p class="m3-font-body-small text-error mt-2">
+                                {containers.error.message}
+                            </p>
+                        {:else if containers.current?.error}
+                            <p class="m3-font-body-small text-error mt-2">
+                                {containers.current.error}
+                            </p>
+                        {:else if containerItems.length === 0}
+                            <p
+                                class="m3-font-label-small text-on-surface-variant"
+                            >
+                                No running containers. Deploy this service to
+                                start them.
+                            </p>
+                        {:else}
+                            <ul
+                                class="x:min-h-0 x:flex-1 x:overflow-auto mt-1 flex flex-col"
+                            >
+                                {#each containerItems as container (container.id)}
+                                    <li
+                                        class="flex w-full items-center gap-3 py-2"
+                                    >
+                                        <div
+                                            class="bg-primary-container text-on-primary-container grid size-8 shrink-0 place-items-center rounded-full"
+                                        >
+                                            <Icon
+                                                icon={deployedCodeIcon}
+                                                size={18}
+                                            />
+                                        </div>
+
+                                        <div class="min-w-0 flex-1">
+                                            <p
+                                                class="m3-font-label-large text-on-surface truncate"
+                                            >
+                                                {container.name}
+                                            </p>
+                                            <p
+                                                class="m3-font-label-small text-on-surface-variant truncate"
+                                            >
+                                                {container.image} ·
+                                                {container.machineName} ·
+                                                {container.shortId}
+                                            </p>
+                                        </div>
+
+                                        <span
+                                            class={[
+                                                "m3-font-label-small inline-flex h-5 shrink-0 items-center rounded-full px-2 capitalize",
+                                                statusClasses(container.status),
+                                            ]}
+                                        >
+                                            {container.status}
+                                        </span>
+                                    </li>
+                                {/each}
+                            </ul>
+                        {/if}
+                    </Card>
+                </div>
             </div>
 
-            {#if containers.loading}
-                <div class="flex min-h-24 items-center justify-center">
-                    <LoadingIndicator aria-label="Loading containers" />
-                </div>
-            {:else if containers.error}
-                <p class="text-error text-sm">{containers.error.message}</p>
-            {:else if containers.current?.error}
-                <p class="text-error text-sm">{containers.current.error}</p>
-            {:else if containerItems.length === 0}
-                <p class="text-on-surface-variant text-sm">
-                    No running containers. Deploy this service to start them.
-                </p>
-            {:else}
-                <ul class="flex flex-col">
-                    {#each containerItems as container (container.id)}
-                        <li
-                            class="border-outline-variant flex items-center justify-between gap-3 border-b py-3 last:border-b-0"
-                        >
-                            <div class="flex min-w-0 items-center gap-3">
-                                <div
-                                    class={[
-                                        "inline-flex shrink-0 items-center rounded-full p-1.5",
-                                        statusClasses(container.status),
-                                    ]}
-                                >
-                                    <Icon icon={deployedCodeIcon} size={18} />
-                                </div>
-
-                                <div class="min-w-0">
-                                    <p
-                                        class="text-on-surface truncate text-sm font-medium"
-                                    >
-                                        {container.name}
-                                    </p>
-                                    <p
-                                        class="text-on-surface-variant truncate text-xs"
-                                    >
-                                        {container.image} · {container.machineName}
-                                        · {container.shortId}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <span
-                                class={[
-                                    "inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-medium capitalize",
-                                    statusClasses(container.status),
-                                ]}
-                            >
-                                {container.status}
-                            </span>
-                        </li>
-                    {/each}
-                </ul>
-            {/if}
-        </Card>
-
-        <ComposeEditor serviceId={svc.id} initialCompose={svc.value} />
-    {/if}
-</main>
+            <div
+                class="x:h-full x:min-h-0 flex min-h-48 min-w-0 flex-1 flex-col"
+            >
+                <ComposeEditor serviceId={svc.id} initialCompose={svc.value} />
+            </div>
+        </div>
+    </div>
+{/if}
 
 <Dialog bind:open={deleteDialogOpen} headline="Delete service">
     <div class="flex flex-col gap-2">
-        <p class="text-on-surface">
+        <p class="m3-font-body-large text-on-surface">
             Are you sure you want to delete this service?
         </p>
 
-        <p class="text-on-surface-variant text-sm">
+        <p class="m3-font-label-small text-on-surface-variant">
             This action cannot be undone.
         </p>
     </div>

@@ -1,0 +1,7 @@
+{
+  "name": "PostgreSQL",
+  "description": "Relational database for apps that need durable SQL storage.",
+  "type": "postgresql",
+  "icon": "postgresql",
+  "tags": ["database"]
+}

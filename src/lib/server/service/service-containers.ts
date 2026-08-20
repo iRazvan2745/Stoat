@@ -2,7 +2,7 @@
 import { ucClient } from "#lib/api/client";
 import type { FormattedCompose } from "#lib/server/deployments/deployment-compose";
 import { formatComposeFile } from "#lib/server/deployments/deployment-compose";
-import { getService } from "#lib/server/service/services";
+import { getService, serviceComposePrefix } from "#lib/server/service/services";
 
 import type { components } from "../../../../schema";
 
@@ -117,7 +117,7 @@ export async function listServiceContainers(
     let formatted: FormattedCompose;
 
     try {
-      formatted = formatComposeFile(svc.value, svc.slug ?? svc.id);
+      formatted = formatComposeFile(svc.value, serviceComposePrefix(svc));
     } catch {
       return { error: null, items: [] };
     }
