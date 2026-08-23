@@ -165,14 +165,17 @@
 <svelte:window onpointerdown={handleWindowPointerDown} />
 
 <div class="mx-auto w-full max-w-6xl">
-    <header class="mb-4 flex items-center justify-between gap-4">
-        <div>
-            <h1 class="text-on-surface">Deployments</h1>
+    <header class="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex min-w-0 flex-col gap-1">
+            <h1 class="m3-font-headline-small text-on-surface">Deployments</h1>
+            <p class="m3-font-body-medium text-on-surface-variant">
+                Deploy history and logs for this service.
+            </p>
         </div>
 
         {#if deployments.length > 0}
             <div
-                class="bg-secondary-container text-on-secondary-container shrink-0 rounded-full px-3 py-1 text-xs font-medium"
+                class="bg-secondary-container text-on-secondary-container m3-font-label-medium inline-flex h-6 shrink-0 items-center rounded-full px-2.5"
             >
                 {deployments.length} total
             </div>

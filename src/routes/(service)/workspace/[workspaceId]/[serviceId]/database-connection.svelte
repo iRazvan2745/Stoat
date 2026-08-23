@@ -5,7 +5,10 @@
     import { Button, Card, Icon, LoadingIndicator, snackbar } from "m3-svelte";
 
     import { getPostgresConnection } from "#lib/api/services.remote";
-    import { maskPostgresUrl, wrapUrlSegments } from "#lib/service/database-url";
+    import {
+        maskPostgresUrl,
+        wrapUrlSegments,
+    } from "#lib/service/database-url";
 
     interface Props {
         serviceId: string;

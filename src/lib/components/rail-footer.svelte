@@ -60,7 +60,7 @@
             {:else if user?.email}
                 {#await gravatar(user.email) then src}
                     <img
-                        src={src}
+                        {src}
                         alt=""
                         class="size-10 shrink-0 rounded-full object-cover"
                     />

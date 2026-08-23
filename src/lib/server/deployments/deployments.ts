@@ -170,7 +170,11 @@ export async function startDeployment({ service_id }: v.InferOutput<typeof Start
     const jobId = await boss.send(
       DEPLOYMENT_QUEUE,
       { deployment_id: deployment.id, service_id },
-      { db: fromDrizzle(tx, sql), retryLimit: 0, singletonKey: service_id },
+      {
+        db: fromDrizzle(tx, sql),
+        retryLimit: 0,
+        singletonKey: service_id,
+      },
     );
 
     if (!jobId) {

@@ -2,7 +2,6 @@ import { UNCLOUD_API } from "$app/env/private";
 import createClient from "openapi-fetch";
 
 import type { paths } from "../../../../schema";
-
 import { fetchUncloud, fetchUncloudStream } from "./fetch";
 
 export const ucClient = createClient<paths>({

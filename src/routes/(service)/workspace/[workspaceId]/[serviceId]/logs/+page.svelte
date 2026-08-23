@@ -1,10 +1,14 @@
 <script lang="ts">
     import logsIcon from "@ktibow/iconset-material-symbols/article-outline";
-    import { Chip, Icon, LoadingIndicator } from "m3-svelte";
+    import jumpToBottomIcon from "@ktibow/iconset-material-symbols/vertical-align-bottom";
+    import { Button, Chip, Icon, LoadingIndicator } from "m3-svelte";
     import { parseAsArrayOf, parseAsString, useQueryState } from "nuqs-svelte";
 
     import { getServiceContainerLogs } from "#lib/api/services.remote";
-    import { filterContainerLogs, matchContainerId } from "#lib/service/container-logs";
+    import {
+        filterContainerLogs,
+        matchContainerId,
+    } from "#lib/service/container-logs";
     import type { ContainerLogRecord } from "#lib/service/container-logs";
     import { attachFollowScroll } from "#lib/ui/follow-scroll";
 
@@ -125,23 +129,36 @@
 
 <div class="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
     <header class="flex flex-wrap items-center justify-between gap-3">
-        <h1 class="text-on-surface text-xl font-medium">Logs</h1>
+        <h1 class="m3-font-headline-small text-on-surface">Logs</h1>
 
         <div class="flex items-center gap-3">
             {#if snapshot}
-                <span class="text-on-surface-variant text-xs">
+                <span
+                    class={[
+                        "m3-font-label-medium inline-flex h-6 items-center gap-1.5 rounded-full px-2.5",
+                        following
+                            ? "bg-primary-container-subtle text-on-primary-container-subtle"
+                            : "bg-secondary-container-subtle text-on-secondary-container-subtle",
+                    ]}
+                >
+                    <span
+                        class="size-1.5 rounded-full bg-current"
+                        aria-hidden="true"
+                    ></span>
                     {following ? "Live" : "Idle"}
                 </span>
             {/if}
 
             {#if !followLatest && visibleLogs.length > 0}
-                <button
-                    class="text-primary text-xs font-medium"
-                    type="button"
+                <Button
+                    variant="tonal"
+                    size="xs"
+                    iconType="left"
                     onclick={jumpToLatest}
                 >
+                    <Icon icon={jumpToBottomIcon} />
                     Jump to latest
-                </button>
+                </Button>
             {/if}
         </div>
     </header>
@@ -181,15 +198,19 @@
                 <LoadingIndicator aria-label="Loading container logs" />
             </div>
         {:else if logsQuery.error}
-            <p class="text-error p-4 text-sm">{logsQuery.error.message}</p>
+            <p class="text-error m3-font-body-small p-4">
+                {logsQuery.error.message}
+            </p>
         {:else if streamError && logs.length === 0}
-            <p class="text-on-surface-variant p-4 text-sm">{streamError}</p>
+            <p class="text-on-surface-variant m3-font-body-small p-4">
+                {streamError}
+            </p>
         {:else if visibleLogs.length === 0}
             <div
-                class="text-on-surface-variant flex min-h-64 flex-col items-center justify-center gap-2 px-6 text-center text-sm"
+                class="text-on-surface-variant flex min-h-64 flex-col items-center justify-center gap-2 px-6 text-center"
             >
-                <Icon icon={logsIcon} size={20} />
-                <p>No logs yet</p>
+                <Icon icon={logsIcon} size={24} />
+                <p class="m3-font-body-medium">No logs yet</p>
             </div>
         {:else}
             <div

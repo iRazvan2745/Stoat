@@ -147,8 +147,8 @@
 <div class="flex h-full min-h-0 flex-col gap-4">
     <header class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex min-w-0 flex-col gap-1">
-            <h1 class="text-on-surface text-xl font-medium">Environment</h1>
-            <p class="text-on-surface-variant text-sm">
+            <h1 class="m3-font-headline-small text-on-surface">Environment</h1>
+            <p class="m3-font-body-medium text-on-surface-variant">
                 Variables are applied to every container on the next deploy.
             </p>
         </div>
@@ -207,9 +207,12 @@
         <Card variant="elevated">
             {#if variables.length === 0}
                 <div
-                    class="text-on-surface-variant flex min-h-48 flex-col items-center justify-center gap-3 text-sm"
+                    class="text-on-surface-variant flex min-h-48 flex-col items-center justify-center gap-3"
                 >
-                    <p>No environment variables yet</p>
+                    <Icon icon={variablesIcon} size={24} />
+                    <p class="m3-font-body-medium">
+                        No environment variables yet
+                    </p>
                     <Button
                         variant="tonal"
                         iconType="left"
@@ -260,9 +263,9 @@
         </Card>
     {:else}
         <Card variant="elevated">
-            <div class="mb-2 flex items-center gap-2">
+            <div class="text-on-surface-variant mb-2 flex items-center gap-2">
                 <Icon icon={codeIcon} size={18} />
-                <p class="text-on-surface-variant text-sm">.env file</p>
+                <p class="m3-font-body-small">.env file</p>
             </div>
             <EnvironmentEditor bind:value={envFile} />
         </Card>

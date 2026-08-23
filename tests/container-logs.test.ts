@@ -2,6 +2,7 @@ import { setImmediate as waitImmediate } from "node:timers/promises";
 
 import { describe, expect, it } from "vite-plus/test";
 
+import { consumeSseJsonStream } from "#lib/server/shared/sse";
 import {
   composeServiceName,
   filterContainerLogs,
@@ -11,7 +12,6 @@ import {
   trimContainerLogs,
 } from "#lib/service/container-logs";
 import type { ContainerLogRecord } from "#lib/service/container-logs";
-import { consumeSseJsonStream } from "#lib/server/shared/sse";
 
 const log = (
   partial: Partial<ContainerLogRecord> & Pick<ContainerLogRecord, "id" | "timestamp">,

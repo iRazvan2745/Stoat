@@ -1,3 +1,9 @@
+import { formatComposeFile } from "#lib/server/deployments/deployment-compose";
+// oxlint-disable func-style
+import { findPublishedTcpPort, listComposePorts } from "#lib/server/service/compose-ports";
+import { listEnvironmentVariables } from "#lib/server/service/service-environment";
+import { getService, serviceComposePrefix } from "#lib/server/service/services";
+import { ucClient } from "#lib/server/uncloud";
 import {
   DEFAULT_POSTGRES_PORT,
   buildPostgresUrl,
@@ -5,12 +11,6 @@ import {
   postgresConnectionParts,
 } from "#lib/service/database-url";
 import type { PostgresConnectionUrl } from "#lib/service/database-url";
-// oxlint-disable func-style
-import { findPublishedTcpPort, listComposePorts } from "#lib/server/service/compose-ports";
-import { formatComposeFile } from "#lib/server/deployments/deployment-compose";
-import { listEnvironmentVariables } from "#lib/server/service/service-environment";
-import { getService, serviceComposePrefix } from "#lib/server/service/services";
-import { ucClient } from "#lib/server/uncloud";
 
 export interface PostgresConnectionInfo {
   database: string;

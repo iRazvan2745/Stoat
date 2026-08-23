@@ -1,9 +1,9 @@
 diff --git a/package/buttons/ButtonGroup.svelte b/package/buttons/ButtonGroup.svelte
 new file mode 100644
-index 0000000000000000000000000000000000000000..759a0a32cd9762c6b8302a872a845941532924a8
+index 0000000000000000000000000000000000000000..c7832d4e1c1ed251b1b448ca3a2a18785fea36d3
 --- /dev/null
 +++ b/package/buttons/ButtonGroup.svelte
-@@ -0,0 +1,302 @@
+@@ -0,0 +1,313 @@
 +<script lang="ts">
 +  import type { Snippet } from "svelte";
 +  import type { DivAttrs } from "../misc/typing-utils";
@@ -90,30 +90,40 @@ index 0000000000000000000000000000000000000000..759a0a32cd9762c6b8302a872a845941
 +    --button-group-min: 2rem;
 +    --button-group-pad: 0.75rem;
 +    --button-group-pressed: var(--m3-shape-small);
++    --inner-corner: var(--m3-shape-extra-small);
++    --inner-corner-active: var(--m3-shape-extra-small);
 +  }
 +
 +  .size-s {
 +    --button-group-min: 2.5rem;
 +    --button-group-pad: 1rem;
 +    --button-group-pressed: var(--m3-shape-small);
++    --inner-corner: var(--m3-shape-small);
++    --inner-corner-active: var(--m3-shape-extra-small);
 +  }
 +
 +  .size-m {
 +    --button-group-min: 3.5rem;
 +    --button-group-pad: 1.5rem;
 +    --button-group-pressed: var(--m3-shape-medium);
++    --inner-corner: var(--m3-shape-small);
++    --inner-corner-active: var(--m3-shape-extra-small);
 +  }
 +
 +  .size-l {
 +    --button-group-min: 6rem;
 +    --button-group-pad: 3rem;
 +    --button-group-pressed: var(--m3-shape-large);
++    --inner-corner: var(--m3-shape-large);
++    --inner-corner-active: var(--m3-shape-medium);
 +  }
 +
 +  .size-xl {
 +    --button-group-min: 8.5rem;
 +    --button-group-pad: 4rem;
 +    --button-group-pressed: var(--m3-shape-large);
++    --inner-corner: var(--m3-shape-large-increased);
++    --inner-corner-active: var(--m3-shape-large);
 +  }
 +
 +  .standard.size-xs {
@@ -129,29 +139,17 @@ index 0000000000000000000000000000000000000000..759a0a32cd9762c6b8302a872a845941
 +  }
 +
 +  .connected {
-+    gap: 0.5rem;
++    gap: 0.125rem;
 +  }
 +
-+  .button-group.button-group > :global(.m3-container.m3-container) {
-+    flex: 0 0 auto;
++  .button-group > :global(.m3-container) {
 +    overflow: hidden;
 +    white-space: nowrap;
 +    transition:
-+      width var(--m3-easing-fast-spatial),
-+      min-width var(--m3-easing-fast-spatial),
-+      max-width var(--m3-easing-fast-spatial),
-+      padding-inline var(--m3-easing-fast-spatial),
 +      border-radius var(--m3-easing-fast-spatial),
 +      box-shadow var(--m3-easing-fast),
 +      background-color var(--m3-easing-fast),
 +      color var(--m3-easing-fast);
-+  }
-+
-+  .button-group.button-group
-+    > :global(.m3-container.m3-container:active:not(:disabled, :has(> input:disabled))),
-+  .connected.round
-+    > :global(.m3-container.m3-container:active:not(:disabled, :has(> input:disabled))) {
-+    border-radius: var(--button-group-pressed) !important;
 +  }
 +
 +  .button-group > :global(.m3-container:not(:disabled, :has(> input:disabled))) {
@@ -172,9 +170,37 @@ index 0000000000000000000000000000000000000000..759a0a32cd9762c6b8302a872a845941
 +    color: var(--m3c-on-primary) !important;
 +  }
 +
-+  .button-group.button-group
++  .standard > :global(.m3-container) {
++    flex: 0 0 auto;
++    transition:
++      width var(--m3-easing-fast-spatial),
++      min-width var(--m3-easing-fast-spatial),
++      max-width var(--m3-easing-fast-spatial),
++      padding-inline var(--m3-easing-fast-spatial),
++      border-radius var(--m3-easing-fast-spatial),
++      box-shadow var(--m3-easing-fast),
++      background-color var(--m3-easing-fast),
++      color var(--m3-easing-fast);
++  }
++
++  .standard
 +    > :global(
-+      .m3-container.m3-container:not(.icon-full):is(
++      .m3-container:is(
++          [data-selected],
++          [aria-pressed="true"],
++          :has(> input:checked)
++        ):not(:active)
++    ) {
++    border-radius: var(--m3-shape-full) !important;
++  }
++
++  .standard > :global(.m3-container:active:not(:disabled, :has(> input:disabled))) {
++    border-radius: var(--button-group-pressed) !important;
++  }
++
++  .standard
++    > :global(
++      .m3-container:not(.icon-full):is(
 +          [data-selected],
 +          [aria-pressed="true"],
 +          :has(> input:checked)
@@ -183,14 +209,13 @@ index 0000000000000000000000000000000000000000..759a0a32cd9762c6b8302a872a845941
 +    padding-inline: calc(var(--button-group-pad) * var(--button-group-selected-scale)) !important;
 +  }
 +
-+  .button-group.button-group
-+    > :global(.m3-container.m3-container:not(.icon-full):active:not(:disabled, :has(> input:disabled))) {
++  .standard > :global(.m3-container:not(.icon-full):active:not(:disabled, :has(> input:disabled))) {
 +    padding-inline: calc(var(--button-group-pad) * (1 + var(--button-group-expand))) !important;
 +  }
 +
-+  .button-group.button-group
++  .standard
 +    > :global(
-+      .m3-container.m3-container:not(.icon-full):is(
++      .m3-container:not(.icon-full):is(
 +          [data-selected],
 +          [aria-pressed="true"],
 +          :has(> input:checked)
@@ -201,7 +226,7 @@ index 0000000000000000000000000000000000000000..759a0a32cd9762c6b8302a872a845941
 +    ) !important;
 +  }
 +
-+  .button-group.button-group > :global(.m3-container.icon-full) {
++  .standard > :global(.m3-container.icon-full) {
 +    --_rest: var(--button-group-min);
 +    width: var(--_rest) !important;
 +    min-width: var(--_rest) !important;
@@ -210,13 +235,9 @@ index 0000000000000000000000000000000000000000..759a0a32cd9762c6b8302a872a845941
 +    padding-inline: 0 !important;
 +  }
 +
-+  .button-group.button-group
++  .standard
 +    > :global(
-+      .m3-container.icon-full:is(
-+          [data-selected],
-+          [aria-pressed="true"],
-+          :has(> input:checked)
-+        )
++      .m3-container.icon-full:is([data-selected], [aria-pressed="true"], :has(> input:checked))
 +    ) {
 +    --_rest: calc(var(--button-group-min) * var(--button-group-selected-scale));
 +    width: var(--_rest) !important;
@@ -226,8 +247,7 @@ index 0000000000000000000000000000000000000000..759a0a32cd9762c6b8302a872a845941
 +    padding-inline: calc(var(--button-group-min) * 0.45) !important;
 +  }
 +
-+  .button-group.button-group
-+    > :global(.m3-container.icon-full:active:not(:disabled, :has(> input:disabled))) {
++  .standard > :global(.m3-container.icon-full:active:not(:disabled, :has(> input:disabled))) {
 +    --_pressed: calc(var(--_rest) * (1 + var(--button-group-expand)));
 +    aspect-ratio: auto;
 +    width: var(--_pressed) !important;
@@ -235,70 +255,61 @@ index 0000000000000000000000000000000000000000..759a0a32cd9762c6b8302a872a845941
 +    max-width: var(--_pressed);
 +  }
 +
-+  .button-group.button-group
-+    > :global(.m3-container.icon-full:has(+ .m3-container:not(:first-child, :last-child):active)),
-+  .button-group.button-group
-+    > :global(.m3-container:not(:first-child, :last-child):active + .m3-container.icon-full) {
++  .standard > :global(.m3-container.icon-full:has(+ .m3-container:not(:first-child, :last-child):active)),
++  .standard > :global(.m3-container:not(:first-child, :last-child):active + .m3-container.icon-full) {
 +    --_neighbor: calc(var(--_rest) * (1 - var(--button-group-expand) / 2));
 +    width: var(--_neighbor) !important;
 +    min-width: var(--_neighbor) !important;
 +    max-width: var(--_neighbor);
 +  }
 +
-+  .button-group.button-group > :global(.m3-container:first-child:active + .m3-container.icon-full),
-+  .button-group.button-group
-+    > :global(.m3-container.icon-full:has(+ .m3-container:last-child:active)) {
++  .standard > :global(.m3-container:first-child:active + .m3-container.icon-full),
++  .standard > :global(.m3-container.icon-full:has(+ .m3-container:last-child:active)) {
 +    --_neighbor: calc(var(--_rest) * (1 - var(--button-group-expand)));
 +    width: var(--_neighbor) !important;
 +    min-width: var(--_neighbor) !important;
 +    max-width: var(--_neighbor);
 +  }
 +
-+  .connected.round > :global(.m3-container.m3-container) {
-+    --shape: calc(var(--button-group-min) / 2);
-+    --square-shape: calc(var(--button-group-min) / 2);
-+    border-radius: calc(var(--button-group-min) / 2);
++  .connected:is(.size-xs, .size-s) > :global(.m3-container) {
++    min-width: 3rem;
 +  }
 +
-+  .connected.square:is(.size-xs, .size-s, .size-m) > :global(.m3-container) {
-+    --inner-corner: var(--m3-shape-small);
++  .connected > :global(.m3-container) {
++    --shape: var(--inner-corner);
++    --square-shape: var(--inner-corner);
++    --pressed-shape: var(--inner-corner-active);
++    border-radius: var(--inner-corner) !important;
 +  }
 +
-+  .connected.square.size-l > :global(.m3-container) {
-+    --inner-corner: var(--m3-shape-large);
++  .connected.round > :global(.m3-container:first-child) {
++    border-start-start-radius: var(--m3-shape-full) !important;
++    border-end-start-radius: var(--m3-shape-full) !important;
 +  }
 +
-+  .connected.square.size-xl > :global(.m3-container) {
-+    --inner-corner: var(--m3-shape-large-increased);
++  .connected.round > :global(.m3-container:last-child) {
++    border-start-end-radius: var(--m3-shape-full) !important;
++    border-end-end-radius: var(--m3-shape-full) !important;
 +  }
 +
-+  .connected.square > :global(.m3-container.m3-container) {
-+    border-radius: var(--inner-corner);
-+  }
-+
-+  .connected.square > :global(.m3-container:first-child:not(:active)) {
-+    border-start-start-radius: var(--m3-shape-medium);
-+    border-end-start-radius: var(--m3-shape-medium);
-+  }
-+
-+  .connected.square > :global(.m3-container:last-child:not(:active)) {
-+    border-start-end-radius: var(--m3-shape-medium);
-+    border-end-end-radius: var(--m3-shape-medium);
-+  }
-+
-+  .connected.square
++  .connected
 +    > :global(
-+      .m3-container.m3-container:is(
++      .m3-container:is(
 +          [data-selected],
 +          [aria-pressed="true"],
 +          :has(> input:checked)
 +        ):not(:active)
 +    ) {
-+    border-radius: calc(var(--button-group-min) / 2);
++    border-radius: var(--m3-shape-full) !important;
++  }
++
++  .connected > :global(.m3-container:active:not(:disabled, :has(> input:disabled))) {
++    border-radius: var(--inner-corner-active) !important;
 +  }
 +
 +  @media (prefers-reduced-motion: reduce) {
-+    .button-group.button-group > :global(.m3-container.m3-container) {
++    .button-group > :global(.m3-container),
++    .standard > :global(.m3-container) {
 +      transition:
 +        box-shadow var(--m3-easing-fast),
 +        background-color var(--m3-easing-fast),

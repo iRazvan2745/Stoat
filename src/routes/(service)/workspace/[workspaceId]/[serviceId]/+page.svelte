@@ -4,7 +4,6 @@
     import deleteIcon from "@ktibow/iconset-material-symbols/delete";
     import deployedCodeIcon from "@ktibow/iconset-material-symbols/deployed-code-outline";
     import moreVertIcon from "@ktibow/iconset-material-symbols/more-vert";
-    import recreateIcon from "@ktibow/iconset-material-symbols/recycling";
     import {
         Button,
         Card,
@@ -15,7 +14,6 @@
         LoadingIndicator,
         Snackbar,
         snackbar,
-        SplitButton,
     } from "m3-svelte";
     import type { Attachment } from "svelte/attachments";
 
@@ -47,6 +45,8 @@
 
     const containerItems = $derived(containers.current?.items ?? []);
     const containersReady = $derived(containers.current !== undefined);
+    const logsHref = (containerId: string): string =>
+        `/workspace/${params.workspaceId}/${params.serviceId}/logs?containers=${containerId}`;
 
     const isHealthyStatus = (status: string): boolean => {
         const normalized = status.toLowerCase();
@@ -119,24 +119,33 @@
         }
     });
 
+    const runningCount = $derived(
+        containerItems.filter((container) => isHealthyStatus(container.status))
+            .length
+    );
+
     const statusClasses = (status: string): string => {
-        switch (status.toLowerCase()) {
-            case "healthy":
-            case "running": {
-                return "bg-on-primary text-on-primary-container";
-            }
-
-            case "dead":
-            case "exited":
-            case "failed":
-            case "unhealthy": {
-                return "bg-error-container text-on-error-container";
-            }
-
-            default: {
-                return "bg-secondary-container text-on-secondary-container";
-            }
+        if (isHealthyStatus(status)) {
+            return "bg-primary-container-subtle text-on-primary-container-subtle";
         }
+
+        if (isUnhealthyStatus(status)) {
+            return "bg-error-container-subtle text-on-error-container-subtle";
+        }
+
+        return "bg-secondary-container-subtle text-on-secondary-container-subtle";
+    };
+
+    const containerIconClasses = (status: string): string => {
+        if (isHealthyStatus(status)) {
+            return "bg-primary-container text-on-primary-container";
+        }
+
+        if (isUnhealthyStatus(status)) {
+            return "bg-error-container text-on-error-container";
+        }
+
+        return "bg-secondary-container text-on-secondary-container";
     };
 
     const pollContainers: Attachment = () => {
@@ -220,9 +229,9 @@
         <header
             class="flex min-h-10 flex-wrap items-center justify-between gap-2"
         >
-            <div class="flex min-w-0 items-center gap-2">
+            <div class="flex min-w-0 items-center gap-3">
                 <div
-                    class="bg-surface-container-high text-on-surface grid size-16 shrink-0 place-items-center rounded-md"
+                    class="bg-surface-container-high text-on-surface grid size-16 shrink-0 place-items-center rounded-lg"
                     aria-hidden="true"
                 >
                     <ServiceIcon
@@ -234,13 +243,11 @@
                 </div>
 
                 <div class="min-w-0">
-                    <h1 class="m3-font-title-large text-on-surface truncate">
+                    <h1 class="m3-font-headline-small text-on-surface truncate">
                         {svc.name ?? "Unnamed service"}
                     </h1>
 
-                    <div
-                        class="mt-0.5 flex min-w-0 flex-wrap items-center gap-2"
-                    >
+                    <div class="mt-1 flex min-w-0 flex-wrap items-center gap-2">
                         {#if svc.slug}
                             <p
                                 class="m3-font-label-small text-on-surface-variant truncate font-mono"
@@ -251,10 +258,14 @@
 
                         <span
                             class={[
-                                "m3-font-label-small inline-flex h-5 shrink-0 items-center rounded-full px-2",
+                                "m3-font-label-medium inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5",
                                 healthClasses,
                             ]}
                         >
+                            <span
+                                class="size-1.5 rounded-full bg-current"
+                                aria-hidden="true"
+                            ></span>
                             {healthLabel}
                         </span>
                     </div>
@@ -262,36 +273,25 @@
             </div>
 
             <div class="flex shrink-0 items-center gap-2">
-                <SplitButton
-                    aria-label="Deploy service"
+                <Button
+                    variant="filled"
+                    iconType="left"
                     disabled={deploying}
                     aria-busy={deploying}
                     onclick={deploy}
-                    variant="filled"
-                    x="right"
-                    y="down"
                 >
                     {#if deploying}
                         <LoadingIndicator
                             size={18}
-                            container={true}
+                            center={false}
                             aria-label="Deploying service"
                         />
-                        Deploying... Youre not gonna see this, if you are then your
-                        browser cant redirect or you had it not redirect
+                        Deploying...
                     {:else}
                         <Icon icon={deployIcon} />
                         Deploy
                     {/if}
-                    {#snippet menu()}
-                        <ExpressiveMenu>
-                            <ExpressiveMenuItem
-                                label="Recreate"
-                                leadingIcon={recreateIcon}
-                            />
-                        </ExpressiveMenu>
-                    {/snippet}
-                </SplitButton>
+                </Button>
 
                 <div class="relative">
                     <Button
@@ -342,7 +342,7 @@
                 {/if}
 
                 <div
-                    class="x:flex x:min-h-0 x:flex-1 x:flex-col x:overflow-hidden x:[&>.m3-container]:flex-1 x:[&>.m3-container]:overflow-hidden min-w-0 [&>.m3-container]:flex [&>.m3-container]:min-h-0 [&>.m3-container]:w-full [&>.m3-container]:flex-col"
+                    class="x:flex x:flex-none x:flex-col min-w-0 [&>.m3-container]:flex [&>.m3-container]:min-h-0 [&>.m3-container]:w-full [&>.m3-container]:flex-col"
                 >
                     <Card variant="elevated">
                         <div
@@ -353,9 +353,11 @@
                             </h2>
 
                             {#if containersReady && containerItems.length > 0}
-                                <Button variant="tonal" size="xs">
-                                    {containerItems.length}
-                                </Button>
+                                <span
+                                    class="bg-secondary-container text-on-secondary-container m3-font-label-medium inline-flex h-6 shrink-0 items-center rounded-full px-2.5"
+                                >
+                                    {runningCount} of {containerItems.length} running
+                                </span>
                             {/if}
                         </div>
 
@@ -365,61 +367,80 @@
                                     aria-label="Loading containers"
                                 />
                             </div>
-                        {:else if containers.error}
-                            <p class="m3-font-body-small text-error mt-2">
-                                {containers.error.message}
-                            </p>
-                        {:else if containers.current?.error}
-                            <p class="m3-font-body-small text-error mt-2">
-                                {containers.current.error}
-                            </p>
-                        {:else if containerItems.length === 0}
-                            <p
-                                class="m3-font-label-small text-on-surface-variant"
+                        {:else if containers.error || containers.current?.error}
+                            <div
+                                class="bg-error-container-subtle text-on-error-container-subtle mt-2 rounded-lg px-3 py-2"
+                                role="status"
                             >
-                                No running containers. Deploy this service to
-                                start them.
-                            </p>
+                                <p class="m3-font-body-small">
+                                    {containers.error?.message ??
+                                        containers.current?.error}
+                                </p>
+                            </div>
+                        {:else if containerItems.length === 0}
+                            <div
+                                class="text-on-surface-variant flex min-h-32 flex-col items-center justify-center gap-1 py-4 text-center"
+                            >
+                                <Icon icon={deployedCodeIcon} size={28} />
+                                <p class="m3-font-body-medium mt-1">
+                                    No running containers
+                                </p>
+                                <p class="m3-font-body-small">
+                                    Deploy this service to start them.
+                                </p>
+                            </div>
                         {:else}
                             <ul
-                                class="x:min-h-0 x:flex-1 x:overflow-auto mt-1 flex flex-col"
+                                class="mt-1 flex flex-col"
                             >
                                 {#each containerItems as container (container.id)}
-                                    <li
-                                        class="flex w-full items-center gap-3 py-2"
-                                    >
-                                        <div
-                                            class="bg-primary-container text-on-primary-container grid size-8 shrink-0 place-items-center rounded-full"
+                                    <li>
+                                        <a
+                                            href={logsHref(container.id)}
+                                            class="hover:bg-on-surface/8 focus-visible:bg-on-surface/8 -mx-2 flex items-center gap-3 rounded-md px-2 py-2 transition-colors"
+                                            aria-label={`View logs for ${container.name}`}
+                                            title="View container logs"
                                         >
-                                            <Icon
-                                                icon={deployedCodeIcon}
-                                                size={18}
-                                            />
-                                        </div>
-
-                                        <div class="min-w-0 flex-1">
-                                            <p
-                                                class="m3-font-label-large text-on-surface truncate"
+                                            <div
+                                                class={[
+                                                    "grid size-8 shrink-0 place-items-center rounded-full",
+                                                    containerIconClasses(
+                                                        container.status
+                                                    ),
+                                                ]}
                                             >
-                                                {container.name}
-                                            </p>
-                                            <p
-                                                class="m3-font-label-small text-on-surface-variant truncate"
-                                            >
-                                                {container.image} ·
-                                                {container.machineName} ·
-                                                {container.shortId}
-                                            </p>
-                                        </div>
+                                                <Icon
+                                                    icon={deployedCodeIcon}
+                                                    size={18}
+                                                />
+                                            </div>
 
-                                        <span
-                                            class={[
-                                                "m3-font-label-small inline-flex h-5 shrink-0 items-center rounded-full px-2 capitalize",
-                                                statusClasses(container.status),
-                                            ]}
-                                        >
-                                            {container.status}
-                                        </span>
+                                            <div class="min-w-0 flex-1">
+                                                <p
+                                                    class="m3-font-label-large text-on-surface truncate"
+                                                >
+                                                    {container.name}
+                                                </p>
+                                                <p
+                                                    class="m3-font-label-small text-on-surface-variant truncate"
+                                                >
+                                                    {container.image} ·
+                                                    {container.machineName} ·
+                                                    {container.shortId}
+                                                </p>
+                                            </div>
+
+                                            <span
+                                                class={[
+                                                    "m3-font-label-small inline-flex h-5 shrink-0 items-center rounded-full px-2 capitalize",
+                                                    statusClasses(
+                                                        container.status
+                                                    ),
+                                                ]}
+                                            >
+                                                {container.status}
+                                            </span>
+                                        </a>
                                     </li>
                                 {/each}
                             </ul>

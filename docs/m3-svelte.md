@@ -119,7 +119,7 @@ Rich, animated menus with CSS anchor positioning, labels, submenus, groups, divi
 
 ## Other components (quick list)
 
-- **Buttons**: `Button` (elevated/filled/tonal/outlined/text, sizes xs–xl, `iconType`), `ButtonGroup` (selected stadium pill, press-grow), `ConnectedButtons`, `SplitButton` (menu via `Menu`), `FAB`
+- **Buttons**: `Button` (elevated/filled/tonal/outlined/text, sizes xs–xl, `iconType`), `ButtonGroup` (`connected` shape-only / `standard` width-morph), `ConnectedButtons`, `SplitButton` (menu via `Menu`), `FAB`
 - **Containers**: `Card`, `ListItem`, `Menu`/`MenuItem` (legacy), expressive menu family, `BottomSheet`, `Dialog`, `Snackbar` + `snackbar()`, `StandardSideSheet`, `Divider`
 - **Inputs**: `Checkbox`, `RadioAnim1..3`, `Switch` (wrap in `<label>`), `Chip`, `Select`/`SelectOutlined`, `Slider`, `TextField*`, `TextFieldOutlined*`, `TextFieldMultiline*`, `DateField*`, `TimePickerDial`
 - **Progress**: `LinearProgress`/`LinearProgressEstimate`, `WavyLinearProgress*`, `CircularProgress*`, `LoadingIndicator`

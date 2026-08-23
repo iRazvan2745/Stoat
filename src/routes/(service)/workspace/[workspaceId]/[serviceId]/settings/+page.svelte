@@ -101,8 +101,8 @@
 {#if svc}
     <div class="flex h-full min-h-0 flex-col gap-4">
         <header class="flex min-w-0 flex-col gap-1">
-            <h1 class="text-on-surface text-xl font-medium">Settings</h1>
-            <p class="text-on-surface-variant text-sm">
+            <h1 class="m3-font-headline-small text-on-surface">Settings</h1>
+            <p class="m3-font-body-medium text-on-surface-variant">
                 Service options that apply on the next deploy.
             </p>
         </header>
@@ -130,7 +130,7 @@
                     <span class="mt-0.5 shrink-0">
                         <Icon icon={warningIcon} size={20} />
                     </span>
-                    <p class="text-sm">{warning}</p>
+                    <p class="m3-font-body-small">{warning}</p>
                 </div>
             {/if}
         </div>

@@ -3,12 +3,12 @@ import fs from "node:fs/promises";
 
 import { and, eq } from "drizzle-orm";
 
-import { createDataSourceFolder, resolveDataSourcePath } from "#lib/server/data-source/paths";
 import {
   composeServiceName,
   discoverComposeFiles,
   repositoryName,
 } from "#lib/server/data-source/discovery";
+import { createDataSourceFolder, resolveDataSourcePath } from "#lib/server/data-source/paths";
 import { db } from "#lib/server/db";
 import { dataSource, services, workspace } from "#lib/server/db/schema";
 import { getRepo } from "#lib/server/shared/git";
