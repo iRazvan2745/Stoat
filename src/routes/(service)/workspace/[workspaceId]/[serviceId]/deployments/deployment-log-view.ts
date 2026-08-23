@@ -1,10 +1,10 @@
 // oxlint-disable func-style no-use-before-define
-import type { DeploymentLogEntry, DeploymentLogRecord } from "#lib/deployment-logs";
+import type { DeploymentLogEntry, DeploymentLogRecord } from "#lib/deployments/logs";
 import {
   buildDeploymentLogEntries,
   insertLogSectionHeaders,
   isDebugDeploymentLog,
-} from "#lib/deployment-logs";
+} from "#lib/deployments/logs";
 
 export type LogFilter = "all" | "stderr" | "stdout";
 

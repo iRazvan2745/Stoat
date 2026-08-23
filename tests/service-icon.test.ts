@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { resolveServiceIcon, serviceIconSrc } from "#lib/service-icon";
+import { resolveServiceIcon, serviceIconSrc } from "#lib/service/icon";
 
 describe("serviceIconSrc", () => {
   it("returns http(s) and relative URLs", () => {

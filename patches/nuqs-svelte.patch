@@ -1,0 +1,11 @@
+diff --git a/dist/adapters/svelte-kit/adapter.svelte b/dist/adapters/svelte-kit/adapter.svelte
+index 1111111111111111111111111111111111111111..2222222222222222222222222222222222222222 100644
+--- a/dist/adapters/svelte-kit/adapter.svelte
++++ b/dist/adapters/svelte-kit/adapter.svelte
+@@ -1,5 +1,5 @@
+ <script lang="ts">
+-  import { browser } from "$app/environment";
++  import { browser } from "$app/env";
+   import { goto, pushState, replaceState } from "$app/navigation";
+   import { page } from "$app/state";
+   import type { Snippet } from "svelte";

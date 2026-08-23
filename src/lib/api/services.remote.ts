@@ -1,35 +1,32 @@
 // oxlint-disable func-style
-import fs from "node:fs/promises";
-import path from "node:path";
-
 import { command, getRequestEvent, query, requested } from "$app/server";
-import { eq } from "drizzle-orm";
 import * as v from "valibot";
 
 import { ENV_NAME_PATTERN } from "#lib/environment";
-import { createDataSourceFolder, resolveDataSourcePath } from "#lib/server/data-source";
-import { dataSource, services, workspace } from "#lib/server/db/schema";
+import { deployService as runDeployment } from "#lib/server/deployments/deployments";
 import { getPostgresConnection as loadPostgresConnection } from "#lib/server/service/service-connection";
-import { previewServiceCompose as loadPreviewCompose } from "#lib/server/service/services";
-import { uniqueSlug } from "#lib/server/slugs";
-import { isAbortError } from "#lib/server/sse";
-import { readTemplateIconValue, readTemplateVersion } from "#lib/server/templates";
-import { ServiceSettingsSchema, mergeServiceSettings } from "#lib/service-settings";
-import { expandTemplateSecrets, expandTemplateVariables } from "#lib/templates";
-
-import { db } from "../server/db";
-import { deployService as runDeployment } from "../server/deployments/deployments";
-import { listServiceContainers } from "../server/service/service-containers";
+import { listServiceContainers } from "#lib/server/service/service-containers";
 import {
-  deleteEnvironmentVariablesForService,
   listEnvironmentVariables,
   replaceEnvironmentVariables,
-} from "../server/service/service-environment";
-import { streamServiceContainerLogs } from "../server/service/service-logs";
+} from "#lib/server/service/service-environment";
+import { streamServiceContainerLogs } from "#lib/server/service/service-logs";
+import {
+  createService as insertService,
+  createServiceFromTemplate as insertServiceFromTemplate,
+  deleteService as removeService,
+  getService as loadService,
+  listServicesInWorkspace,
+  previewServiceCompose as loadPreviewCompose,
+  updateServiceCompose,
+  updateServiceSettings as saveServiceSettings,
+} from "#lib/server/service/services";
+import { isAbortError } from "#lib/server/shared/sse";
+import { ServiceSettingsSchema } from "#lib/service/settings";
 
 export const getServicesInWorkspace = query(
   v.string(),
-  async (wrk) => await db.select().from(services).where(eq(services.workspaceId, wrk)),
+  async (workspaceId) => await listServicesInWorkspace(workspaceId),
 );
 
 const EnvironmentVariableInput = v.object({
@@ -46,76 +43,6 @@ const CreateServiceInput = v.object({
   workspaceId: v.string(),
 });
 
-const insertService = async ({
-  icon,
-  name,
-  type,
-  value,
-  variables,
-  workspaceId,
-}: v.InferOutput<typeof CreateServiceInput>) => {
-  const [workspaceRecord] = await db
-    .select({
-      dataSourcePath: dataSource.path,
-      slug: workspace.slug,
-      workspaceId: workspace.id,
-    })
-    .from(workspace)
-    .innerJoin(dataSource, eq(workspace.dataSourceId, dataSource.id))
-    .where(eq(workspace.id, workspaceId));
-
-  if (!workspaceRecord) {
-    throw new Error("Workspace or data source not found");
-  }
-
-  if (!workspaceRecord.dataSourcePath) {
-    throw new Error("Data source does not have a path");
-  }
-
-  const slug = await uniqueSlug(name, async (candidate) => {
-    const matches = await db
-      .select({ slug: services.slug })
-      .from(services)
-      .where(eq(services.slug, candidate));
-
-    return matches.length > 0;
-  });
-
-  const [created] = await db
-    .insert(services)
-    .values({
-      icon: icon?.trim() ? icon.trim() : null,
-      name,
-      slug,
-      type,
-      value,
-      workspaceId,
-    })
-    .returning();
-
-  if (!created) {
-    throw new Error("Unable to create service");
-  }
-
-  try {
-    await createDataSourceFolder(
-      resolveDataSourcePath(workspaceRecord.dataSourcePath),
-      workspaceRecord.slug,
-      created.slug ?? slug,
-    );
-
-    if (variables.length > 0) {
-      await replaceEnvironmentVariables(created.id, variables);
-    }
-  } catch (error) {
-    await deleteEnvironmentVariablesForService(created.id);
-    await db.delete(services).where(eq(services.id, created.id));
-    throw error;
-  }
-
-  return created;
-};
-
 export const createService = query(CreateServiceInput, insertService);
 
 const CreateServiceFromTemplateInput = v.object({
@@ -127,18 +54,7 @@ const CreateServiceFromTemplateInput = v.object({
 
 export const createServiceFromTemplate = query(
   CreateServiceFromTemplateInput,
-  async ({ appId, name, version, workspaceId }) => {
-    const template = await readTemplateVersion(appId, version);
-
-    return await insertService({
-      icon: (await readTemplateIconValue(appId, template.manifest.icon)) ?? undefined,
-      name,
-      type: template.manifest.type,
-      value: expandTemplateSecrets(template.compose),
-      variables: expandTemplateVariables(template.variables),
-      workspaceId,
-    });
-  },
+  insertServiceFromTemplate,
 );
 
 const UpdateComposeInput = v.object({
@@ -146,56 +62,19 @@ const UpdateComposeInput = v.object({
   id: v.string(),
 });
 
-export const updateCompose = command(UpdateComposeInput, async ({ compose, id }) => {
-  const op = await db
-    .update(services)
-    .set({ value: compose })
-    .where(eq(services.id, id))
-    .returning();
-  return op;
-});
+export const updateCompose = command(
+  UpdateComposeInput,
+  async ({ compose, id }) => await updateServiceCompose(id, compose),
+);
 
 export const previewCompose = command(
   UpdateComposeInput,
   async ({ compose, id }) => await loadPreviewCompose(id, compose),
 );
 
-export const deleteService = query(v.string(), async (id) => {
-  const [svc] = await db.select().from(services).where(eq(services.id, id));
+export const deleteService = query(v.string(), async (id) => await removeService(id));
 
-  if (!svc) {
-    throw new Error("Service not found");
-  }
-
-  const [wrk] = await db.select().from(workspace).where(eq(workspace.id, svc.workspaceId));
-
-  if (!wrk) {
-    throw new Error("Workspace not found");
-  }
-
-  const [ds] = await db.select().from(dataSource).where(eq(dataSource.id, wrk.dataSourceId));
-
-  if (!ds?.path) {
-    throw new Error("Data source does not have a path");
-  }
-
-  await deleteEnvironmentVariablesForService(id);
-
-  const op = await db.delete(services).where(eq(services.id, id)).returning();
-
-  await fs.rm(path.join(resolveDataSourcePath(ds.path), wrk.slug, svc.slug ?? svc.id), {
-    force: true,
-    recursive: true,
-  });
-
-  return op;
-});
-
-export const getService = query(v.string(), async (id) => {
-  const [op] = await db.select().from(services).where(eq(services.id, id));
-
-  return op;
-});
+export const getService = query(v.string(), async (id) => await loadService(id));
 
 export const getPostgresConnection = query(
   v.string(),
@@ -268,26 +147,8 @@ const UpdateServiceSettingsInput = v.object({
 export const updateServiceSettings = command(
   UpdateServiceSettingsInput,
   async ({ serviceId, settings }) => {
-    const [svc] = await db.select().from(services).where(eq(services.id, serviceId));
-
-    if (!svc) {
-      throw new Error("Service not found");
-    }
-
-    const [updated] = await db
-      .update(services)
-      .set({
-        settings: mergeServiceSettings(svc.settings, settings),
-      })
-      .where(eq(services.id, serviceId))
-      .returning();
-
-    if (!updated) {
-      throw new Error("Unable to update service settings");
-    }
-
+    const updated = await saveServiceSettings(serviceId, settings);
     await refreshServiceQueries();
-
     return updated;
   },
 );

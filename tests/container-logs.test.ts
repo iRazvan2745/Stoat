@@ -9,9 +9,9 @@ import {
   parseContainerLogEvent,
   resolveContainerLabel,
   trimContainerLogs,
-} from "#lib/container-logs";
-import type { ContainerLogRecord } from "#lib/container-logs";
-import { consumeSseJsonStream } from "#lib/server/sse";
+} from "#lib/service/container-logs";
+import type { ContainerLogRecord } from "#lib/service/container-logs";
+import { consumeSseJsonStream } from "#lib/server/shared/sse";
 
 const log = (
   partial: Partial<ContainerLogRecord> & Pick<ContainerLogRecord, "id" | "timestamp">,

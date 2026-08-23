@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import type { DeploymentLogRecord } from "#lib/deployment-logs";
+import type { DeploymentLogRecord } from "#lib/deployments/logs";
 
 import {
   buildDeploymentLogView,

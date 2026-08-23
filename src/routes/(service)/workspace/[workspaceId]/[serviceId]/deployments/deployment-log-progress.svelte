@@ -2,7 +2,7 @@
     import checkIcon from "@ktibow/iconset-material-symbols/check-circle-outline";
     import { Icon, LinearProgress, LinearProgressEstimate } from "m3-svelte";
 
-    import type { ParsedDeploymentProgress } from "#lib/deployment-logs";
+    import type { ParsedDeploymentProgress } from "#lib/deployments/logs";
 
     import { formatTime } from "./deployment";
 

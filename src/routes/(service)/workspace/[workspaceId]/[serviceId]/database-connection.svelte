@@ -5,7 +5,7 @@
     import { Button, Card, Icon, LoadingIndicator, snackbar } from "m3-svelte";
 
     import { getPostgresConnection } from "#lib/api/services.remote";
-    import { maskPostgresUrl, wrapUrlSegments } from "#lib/database-url";
+    import { maskPostgresUrl, wrapUrlSegments } from "#lib/service/database-url";
 
     interface Props {
         serviceId: string;
@@ -13,6 +13,7 @@
 
     let { serviceId }: Props = $props();
 
+    // svelte-ignore state_referenced_locally
     const connectionQuery = getPostgresConnection(serviceId);
     let revealPassword = $state(false);
 

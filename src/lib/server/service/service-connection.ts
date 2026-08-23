@@ -1,16 +1,16 @@
-// oxlint-disable func-style
-import { ucClient } from "#lib/api/client";
-import { findPublishedTcpPort, listComposePorts } from "#lib/compose-ports";
 import {
   DEFAULT_POSTGRES_PORT,
   buildPostgresUrl,
   internalHostname,
   postgresConnectionParts,
-} from "#lib/database-url";
-import type { PostgresConnectionUrl } from "#lib/database-url";
+} from "#lib/service/database-url";
+import type { PostgresConnectionUrl } from "#lib/service/database-url";
+// oxlint-disable func-style
+import { findPublishedTcpPort, listComposePorts } from "#lib/server/service/compose-ports";
 import { formatComposeFile } from "#lib/server/deployments/deployment-compose";
 import { listEnvironmentVariables } from "#lib/server/service/service-environment";
 import { getService, serviceComposePrefix } from "#lib/server/service/services";
+import { ucClient } from "#lib/server/uncloud";
 
 export interface PostgresConnectionInfo {
   database: string;

@@ -1,19 +1,19 @@
 // oxlint-disable func-style no-await-in-loop promise/avoid-new
 import { UNCLOUD_API } from "$app/env/private";
 
-import type { ContainerLogRecord, ContainerLogSource } from "#lib/container-logs";
+import type { ContainerLogRecord, ContainerLogSource } from "#lib/service/container-logs";
 import {
   insertLogSorted,
   matchContainerId,
   parseContainerLogEvent,
   resolveContainerLabel,
   trimContainerLogs,
-} from "#lib/container-logs";
+} from "#lib/service/container-logs";
 import { formatComposeFile } from "#lib/server/deployments/deployment-compose";
 import type { ServiceContainerInfo } from "#lib/server/service/service-containers";
 import { listServiceContainers } from "#lib/server/service/service-containers";
 import { getService, serviceComposePrefix } from "#lib/server/service/services";
-import { consumeSseJsonStream, isAbortError } from "#lib/server/sse";
+import { consumeSseJsonStream, isAbortError } from "#lib/server/shared/sse";
 
 const LOG_TAIL = 200;
 const MAX_CONTAINER_LOGS = 5000;

@@ -1,3 +1,329 @@
+diff --git a/package/buttons/ButtonGroup.svelte b/package/buttons/ButtonGroup.svelte
+new file mode 100644
+index 0000000000000000000000000000000000000000..759a0a32cd9762c6b8302a872a845941532924a8
+--- /dev/null
++++ b/package/buttons/ButtonGroup.svelte
+@@ -0,0 +1,302 @@
++<script lang="ts">
++  import type { Snippet } from "svelte";
++  import type { DivAttrs } from "../misc/typing-utils";
++
++  type Shape = "round" | "square";
++  type Size = "xs" | "s" | "m" | "l" | "xl";
++  type Variant = "connected" | "standard";
++
++  let {
++    children,
++    selected,
++    shape = "round",
++    size = "s",
++    variant = "connected",
++    ...extra
++  }: {
++    children: Snippet;
++    selected?: number;
++    shape?: Shape;
++    size?: Size;
++    variant?: Variant;
++  } & DivAttrs = $props();
++
++  let root = $state<HTMLDivElement>();
++  let internalSelected = $state(0);
++  const activeIndex = $derived(selected ?? internalSelected);
++
++  const items = (): HTMLElement[] =>
++    root ? [...root.querySelectorAll<HTMLElement>(":scope > .m3-container")] : [];
++
++  const isUnavailable = (item: HTMLElement): boolean =>
++    item.matches(":disabled") || Boolean(item.querySelector(":scope > input:disabled"));
++
++  $effect(() => {
++    const index = activeIndex;
++
++    for (const [i, item] of items().entries()) {
++      item.toggleAttribute("data-selected", i === index);
++    }
++  });
++
++  const onSelect = (event: MouseEvent): void => {
++    if (selected !== undefined || !root) {
++      return;
++    }
++
++    const target = event.target;
++    if (!(target instanceof Element)) {
++      return;
++    }
++
++    const item = target.closest(".m3-container");
++    if (!(item instanceof HTMLElement) || !root.contains(item) || isUnavailable(item)) {
++      return;
++    }
++
++    const index = items().indexOf(item);
++    if (index >= 0) {
++      internalSelected = index;
++    }
++  };
++</script>
++
++<div
++  bind:this={root}
++  class={["m3-container", "button-group", variant, `size-${size}`, variant === "connected" && shape]}
++  role="group"
++  {...extra}
++  onclick={onSelect}
++>
++  {@render children()}
++</div>
++
++<style>
++  .button-group {
++    --button-group-expand: 0.15;
++    --button-group-selected-scale: 1.85;
++    display: inline-flex;
++    max-width: 100%;
++    align-items: center;
++  }
++
++  .size-xs {
++    --button-group-min: 2rem;
++    --button-group-pad: 0.75rem;
++    --button-group-pressed: var(--m3-shape-small);
++  }
++
++  .size-s {
++    --button-group-min: 2.5rem;
++    --button-group-pad: 1rem;
++    --button-group-pressed: var(--m3-shape-small);
++  }
++
++  .size-m {
++    --button-group-min: 3.5rem;
++    --button-group-pad: 1.5rem;
++    --button-group-pressed: var(--m3-shape-medium);
++  }
++
++  .size-l {
++    --button-group-min: 6rem;
++    --button-group-pad: 3rem;
++    --button-group-pressed: var(--m3-shape-large);
++  }
++
++  .size-xl {
++    --button-group-min: 8.5rem;
++    --button-group-pad: 4rem;
++    --button-group-pressed: var(--m3-shape-large);
++  }
++
++  .standard.size-xs {
++    gap: 1.125rem;
++  }
++
++  .standard.size-s {
++    gap: 0.75rem;
++  }
++
++  .standard:is(.size-m, .size-l, .size-xl) {
++    gap: 0.5rem;
++  }
++
++  .connected {
++    gap: 0.5rem;
++  }
++
++  .button-group.button-group > :global(.m3-container.m3-container) {
++    flex: 0 0 auto;
++    overflow: hidden;
++    white-space: nowrap;
++    transition:
++      width var(--m3-easing-fast-spatial),
++      min-width var(--m3-easing-fast-spatial),
++      max-width var(--m3-easing-fast-spatial),
++      padding-inline var(--m3-easing-fast-spatial),
++      border-radius var(--m3-easing-fast-spatial),
++      box-shadow var(--m3-easing-fast),
++      background-color var(--m3-easing-fast),
++      color var(--m3-easing-fast);
++  }
++
++  .button-group.button-group
++    > :global(.m3-container.m3-container:active:not(:disabled, :has(> input:disabled))),
++  .connected.round
++    > :global(.m3-container.m3-container:active:not(:disabled, :has(> input:disabled))) {
++    border-radius: var(--button-group-pressed) !important;
++  }
++
++  .button-group > :global(.m3-container:not(:disabled, :has(> input:disabled))) {
++    background-color: var(--m3c-surface-container) !important;
++    color: var(--m3c-on-surface-variant) !important;
++    box-shadow: none !important;
++    outline-color: transparent !important;
++  }
++
++  .button-group
++    > :global(
++      .m3-container:is([data-selected], [aria-pressed="true"], :has(> input:checked)):not(
++          :disabled,
++          :has(> input:disabled)
++        )
++    ) {
++    background-color: var(--m3c-primary) !important;
++    color: var(--m3c-on-primary) !important;
++  }
++
++  .button-group.button-group
++    > :global(
++      .m3-container.m3-container:not(.icon-full):is(
++          [data-selected],
++          [aria-pressed="true"],
++          :has(> input:checked)
++        )
++    ) {
++    padding-inline: calc(var(--button-group-pad) * var(--button-group-selected-scale)) !important;
++  }
++
++  .button-group.button-group
++    > :global(.m3-container.m3-container:not(.icon-full):active:not(:disabled, :has(> input:disabled))) {
++    padding-inline: calc(var(--button-group-pad) * (1 + var(--button-group-expand))) !important;
++  }
++
++  .button-group.button-group
++    > :global(
++      .m3-container.m3-container:not(.icon-full):is(
++          [data-selected],
++          [aria-pressed="true"],
++          :has(> input:checked)
++        ):active:not(:disabled, :has(> input:disabled))
++    ) {
++    padding-inline: calc(
++      var(--button-group-pad) * var(--button-group-selected-scale) * (1 + var(--button-group-expand))
++    ) !important;
++  }
++
++  .button-group.button-group > :global(.m3-container.icon-full) {
++    --_rest: var(--button-group-min);
++    width: var(--_rest) !important;
++    min-width: var(--_rest) !important;
++    max-width: var(--_rest);
++    aspect-ratio: 1;
++    padding-inline: 0 !important;
++  }
++
++  .button-group.button-group
++    > :global(
++      .m3-container.icon-full:is(
++          [data-selected],
++          [aria-pressed="true"],
++          :has(> input:checked)
++        )
++    ) {
++    --_rest: calc(var(--button-group-min) * var(--button-group-selected-scale));
++    width: var(--_rest) !important;
++    min-width: var(--_rest) !important;
++    max-width: var(--_rest);
++    aspect-ratio: auto;
++    padding-inline: calc(var(--button-group-min) * 0.45) !important;
++  }
++
++  .button-group.button-group
++    > :global(.m3-container.icon-full:active:not(:disabled, :has(> input:disabled))) {
++    --_pressed: calc(var(--_rest) * (1 + var(--button-group-expand)));
++    aspect-ratio: auto;
++    width: var(--_pressed) !important;
++    min-width: var(--_pressed) !important;
++    max-width: var(--_pressed);
++  }
++
++  .button-group.button-group
++    > :global(.m3-container.icon-full:has(+ .m3-container:not(:first-child, :last-child):active)),
++  .button-group.button-group
++    > :global(.m3-container:not(:first-child, :last-child):active + .m3-container.icon-full) {
++    --_neighbor: calc(var(--_rest) * (1 - var(--button-group-expand) / 2));
++    width: var(--_neighbor) !important;
++    min-width: var(--_neighbor) !important;
++    max-width: var(--_neighbor);
++  }
++
++  .button-group.button-group > :global(.m3-container:first-child:active + .m3-container.icon-full),
++  .button-group.button-group
++    > :global(.m3-container.icon-full:has(+ .m3-container:last-child:active)) {
++    --_neighbor: calc(var(--_rest) * (1 - var(--button-group-expand)));
++    width: var(--_neighbor) !important;
++    min-width: var(--_neighbor) !important;
++    max-width: var(--_neighbor);
++  }
++
++  .connected.round > :global(.m3-container.m3-container) {
++    --shape: calc(var(--button-group-min) / 2);
++    --square-shape: calc(var(--button-group-min) / 2);
++    border-radius: calc(var(--button-group-min) / 2);
++  }
++
++  .connected.square:is(.size-xs, .size-s, .size-m) > :global(.m3-container) {
++    --inner-corner: var(--m3-shape-small);
++  }
++
++  .connected.square.size-l > :global(.m3-container) {
++    --inner-corner: var(--m3-shape-large);
++  }
++
++  .connected.square.size-xl > :global(.m3-container) {
++    --inner-corner: var(--m3-shape-large-increased);
++  }
++
++  .connected.square > :global(.m3-container.m3-container) {
++    border-radius: var(--inner-corner);
++  }
++
++  .connected.square > :global(.m3-container:first-child:not(:active)) {
++    border-start-start-radius: var(--m3-shape-medium);
++    border-end-start-radius: var(--m3-shape-medium);
++  }
++
++  .connected.square > :global(.m3-container:last-child:not(:active)) {
++    border-start-end-radius: var(--m3-shape-medium);
++    border-end-end-radius: var(--m3-shape-medium);
++  }
++
++  .connected.square
++    > :global(
++      .m3-container.m3-container:is(
++          [data-selected],
++          [aria-pressed="true"],
++          :has(> input:checked)
++        ):not(:active)
++    ) {
++    border-radius: calc(var(--button-group-min) / 2);
++  }
++
++  @media (prefers-reduced-motion: reduce) {
++    .button-group.button-group > :global(.m3-container.m3-container) {
++      transition:
++        box-shadow var(--m3-easing-fast),
++        background-color var(--m3-easing-fast),
++        color var(--m3-easing-fast);
++    }
++  }
++</style>
+diff --git a/package/buttons/ButtonGroup.svelte.d.ts b/package/buttons/ButtonGroup.svelte.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..65fa933e137cd60f36cdf364b8e19e1a28bc3860
+--- /dev/null
++++ b/package/buttons/ButtonGroup.svelte.d.ts
+@@ -0,0 +1,12 @@
++import type { Snippet } from "svelte";
++import type { DivAttrs } from "../misc/typing-utils";
++type $$ComponentProps = {
++    children: Snippet;
++    selected?: number;
++    shape?: "round" | "square";
++    size?: "xs" | "s" | "m" | "l" | "xl";
++    variant?: "connected" | "standard";
++} & DivAttrs;
++declare const ButtonGroup: import("svelte").Component<$$ComponentProps, {}, "">;
++type ButtonGroup = ReturnType<typeof ButtonGroup>;
++export default ButtonGroup;
 diff --git a/package/containers/ExpressiveMenu.svelte b/package/containers/ExpressiveMenu.svelte
 new file mode 100755
 index 0000000000000000000000000000000000000000..267dd4429424c0dde753d973a9813070316ac12e
@@ -611,10 +937,17 @@ index 0000000000000000000000000000000000000000..9c076896b0b631ef3dd4b766fa95af8a
 +type MenuDivider = ReturnType<typeof MenuDivider>;
 +export default MenuDivider;
 diff --git a/package/index.d.ts b/package/index.d.ts
-index 78b8a6de3e6fd012c1eeae984b7643b8baca7ac8..89d74a1db8734bb41f10b6aeac5496c3be5dd7f0 100644
+index 78b8a6de3e6fd012c1eeae984b7643b8baca7ac8..c05c596589323862fd35d5b25182e194afbe91e1 100644
 --- a/package/index.d.ts
 +++ b/package/index.d.ts
-@@ -13,8 +13,12 @@ export { default as SplitButton } from "./buttons/SplitButton.svelte";
+@@ -7,14 +7,19 @@ export { default as Icon } from "./misc/Icon.svelte";
+ export * from "./misc/shapes.js";
+ export * from "./misc/shapesAnimatable.js";
+ export { default as Button } from "./buttons/Button.svelte";
++export { default as ButtonGroup } from "./buttons/ButtonGroup.svelte";
+ export { default as ConnectedButtons } from "./buttons/ConnectedButtons.svelte";
+ export { default as FAB } from "./buttons/FAB.svelte";
+ export { default as SplitButton } from "./buttons/SplitButton.svelte";
  export { default as BottomSheet } from "./containers/BottomSheet.svelte";
  export { default as Card } from "./containers/Card.svelte";
  export { default as Dialog } from "./containers/Dialog.svelte";
@@ -628,10 +961,17 @@ index 78b8a6de3e6fd012c1eeae984b7643b8baca7ac8..89d74a1db8734bb41f10b6aeac5496c3
  export { default as Snackbar, snackbar } from "./containers/Snackbar.svelte";
  export { default as SnackbarItem } from "./containers/SnackbarItem.svelte";
 diff --git a/package/index.js b/package/index.js
-index 78b8a6de3e6fd012c1eeae984b7643b8baca7ac8..89d74a1db8734bb41f10b6aeac5496c3be5dd7f0 100644
+index 78b8a6de3e6fd012c1eeae984b7643b8baca7ac8..c05c596589323862fd35d5b25182e194afbe91e1 100644
 --- a/package/index.js
 +++ b/package/index.js
-@@ -13,8 +13,12 @@ export { default as SplitButton } from "./buttons/SplitButton.svelte";
+@@ -7,14 +7,19 @@ export { default as Icon } from "./misc/Icon.svelte";
+ export * from "./misc/shapes.js";
+ export * from "./misc/shapesAnimatable.js";
+ export { default as Button } from "./buttons/Button.svelte";
++export { default as ButtonGroup } from "./buttons/ButtonGroup.svelte";
+ export { default as ConnectedButtons } from "./buttons/ConnectedButtons.svelte";
+ export { default as FAB } from "./buttons/FAB.svelte";
+ export { default as SplitButton } from "./buttons/SplitButton.svelte";
  export { default as BottomSheet } from "./containers/BottomSheet.svelte";
  export { default as Card } from "./containers/Card.svelte";
  export { default as Dialog } from "./containers/Dialog.svelte";

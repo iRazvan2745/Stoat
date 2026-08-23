@@ -25,7 +25,7 @@
         getService,
         getServiceContainers,
     } from "#lib/api/services.remote";
-    import ServiceIcon from "#lib/service-icon.svelte";
+    import ServiceIcon from "#lib/service/icon.svelte";
 
     import ComposeEditor from "./compose-editor.svelte";
     import DatabaseConnection from "./database-connection.svelte";
@@ -144,7 +144,9 @@
         let timeoutId = 0;
 
         const refresh = async (): Promise<void> => {
-            await containers.refresh();
+            if (!cancelled && !containers.loading) {
+                await containers.refresh();
+            }
 
             if (cancelled) {
                 return;

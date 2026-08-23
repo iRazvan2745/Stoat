@@ -1,7 +1,7 @@
 // oxlint-disable oxc/no-barrel-file sort-keys
 import { bigserial, boolean, index, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
-import type { ServiceSettings } from "../../service-settings";
+import type { ServiceSettings } from "#lib/service/settings";
 
 export const dataSource = pgTable("data_source", {
   id: text("id")

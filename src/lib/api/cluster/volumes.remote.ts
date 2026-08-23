@@ -1,6 +1,6 @@
 import { query } from "$app/server";
 
-import { ucClient } from "#lib/api/client";
+import { ucClient } from "#lib/server/uncloud";
 
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error && error.message ? error.message : "Unable to load volumes.";

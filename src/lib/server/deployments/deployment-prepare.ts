@@ -4,9 +4,8 @@ import path from "node:path";
 
 import { eq } from "drizzle-orm";
 
-import { ucClient } from "#lib/api/client";
 import { serializeEnvFile } from "#lib/environment";
-import { resolveDataSourcePath } from "#lib/server/data-source";
+import { resolveDataSourcePath } from "#lib/server/data-source/paths";
 import { dataSource, deploymentLogs, workspace } from "#lib/server/db/schema";
 import {
   applyEnvironmentVariables,
@@ -14,9 +13,10 @@ import {
   inlineEnvironmentVariables,
 } from "#lib/server/deployments/deployment-compose";
 import { consumeDeployStream } from "#lib/server/deployments/deployment-stream";
-import { getRepo } from "#lib/server/git";
 import { listEnvironmentVariables } from "#lib/server/service/service-environment";
 import { getService, serviceComposePrefix } from "#lib/server/service/services";
+import { getRepo } from "#lib/server/shared/git";
+import { ucStreamClient } from "#lib/server/uncloud";
 
 import { db } from "../db";
 
@@ -56,9 +56,18 @@ async function getWorkspace(id: string) {
   return wrk;
 }
 
-export async function prepareDeployment(id: string, deploymentId: string): Promise<void> {
+export async function prepareDeployment(
+  id: string,
+  deploymentId: string,
+  signal?: AbortSignal,
+): Promise<void> {
   const log = (stream: "debug" | "stderr" | "stdout", message: string) =>
     addDeploymentLog(deploymentId, stream, message);
+  const throwIfCancelled = () => {
+    if (signal?.aborted) {
+      throw new Error("Deployment cancelled");
+    }
+  };
 
   const svc = await getService(id);
 
@@ -74,7 +83,7 @@ export async function prepareDeployment(id: string, deploymentId: string): Promi
   const wrk = await getWorkspace(svc.workspaceId);
   const ds = await getDatasourceFromWorkspace(svc.workspaceId);
   const repoPath = resolveDataSourcePath(ds.path);
-  const servicePath = path.join(wrk.id, serviceSlug);
+  const servicePath = path.join(wrk.slug, serviceSlug);
   const dataServiceDir = path.join(repoPath, servicePath);
   const repo = await getRepo({ repoPath, repoUrl: ds.url });
 
@@ -97,6 +106,8 @@ export async function prepareDeployment(id: string, deploymentId: string): Promi
   } else {
     await fs.rm(dataEnvPath, { force: true });
   }
+
+  throwIfCancelled();
 
   const composeRepoPath = path.join(servicePath, "compose.yaml");
   const envRepoPath = path.join(servicePath, ".env");
@@ -138,7 +149,9 @@ export async function prepareDeployment(id: string, deploymentId: string): Promi
     await log("debug", "Nothing to push — remote is already up to date");
   }
 
-  const deploy = await ucClient.POST("/api/v1/services/deploy/compose", {
+  throwIfCancelled();
+
+  const deploy = await ucStreamClient.POST("/api/v1/services/deploy/compose", {
     body: {
       compose: Buffer.from(deployCompose).toString("base64"),
       options: {
@@ -148,10 +161,17 @@ export async function prepareDeployment(id: string, deploymentId: string): Promi
       },
     },
     parseAs: "stream",
+    signal,
   });
 
   if (deploy.error) {
-    throw new Error("Failed to deploy service");
+    // The schema declares no error body for this endpoint, so widen the type
+    // to surface whatever uncloud actually returned.
+    const errorBody: unknown = deploy.error;
+    const detail = typeof errorBody === "string" ? errorBody : JSON.stringify(errorBody);
+    const status = deploy.response ? ` (HTTP ${deploy.response.status})` : "";
+
+    throw new Error(`Failed to deploy service${status}: ${detail}`);
   }
 
   if (!deploy.response) {

@@ -1,7 +1,7 @@
 // oxlint-disable func-style default-case
-import type { DeploymentFailureLog } from "#lib/deployment-failure";
-import { detectDeploymentFailure } from "#lib/deployment-failure";
-import type { ServiceSettings } from "#lib/service-settings";
+import type { DeploymentFailureLog } from "#lib/deployments/failure";
+import { detectDeploymentFailure } from "#lib/deployments/failure";
+import type { ServiceSettings } from "#lib/service/settings";
 
 export interface Deployment {
   createdAt: Date;

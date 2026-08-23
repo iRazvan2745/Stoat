@@ -29,7 +29,7 @@
         getWorkspace,
         listWorkspaces,
     } from "#lib/api/workspace.remote";
-    import ServiceIcon from "#lib/service-icon.svelte";
+    import ServiceIcon from "#lib/service/icon.svelte";
 
     import type { PageProps } from "./$types";
     import TemplatesDialog from "./templates-dialog.svelte";

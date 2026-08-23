@@ -23,7 +23,7 @@
         useQueryStates,
     } from "nuqs-svelte";
 
-    import { listDataSources } from "#lib/api/data-source/data-source.remote";
+    import { listDataSources } from "#lib/api/data-source.remote";
     import { createWorkspace, listWorkspaces } from "#lib/api/workspace.remote";
 
     const workspace = listWorkspaces();

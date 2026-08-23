@@ -26,6 +26,7 @@
     // The editor keeps its own draft after the service has loaded.
     // svelte-ignore state_referenced_locally
     let compose = $state(initialCompose ?? "");
+    // svelte-ignore state_referenced_locally
     let lastSaved = $state(initialCompose ?? "");
     let editorLoading = $state(true);
     let saving = $state(false);
@@ -272,7 +273,7 @@
         {:else if previewError}
             <p class="preview-error" role="alert">{previewError}</p>
         {:else}
-            <pre class="preview-yaml" tabindex="0">{previewYaml}</pre>
+            <pre class="preview-yaml">{previewYaml}</pre>
         {/if}
 
         {#snippet buttons()}

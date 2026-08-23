@@ -2,7 +2,7 @@
     import widgetsIcon from "@ktibow/iconset-material-symbols/widgets-outline";
     import { Icon } from "m3-svelte";
 
-    import { resolveServiceIcon } from "#lib/service-icon";
+    import { resolveServiceIcon } from "#lib/service/icon";
 
     let {
         alt = "",

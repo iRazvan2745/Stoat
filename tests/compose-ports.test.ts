@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { findPublishedTcpPort, listComposePorts, parseComposePortSpec } from "#lib/compose-ports";
+import {
+  findPublishedTcpPort,
+  listComposePorts,
+  parseComposePortSpec,
+} from "#lib/server/service/compose-ports";
 
 describe("parseComposePortSpec", () => {
   it("parses docker short, mapped, and host-ip forms", () => {

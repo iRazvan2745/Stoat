@@ -4,12 +4,12 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { PgBoss, fromDrizzle } from "pg-boss";
 import * as v from "valibot";
 
-import { detectDeploymentFailure } from "#lib/deployment-failure";
+import { detectDeploymentFailure } from "#lib/deployments/failure";
 import { db } from "#lib/server/db";
 import { deploymentLogs, deployments } from "#lib/server/db/schema";
 import { prepareDeployment } from "#lib/server/deployments/deployment-prepare";
 import { getService } from "#lib/server/service/services";
-import { parseServiceSettings } from "#lib/service-settings";
+import { parseServiceSettings } from "#lib/service/settings";
 
 const StartDeploymentInput = v.object({
   service_id: v.string(),
@@ -17,10 +17,16 @@ const StartDeploymentInput = v.object({
 
 const DEPLOYMENT_QUEUE = "deployments";
 
+const STALE_DEPLOYMENT_TIMEOUT_MS = 10 * 60 * 1000;
+const RECONCILE_MIN_INTERVAL_MS = 10_000;
+
 interface DeploymentJob {
   deployment_id: string;
   service_id: string;
 }
+
+/** Abort controllers for deployments currently being processed in this instance. */
+const activeDeployments = new Map<string, AbortController>();
 
 const boss = new PgBoss(DATABASE_URL);
 boss.on("error", (error) => {
@@ -73,8 +79,11 @@ async function processDeployment({
     });
   });
 
+  const controller = new AbortController();
+  activeDeployments.set(deploymentId, controller);
+
   try {
-    await prepareDeployment(serviceId, deploymentId);
+    await prepareDeployment(serviceId, deploymentId, controller.signal);
 
     if (await isDeploymentTerminal(deploymentId)) {
       return;
@@ -111,6 +120,8 @@ async function processDeployment({
         stream: "stderr",
       });
     });
+  } finally {
+    activeDeployments.delete(deploymentId);
   }
 }
 
@@ -128,7 +139,7 @@ async function initializeBoss(): Promise<void> {
   console.log("pg-boss deployment worker started", { workerId });
 }
 
-async function ensureBossReady(): Promise<void> {
+export async function ensureDeploymentWorker(): Promise<void> {
   const ready = (bossReady ??= initializeBoss());
 
   try {
@@ -143,7 +154,7 @@ async function ensureBossReady(): Promise<void> {
 }
 
 export async function startDeployment({ service_id }: v.InferOutput<typeof StartDeploymentInput>) {
-  await ensureBossReady();
+  await ensureDeploymentWorker();
 
   return db.transaction(async (tx) => {
     const [deployment] = await tx
@@ -155,14 +166,15 @@ export async function startDeployment({ service_id }: v.InferOutput<typeof Start
       throw new Error("Unable to create deployment");
     }
 
+    // singletonKey allows at most one queued (not yet started) job per service.
     const jobId = await boss.send(
       DEPLOYMENT_QUEUE,
       { deployment_id: deployment.id, service_id },
-      { db: fromDrizzle(tx, sql), retryLimit: 0 },
+      { db: fromDrizzle(tx, sql), retryLimit: 0, singletonKey: service_id },
     );
 
     if (!jobId) {
-      throw new Error("Unable to enqueue deployment");
+      throw new Error("A deployment is already queued for this service");
     }
 
     await tx.update(deployments).set({ jobId }).where(eq(deployments.id, deployment.id));
@@ -182,7 +194,7 @@ export async function deployService(id: string) {
 }
 
 export async function cancelDeployment(deploymentId: string): Promise<void> {
-  await ensureBossReady();
+  await ensureDeploymentWorker();
 
   const deployment = await getDeploymentRecord(deploymentId);
 
@@ -206,6 +218,10 @@ export async function cancelDeployment(deploymentId: string): Promise<void> {
     });
   });
 
+  // Abort in-flight work (git push / deploy stream) after the record is
+  // marked cancelled, so the worker sees the terminal state and stops quietly.
+  activeDeployments.get(deploymentId)?.abort();
+
   if (deployment.jobId) {
     try {
       await boss.cancel(DEPLOYMENT_QUEUE, deployment.jobId);
@@ -219,26 +235,54 @@ export async function cancelDeployment(deploymentId: string): Promise<void> {
 }
 
 export async function deleteDeployment(deploymentId: string): Promise<void> {
-  const [deleted] = await db
-    .delete(deployments)
-    .where(eq(deployments.id, deploymentId))
+  const deployment = await getDeploymentRecord(deploymentId);
+
+  if (!deployment) {
+    throw new Error("Deployment not found");
+  }
+
+  if (!deployment.finishedAt) {
+    throw new Error("Deployment is still running — cancel it before deleting");
+  }
+
+  await db.delete(deployments).where(eq(deployments.id, deploymentId));
+}
+
+async function markDeploymentFailed(deploymentId: string, reason?: string): Promise<void> {
+  const updated = await db
+    .update(deployments)
+    .set({ finishedAt: new Date(), outcome: "failed" })
+    .where(and(eq(deployments.id, deploymentId), isNull(deployments.finishedAt)))
     .returning({ id: deployments.id });
 
-  if (!deleted) {
-    throw new Error("Deployment not found");
+  if (updated.length > 0 && reason) {
+    await db.insert(deploymentLogs).values({
+      deploymentId,
+      message: reason,
+      stream: "stderr",
+    });
   }
 }
 
-async function markDeploymentFailed(deploymentId: string): Promise<void> {
-  await db
-    .update(deployments)
-    .set({ finishedAt: new Date(), outcome: "failed" })
-    .where(and(eq(deployments.id, deploymentId), isNull(deployments.finishedAt)));
-}
+const reconcileLastRunAt = new Map<string, number>();
 
 export async function reconcileFailedDeployments(serviceId: string): Promise<void> {
+  const now = Date.now();
+  const lastRun = reconcileLastRunAt.get(serviceId);
+
+  if (lastRun !== undefined && now - lastRun < RECONCILE_MIN_INTERVAL_MS) {
+    return;
+  }
+
+  reconcileLastRunAt.set(serviceId, now);
+
   const unfinished = await db
-    .select({ id: deployments.id })
+    .select({
+      createdAt: deployments.createdAt,
+      id: deployments.id,
+      queuedAt: deployments.queuedAt,
+      startedAt: deployments.startedAt,
+    })
     .from(deployments)
     .where(and(eq(deployments.serviceId, serviceId), isNull(deployments.finishedAt)));
 
@@ -248,6 +292,7 @@ export async function reconcileFailedDeployments(serviceId: string): Promise<voi
 
   const logs = await db
     .select({
+      createdAt: deploymentLogs.createdAt,
       deploymentId: deploymentLogs.deploymentId,
       message: deploymentLogs.message,
     })
@@ -259,19 +304,40 @@ export async function reconcileFailedDeployments(serviceId: string): Promise<voi
       ),
     );
 
-  const logsByDeployment = new Map<string, { message: string }[]>();
+  const logsByDeployment = new Map<string, { createdAt: Date; message: string }[]>();
 
   for (const log of logs) {
     const current = logsByDeployment.get(log.deploymentId) ?? [];
-    current.push({ message: log.message });
+    current.push({ createdAt: log.createdAt, message: log.message });
     logsByDeployment.set(log.deploymentId, current);
   }
 
   for (const deployment of unfinished) {
-    const failure = detectDeploymentFailure(logsByDeployment.get(deployment.id) ?? []);
+    const deploymentLogEntries = logsByDeployment.get(deployment.id) ?? [];
+    const failure = detectDeploymentFailure(deploymentLogEntries);
 
     if (failure) {
       await markDeploymentFailed(deployment.id);
+      continue;
+    }
+
+    // Recover deployments orphaned by a crash or restart: no terminal state
+    // and no activity (new logs) for longer than the stale timeout.
+    let lastActivity = Math.max(
+      deployment.createdAt.getTime(),
+      deployment.queuedAt?.getTime() ?? 0,
+      deployment.startedAt?.getTime() ?? 0,
+    );
+
+    for (const log of deploymentLogEntries) {
+      lastActivity = Math.max(lastActivity, log.createdAt.getTime());
+    }
+
+    if (now - lastActivity > STALE_DEPLOYMENT_TIMEOUT_MS) {
+      await markDeploymentFailed(
+        deployment.id,
+        "Deployment marked as failed after 10 minutes without activity",
+      );
     }
   }
 }

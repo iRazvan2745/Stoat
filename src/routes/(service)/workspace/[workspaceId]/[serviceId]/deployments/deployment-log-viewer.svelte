@@ -6,8 +6,8 @@
         useQueryState,
     } from "nuqs-svelte";
 
-    import type { DeploymentLogRecord } from "#lib/deployment-logs";
-    import { attachFollowScroll } from "#lib/follow-scroll";
+    import type { DeploymentLogRecord } from "#lib/deployments/logs";
+    import { attachFollowScroll } from "#lib/ui/follow-scroll";
 
     import type { Deployment } from "./deployment";
     import DeploymentLogBanner from "./deployment-log-banner.svelte";

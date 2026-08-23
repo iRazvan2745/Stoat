@@ -8,7 +8,7 @@ import {
   postgresConnectionParts,
   splitPostgresUrl,
   wrapUrlSegments,
-} from "#lib/database-url";
+} from "#lib/service/database-url";
 
 describe("buildPostgresUrl", () => {
   it("encodes credentials and builds a postgresql URL", () => {

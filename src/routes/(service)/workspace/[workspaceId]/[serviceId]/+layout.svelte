@@ -8,6 +8,8 @@
     import settingsIcon from "@ktibow/iconset-material-symbols/settings-outline";
     import { FAB, NavigationRail, NavigationRailItem } from "m3-svelte";
 
+    import RailFooter from "#lib/components/rail-footer.svelte";
+
     let { children, params } = $props();
     let railOpen = $state(false);
 
@@ -16,7 +18,7 @@
 </script>
 
 <div class="flex h-full w-svw min-w-0">
-    <div class="shrink-0">
+    <div class="relative z-10 shrink-0">
         <NavigationRail bind:open={railOpen}>
             {#snippet fab(open)}
                 <FAB
@@ -59,6 +61,7 @@
                 icon={settingsIcon}
             />
         </NavigationRail>
+        <RailFooter open={railOpen} />
     </div>
     <main
         class="bg-surface m:p-6 mt-6 h-[calc(100svh-1.5rem)] min-w-0 flex-1 overflow-y-auto p-4"

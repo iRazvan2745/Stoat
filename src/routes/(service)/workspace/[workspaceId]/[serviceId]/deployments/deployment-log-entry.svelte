@@ -2,8 +2,8 @@
     import type {
         DeploymentLogEntry,
         LogHighlightKind,
-    } from "#lib/deployment-logs";
-    import { highlightLogMessage } from "#lib/deployment-logs";
+    } from "#lib/deployments/logs";
+    import { highlightLogMessage } from "#lib/deployments/logs";
 
     import { formatTime } from "./deployment";
     import DeploymentLogProgress from "./deployment-log-progress.svelte";

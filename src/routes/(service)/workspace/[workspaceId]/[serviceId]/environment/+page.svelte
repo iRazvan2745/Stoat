@@ -5,8 +5,8 @@
     import variablesIcon from "@ktibow/iconset-material-symbols/variables-outline";
     import {
         Button,
+        ButtonGroup,
         Card,
-        ConnectedButtons,
         Icon,
         LoadingIndicator,
         Snackbar,
@@ -154,24 +154,29 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
-            <ConnectedButtons>
+            <ButtonGroup
+                selected={view.current === "list" ? 0 : 1}
+                aria-label="Environment view"
+            >
                 <Button
-                    variant={view.current === "list" ? "filled" : "outlined"}
+                    variant="filled"
                     iconType="left"
+                    aria-pressed={view.current === "list"}
                     onclick={() => setView("list")}
                 >
                     <Icon icon={variablesIcon} size={18} />
                     Variables
                 </Button>
                 <Button
-                    variant={view.current === "editor" ? "filled" : "outlined"}
+                    variant="filled"
                     iconType="left"
+                    aria-pressed={view.current === "editor"}
                     onclick={() => setView("editor")}
                 >
                     <Icon icon={codeIcon} size={18} />
                     .env
                 </Button>
-            </ConnectedButtons>
+            </ButtonGroup>
 
             <Button
                 variant="tonal"

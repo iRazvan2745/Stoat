@@ -2,7 +2,7 @@
 
 This project uses [m3-svelte](https://github.com/KTibow/m3-svelte) **7.2.0** (Material Design 3 components for Svelte 5), **patched** via `patches/m3-svelte.patch` (registered in `pnpm-workspace.yaml`) to add the **expressive menus** from the [mrsproutt/m3-svelte `expressive-menus` branch](https://github.com/mrsproutt/m3-svelte/tree/expressive-menus/src/lib/containers).
 
-The patch adds `ExpressiveMenu`, `ExpressiveMenuItem`, `ExpressiveMenuGroup`, `MenuDivider` and extends the legacy `Menu` with anchor positioning (`open`, `anchored`, `x`, `y`).
+The patch adds `ExpressiveMenu`, `ExpressiveMenuItem`, `ExpressiveMenuGroup`, `MenuDivider`, `ButtonGroup`, and extends the legacy `Menu` with anchor positioning (`open`, `anchored`, `x`, `y`).
 
 > **Rule of thumb: use the expressive menu family for menus.** The default `Menu`/`MenuItem` are the minimal legacy variants — reach for them only for tiny dropdowns (e.g. inside `SplitButton`).
 
@@ -119,7 +119,7 @@ Rich, animated menus with CSS anchor positioning, labels, submenus, groups, divi
 
 ## Other components (quick list)
 
-- **Buttons**: `Button` (elevated/filled/tonal/outlined/text, sizes xs–xl, `iconType`), `ConnectedButtons`, `SplitButton` (menu via `Menu`), `FAB`
+- **Buttons**: `Button` (elevated/filled/tonal/outlined/text, sizes xs–xl, `iconType`), `ButtonGroup` (selected stadium pill, press-grow), `ConnectedButtons`, `SplitButton` (menu via `Menu`), `FAB`
 - **Containers**: `Card`, `ListItem`, `Menu`/`MenuItem` (legacy), expressive menu family, `BottomSheet`, `Dialog`, `Snackbar` + `snackbar()`, `StandardSideSheet`, `Divider`
 - **Inputs**: `Checkbox`, `RadioAnim1..3`, `Switch` (wrap in `<label>`), `Chip`, `Select`/`SelectOutlined`, `Slider`, `TextField*`, `TextFieldOutlined*`, `TextFieldMultiline*`, `DateField*`, `TimePickerDial`
 - **Progress**: `LinearProgress`/`LinearProgressEstimate`, `WavyLinearProgress*`, `CircularProgress*`, `LoadingIndicator`

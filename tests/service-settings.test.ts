@@ -5,7 +5,7 @@ import {
   parseServiceSettings,
   prefixChangeWarning,
   shouldPrefixServices,
-} from "#lib/service-settings";
+} from "#lib/service/settings";
 
 describe("parseServiceSettings", () => {
   it("returns an empty object for missing or invalid values", () => {

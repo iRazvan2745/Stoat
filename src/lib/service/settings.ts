@@ -1,11 +1,13 @@
 import * as v from "valibot";
 
 export interface ServiceSettings {
+  sourcePath?: string;
   shouldPrefix?: boolean;
 }
 
 export const ServiceSettingsSchema = v.object({
   shouldPrefix: v.optional(v.boolean()),
+  sourcePath: v.optional(v.string()),
 });
 
 export function parseServiceSettings(value: unknown): ServiceSettings {

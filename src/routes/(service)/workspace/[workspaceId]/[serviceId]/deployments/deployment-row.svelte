@@ -3,7 +3,7 @@
     import moreVertIcon from "@ktibow/iconset-material-symbols/more-vert";
     import { Button, Icon, LoadingIndicator } from "m3-svelte";
 
-    import type { DeploymentLogRecord } from "#lib/deployment-logs";
+    import type { DeploymentLogRecord } from "#lib/deployments/logs";
 
     import type { Deployment } from "./deployment";
     import {

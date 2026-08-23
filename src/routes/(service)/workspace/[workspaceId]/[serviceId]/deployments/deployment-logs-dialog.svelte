@@ -3,7 +3,7 @@
     import errorIcon from "@ktibow/iconset-material-symbols/error-circle-rounded-outline";
     import { Button, Dialog, Icon, LoadingIndicator } from "m3-svelte";
 
-    import type { DeploymentLogRecord } from "#lib/deployment-logs";
+    import type { DeploymentLogRecord } from "#lib/deployments/logs";
 
     import { isDeploymentActive } from "./deployment";
     import type { Deployment } from "./deployment";

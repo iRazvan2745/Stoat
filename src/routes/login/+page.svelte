@@ -15,7 +15,7 @@
     import { parseAsStringLiteral, useQueryState } from "nuqs-svelte";
 
     import stoatLogo from "#lib/assets/stoat.png";
-    import { authClient } from "#lib/auth-client";
+    import { authClient } from "#lib/auth/auth-client";
 
     const POST_AUTH_PATH = "/workspace";
     const MIN_PASSWORD_LENGTH = 8;

@@ -2,17 +2,16 @@
 import { setTimeout as wait } from "node:timers/promises";
 
 import { command, query } from "$app/server";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, gt } from "drizzle-orm";
 import * as v from "valibot";
 
+import { db } from "#lib/server/db";
 import { deploymentLogs, deployments } from "#lib/server/db/schema";
 import {
   reconcileFailedDeployments,
   cancelDeployment as runCancelDeployment,
   deleteDeployment as runDeleteDeployment,
 } from "#lib/server/deployments/deployments";
-
-import { db } from "../server/db";
 
 const DEPLOYMENT_POLL_INTERVAL = 1000;
 
@@ -52,19 +51,23 @@ export const getLatestSuccessfulDeployment = query(v.string(), async (serviceId)
 });
 
 const streamDeploymentLogs = async function* streamDeploymentLogs(deploymentId: string) {
-  let previousSnapshot: string | undefined;
+  const logs: (typeof deploymentLogs.$inferSelect)[] = [];
+  let lastId = 0;
+  let emitted = false;
 
   while (true) {
-    const currentLogs = await db
+    // Only fetch rows we haven't seen yet instead of re-reading the whole log.
+    const newLogs = await db
       .select()
       .from(deploymentLogs)
-      .where(eq(deploymentLogs.deploymentId, deploymentId))
+      .where(and(eq(deploymentLogs.deploymentId, deploymentId), gt(deploymentLogs.id, lastId)))
       .orderBy(asc(deploymentLogs.id));
-    const currentSnapshot = JSON.stringify(currentLogs);
 
-    if (currentSnapshot !== previousSnapshot) {
-      previousSnapshot = currentSnapshot;
-      yield currentLogs;
+    if (newLogs.length > 0 || !emitted) {
+      logs.push(...newLogs);
+      lastId = logs.at(-1)?.id ?? lastId;
+      emitted = true;
+      yield [...logs];
     }
 
     await wait(DEPLOYMENT_POLL_INTERVAL);

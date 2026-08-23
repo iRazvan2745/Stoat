@@ -1,8 +1,8 @@
-// oxlint-disable func-style
-import { ucClient } from "#lib/api/client";
 import type { FormattedCompose } from "#lib/server/deployments/deployment-compose";
 import { formatComposeFile } from "#lib/server/deployments/deployment-compose";
 import { getService, serviceComposePrefix } from "#lib/server/service/services";
+// oxlint-disable func-style
+import { ucClient } from "#lib/server/uncloud";
 
 import type { components } from "../../../../schema";
 

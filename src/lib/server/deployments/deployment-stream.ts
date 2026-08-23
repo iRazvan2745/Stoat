@@ -1,5 +1,5 @@
 // oxlint-disable func-style no-await-in-loop
-import { formatDeployPlanMessage } from "#lib/deployment-logs";
+import { formatDeployPlanMessage } from "#lib/deployments/logs";
 
 export interface DeployEventPayload {
   type?: string;

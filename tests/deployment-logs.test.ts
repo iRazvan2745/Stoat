@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import type { DeploymentLogRecord } from "#lib/deployment-logs";
+import type { DeploymentLogRecord } from "#lib/deployments/logs";
 import {
   buildDeploymentLogEntries,
   formatDeployPlanMessage,
@@ -9,7 +9,7 @@ import {
   insertLogSectionHeaders,
   isDebugDeploymentLog,
   parseDeploymentProgress,
-} from "#lib/deployment-logs";
+} from "#lib/deployments/logs";
 
 const log = (
   partial: Partial<DeploymentLogRecord> & Pick<DeploymentLogRecord, "id" | "message">,

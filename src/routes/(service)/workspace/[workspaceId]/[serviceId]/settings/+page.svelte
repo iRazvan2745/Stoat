@@ -16,7 +16,7 @@
         parseServiceSettings,
         prefixChangeWarning,
         shouldPrefixServices,
-    } from "#lib/service-settings";
+    } from "#lib/service/settings";
 
     const SAVE_DEBOUNCE_MS = 400;
 

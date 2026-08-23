@@ -4,9 +4,9 @@
     import { parseAsArrayOf, parseAsString, useQueryState } from "nuqs-svelte";
 
     import { getServiceContainerLogs } from "#lib/api/services.remote";
-    import { filterContainerLogs, matchContainerId } from "#lib/container-logs";
-    import type { ContainerLogRecord } from "#lib/container-logs";
-    import { attachFollowScroll } from "#lib/follow-scroll";
+    import { filterContainerLogs, matchContainerId } from "#lib/service/container-logs";
+    import type { ContainerLogRecord } from "#lib/service/container-logs";
+    import { attachFollowScroll } from "#lib/ui/follow-scroll";
 
     const { params } = $props();
 

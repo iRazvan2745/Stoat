@@ -3,6 +3,7 @@
     import addIcon from "@ktibow/iconset-material-symbols/add";
     import databaseIcon from "@ktibow/iconset-material-symbols/database";
     import deleteIcon from "@ktibow/iconset-material-symbols/delete";
+    import searchIcon from "@ktibow/iconset-material-symbols/search";
     import {
         Button,
         Card,
@@ -19,12 +20,9 @@
     import {
         createDataSource,
         deleteDataSource,
+        discoverDataSource,
         listDataSources,
-    } from "#lib/api/data-source/data-source.remote";
-
-    type DataSourceRow = NonNullable<
-        ReturnType<typeof listDataSources>["current"]
-    >[number];
+    } from "#lib/api/data-source.remote";
 
     const dataSources = listDataSources();
 
@@ -35,6 +33,7 @@
     let deleting = useQueryState("deleting", parseAsString.withDefault(""));
     let url = $state("");
     let submitting = $state(false);
+    let discoveringId = $state<string | null>(null);
 
     const create = async (): Promise<void> => {
         if (!url.trim()) {
@@ -86,6 +85,37 @@
             );
         }
     };
+
+    const discover = async (id: string): Promise<void> => {
+        if (discoveringId !== null) {
+            return;
+        }
+
+        discoveringId = id;
+
+        try {
+            const result = await discoverDataSource(id);
+            const parts = [`imported ${result.imported}`];
+
+            if (result.existing > 0) {
+                parts.push(`${result.existing} already imported`);
+            }
+
+            if (result.skipped > 0) {
+                parts.push(`${result.skipped} skipped`);
+            }
+
+            snackbar(`Autodiscovery: ${parts.join(", ")}`);
+        } catch (error) {
+            snackbar(
+                error instanceof Error
+                    ? error.message
+                    : "Unable to autodiscover Compose services"
+            );
+        } finally {
+            discoveringId = null;
+        }
+    };
 </script>
 
 <div class="flex items-center justify-between gap-4 p-5">
@@ -129,7 +159,7 @@
           text-on-surface-variant
           bg-surface-container-high grid
           min-w-220
-          grid-cols-[minmax(220px,1fr)_minmax(340px,1.6fr)_48px] items-center
+          grid-cols-[minmax(220px,1fr)_minmax(340px,1.6fr)_auto] items-center
           gap-4 px-5
           py-3 text-xs
           font-medium
@@ -148,7 +178,7 @@
                     class="
             border-outline-variant
             grid min-w-220
-            grid-cols-[minmax(220px,1fr)_minmax(340px,1.6fr)_48px] items-center
+            grid-cols-[minmax(220px,1fr)_minmax(340px,1.6fr)_auto] items-center
             gap-4 border-b px-5
             py-3 transition-colors
           "
@@ -180,13 +210,34 @@
                         {ds.url ?? "—"}
                     </div>
 
-                    <Button
-                        size="xs"
-                        variant="tonal"
-                        onclick={() => deleting.set(ds.id)}
-                    >
-                        <Icon icon={deleteIcon} size={18} />
-                    </Button>
+                    <div class="flex items-center justify-end gap-1">
+                        <Button
+                            size="xs"
+                            variant="tonal"
+                            aria-label={`Autodiscover Compose services in ${ds.path ?? ds.url}`}
+                            disabled={discoveringId !== null}
+                            onclick={() => discover(ds.id)}
+                        >
+                            {#if discoveringId === ds.id}
+                                <LoadingIndicator
+                                    size={18}
+                                    center={false}
+                                    aria-label="Autodiscovering Compose services"
+                                />
+                            {:else}
+                                <Icon icon={searchIcon} size={18} />
+                            {/if}
+                        </Button>
+
+                        <Button
+                            size="xs"
+                            variant="tonal"
+                            aria-label={`Delete ${ds.path ?? ds.url}`}
+                            onclick={() => deleting.set(ds.id)}
+                        >
+                            <Icon icon={deleteIcon} size={18} />
+                        </Button>
+                    </div>
                 </div>
 
                 {#if index < (dataSources.current?.length ?? 0) - 1}
