@@ -1,0 +1,14 @@
+services:
+  sidecar:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      additional_contexts:
+        uncloud: ../../uncloud
+    image: git.irazz.lol/stoat/sidecar:local
+    volumes:
+      # Bind-mount the host's Uncloud socket directory.
+      - /run/uncloud:/run/uncloud:ro
+    restart: unless-stopped
+    ports:
+      - 8080:8080

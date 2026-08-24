@@ -4,10 +4,10 @@ import path from "node:path";
 
 import { eq } from "drizzle-orm";
 
+import { db } from "#lib/db";
+import { services, workspace } from "#lib/db/schema";
 import type { EnvironmentVariable } from "#lib/environment";
-import { createDataSourceFolder, resolveDataSourcePath } from "#lib/server/data-source/paths";
-import { db } from "#lib/server/db";
-import { dataSource, services, workspace } from "#lib/server/db/schema";
+import { createWorkspaceFolder, workspacePath } from "#lib/server/data-source/paths";
 import { formatComposeFile } from "#lib/server/deployments/deployment-compose";
 import {
   deleteEnvironmentVariablesForService,
@@ -15,12 +15,12 @@ import {
 } from "#lib/server/service/service-environment";
 import { uniqueSlug } from "#lib/server/shared/slugs";
 import { readTemplateIconValue, readTemplateVersion } from "#lib/server/templates";
+import type { ServiceSettings } from "#lib/service/settings";
 import {
   mergeServiceSettings,
   parseServiceSettings,
   shouldPrefixServices,
 } from "#lib/service/settings";
-import type { ServiceSettings } from "#lib/service/settings";
 import { expandTemplateSecrets, expandTemplateVariables } from "#lib/templates";
 
 export interface CreateServiceInput {
@@ -52,20 +52,14 @@ export async function createService({
 }: CreateServiceInput) {
   const [workspaceRecord] = await db
     .select({
-      dataSourcePath: dataSource.path,
       slug: workspace.slug,
       workspaceId: workspace.id,
     })
     .from(workspace)
-    .innerJoin(dataSource, eq(workspace.dataSourceId, dataSource.id))
     .where(eq(workspace.id, workspaceId));
 
   if (!workspaceRecord) {
-    throw new Error("Workspace or data source not found");
-  }
-
-  if (!workspaceRecord.dataSourcePath) {
-    throw new Error("Data source does not have a path");
+    throw new Error("Workspace not found");
   }
 
   const slug = await uniqueSlug(name, async (candidate) => {
@@ -94,8 +88,8 @@ export async function createService({
   }
 
   try {
-    await createDataSourceFolder(
-      resolveDataSourcePath(workspaceRecord.dataSourcePath),
+    await createWorkspaceFolder(
+      workspacePath(workspaceId),
       workspaceRecord.slug,
       created.slug ?? slug,
     );
@@ -152,17 +146,11 @@ export async function deleteService(id: string) {
     throw new Error("Workspace not found");
   }
 
-  const [ds] = await db.select().from(dataSource).where(eq(dataSource.id, wrk.dataSourceId));
-
-  if (!ds?.path) {
-    throw new Error("Data source does not have a path");
-  }
-
   await deleteEnvironmentVariablesForService(id);
 
   const op = await db.delete(services).where(eq(services.id, id)).returning();
 
-  await fs.rm(path.join(resolveDataSourcePath(ds.path), wrk.slug, svc.slug ?? svc.id), {
+  await fs.rm(path.join(workspacePath(wrk.id), wrk.slug, svc.slug ?? svc.id), {
     force: true,
     recursive: true,
   });

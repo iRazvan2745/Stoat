@@ -4,9 +4,9 @@ import path from "node:path";
 
 import { eq } from "drizzle-orm";
 
+import { dataSource, deploymentLogs, workspace } from "#lib/db/schema";
 import { serializeEnvFile } from "#lib/environment";
-import { resolveDataSourcePath } from "#lib/server/data-source/paths";
-import { dataSource, deploymentLogs, workspace } from "#lib/server/db/schema";
+import { workspacePath } from "#lib/server/data-source/paths";
 import {
   applyEnvironmentVariables,
   formatComposeFile,
@@ -18,7 +18,7 @@ import { getService, serviceComposePrefix } from "#lib/server/service/services";
 import { getRepo } from "#lib/server/shared/git";
 import { ucStreamClient } from "#lib/server/uncloud";
 
-import { db } from "../db";
+import { db } from "../../db";
 
 async function addDeploymentLog(
   deploymentId: string,
@@ -82,7 +82,7 @@ export async function prepareDeployment(
   const deployCompose = inlineEnvironmentVariables(formatted.yaml, environment);
   const wrk = await getWorkspace(svc.workspaceId);
   const ds = await getDatasourceFromWorkspace(svc.workspaceId);
-  const repoPath = resolveDataSourcePath(ds.path);
+  const repoPath = workspacePath(wrk.id);
   const servicePath = path.join(wrk.slug, serviceSlug);
   const dataServiceDir = path.join(repoPath, servicePath);
   const repo = await getRepo({ repoPath, repoUrl: ds.url });
@@ -169,9 +169,8 @@ export async function prepareDeployment(
     // to surface whatever uncloud actually returned.
     const errorBody: unknown = deploy.error;
     const detail = typeof errorBody === "string" ? errorBody : JSON.stringify(errorBody);
-    const status = deploy.response ? ` (HTTP ${deploy.response.status})` : "";
-
-    throw new Error(`Failed to deploy service${status}: ${detail}`);
+    const httpStatus = deploy.response ? ` (HTTP ${deploy.response.status})` : "";
+    throw new Error(`Failed to deploy service${httpStatus}: ${detail}`);
   }
 
   if (!deploy.response) {

@@ -4,9 +4,9 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { PgBoss, fromDrizzle } from "pg-boss";
 import * as v from "valibot";
 
+import { db } from "#lib/db";
+import { deploymentLogs, deployments } from "#lib/db/schema";
 import { detectDeploymentFailure } from "#lib/deployments/failure";
-import { db } from "#lib/server/db";
-import { deploymentLogs, deployments } from "#lib/server/db/schema";
 import { prepareDeployment } from "#lib/server/deployments/deployment-prepare";
 import { getService } from "#lib/server/service/services";
 import { parseServiceSettings } from "#lib/service/settings";

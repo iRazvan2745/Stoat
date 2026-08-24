@@ -2,7 +2,7 @@
   "extends": "./.svelte-kit/tsconfig.json",
   "compilerOptions": {
     "paths": {
-      "#lib": ["./src/lib/index.ts"],
+      "#lib": ["./src/lib/index"],
       "#lib/assets/*": ["./src/lib/assets/*"],
       "#lib/*": ["./src/lib/*"]
     },

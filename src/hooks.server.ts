@@ -5,7 +5,7 @@ import { svelteKitHandler } from "better-auth/svelte-kit";
 import { initLogger } from "evlog";
 import { createEvlogHooks } from "evlog/sveltekit";
 
-import { auth } from "#lib/server/auth";
+import { auth } from "#lib/auth";
 
 initLogger({
   env: { service: "app" },

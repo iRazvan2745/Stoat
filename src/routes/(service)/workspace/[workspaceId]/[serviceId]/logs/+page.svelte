@@ -5,11 +5,11 @@
     import { parseAsArrayOf, parseAsString, useQueryState } from "nuqs-svelte";
 
     import { getServiceContainerLogs } from "#lib/api/services.remote";
+    import type { ContainerLogRecord } from "#lib/service/container-logs";
     import {
         filterContainerLogs,
         matchContainerId,
     } from "#lib/service/container-logs";
-    import type { ContainerLogRecord } from "#lib/service/container-logs";
     import { attachFollowScroll } from "#lib/ui/follow-scroll";
 
     const { params } = $props();
@@ -132,6 +132,17 @@
         <h1 class="m3-font-headline-small text-on-surface">Logs</h1>
 
         <div class="flex items-center gap-3">
+            {#if !followLatest && visibleLogs.length > 0}
+                <Button
+                    variant="tonal"
+                    size="xs"
+                    iconType="left"
+                    onclick={jumpToLatest}
+                >
+                    <Icon icon={jumpToBottomIcon} />
+                    Jump to latest
+                </Button>
+            {/if}
             {#if snapshot}
                 <span
                     class={[
@@ -148,21 +159,8 @@
                     {following ? "Live" : "Idle"}
                 </span>
             {/if}
-
-            {#if !followLatest && visibleLogs.length > 0}
-                <Button
-                    variant="tonal"
-                    size="xs"
-                    iconType="left"
-                    onclick={jumpToLatest}
-                >
-                    <Icon icon={jumpToBottomIcon} />
-                    Jump to latest
-                </Button>
-            {/if}
         </div>
     </header>
-
     <div class="flex flex-wrap items-center gap-2">
         <Chip
             variant="general"
@@ -189,7 +187,7 @@
 
     <div
         id="service-logs-card"
-        class="bg-surface-container-lowest border-outline-variant/40 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border"
+        class="bg-surface-container-low border-outline-variant/40 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border"
     >
         {#if logsQuery.loading && !snapshot}
             <div

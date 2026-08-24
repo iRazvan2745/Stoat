@@ -4,11 +4,30 @@
     import { ExpressiveMenu, ExpressiveMenuItem } from "m3-svelte";
 
     import { authClient } from "#lib/auth/auth-client";
+    import { getGravatarUrl } from "#lib/gravatar";
 
-    const { open }: { open: boolean } = $props();
+    interface User {
+        email: string;
+        image?: string | null;
+        name: string;
+    }
+
+    const {
+        open,
+        initialUser,
+        initialGravatarUrl,
+    }: {
+        initialGravatarUrl?: string | null;
+        initialUser?: User | null;
+        open: boolean;
+    } = $props();
 
     const session = authClient.useSession();
-    const user = $derived($session.data?.user);
+    const user = $derived(
+        $session.isPending
+            ? (initialUser ?? $session.data?.user)
+            : $session.data?.user
+    );
 
     let menuOpen = $state(false);
     let root = $state<HTMLDivElement>();
@@ -18,17 +37,6 @@
             menuOpen = false;
         }
     };
-
-    async function gravatar(email: string): Promise<string> {
-        const data = new TextEncoder().encode(email.trim().toLowerCase());
-        const hash = [
-            ...new Uint8Array(await crypto.subtle.digest("SHA-256", data)),
-        ]
-            .map((byte) => byte.toString(16).padStart(2, "0"))
-            .join("");
-
-        return `https://gravatar.com/avatar/${hash}?s=80&d=identicon`;
-    }
 
     const logout = async (): Promise<void> => {
         menuOpen = false;
@@ -57,14 +65,25 @@
                     alt=""
                     class="size-10 shrink-0 rounded-full object-cover"
                 />
+            {:else if user?.email && $session.isPending && initialGravatarUrl}
+                <img
+                    src={initialGravatarUrl}
+                    alt=""
+                    class="size-10 shrink-0 rounded-full object-cover"
+                />
             {:else if user?.email}
-                {#await gravatar(user.email) then src}
+                {#await getGravatarUrl(user.email) then src}
                     <img
                         {src}
                         alt=""
                         class="size-10 shrink-0 rounded-full object-cover"
                     />
                 {/await}
+            {:else if $session.isPending}
+                <span
+                    class="bg-secondary-container text-on-secondary-container grid size-10 shrink-0 place-items-center rounded-full text-sm font-medium"
+                    aria-hidden="true"
+                ></span>
             {:else}
                 <span
                     class="bg-secondary-container text-on-secondary-container grid size-10 shrink-0 place-items-center rounded-full text-sm font-medium"

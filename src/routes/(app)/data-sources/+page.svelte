@@ -12,7 +12,7 @@
         Icon,
         LoadingIndicator,
         Snackbar,
-        TextField,
+        TextFieldOutlined,
         snackbar,
     } from "m3-svelte";
     import { parseAsBoolean, parseAsString, useQueryState } from "nuqs-svelte";
@@ -32,11 +32,12 @@
     );
     let deleting = useQueryState("deleting", parseAsString.withDefault(""));
     let url = $state("");
+    let uncloudUrl = $state("");
     let submitting = $state(false);
     let discoveringId = $state<string | null>(null);
 
     const create = async (): Promise<void> => {
-        if (!url.trim()) {
+        if (!(url.trim() && uncloudUrl.trim())) {
             return;
         }
 
@@ -44,11 +45,13 @@
 
         try {
             await createDataSource({
+                uncloudUrl: uncloudUrl.trim(),
                 url: url.trim(),
             });
 
             createDialogOpen.set(false);
             url = "";
+            uncloudUrl = "";
 
             snackbar("Data source added");
 
@@ -159,13 +162,12 @@
           text-on-surface-variant
           bg-surface-container-high grid
           min-w-220
-          grid-cols-[minmax(220px,1fr)_minmax(340px,1.6fr)_auto] items-center
+          grid-cols-[minmax(340px,1fr)_auto] items-center
           gap-4 px-5
           py-3 text-xs
           font-medium
         "
             >
-                <span>Path</span>
                 <span>URL</span>
                 <span>Actions</span>
             </div>
@@ -178,12 +180,12 @@
                     class="
             border-outline-variant
             grid min-w-220
-            grid-cols-[minmax(220px,1fr)_minmax(340px,1.6fr)_auto] items-center
+            grid-cols-[minmax(340px,1fr)_auto] items-center
             gap-4 border-b px-5
             py-3 transition-colors
           "
                 >
-                    <!-- path -->
+                    <!-- url -->
                     <div class="flex min-w-0 items-center gap-2">
                         <div
                             class="
@@ -199,22 +201,15 @@
                         <div
                             class="text-on-surface min-w-0 truncate font-mono text-sm"
                         >
-                            {ds.path ?? "—"}
+                            {ds.url ?? "—"}
                         </div>
-                    </div>
-
-                    <!-- url -->
-                    <div
-                        class="text-on-surface-variant min-w-0 truncate font-mono text-sm"
-                    >
-                        {ds.url ?? "—"}
                     </div>
 
                     <div class="flex items-center justify-end gap-1">
                         <Button
                             size="xs"
                             variant="tonal"
-                            aria-label={`Autodiscover Compose services in ${ds.path ?? ds.url}`}
+                            aria-label={`Autodiscover Compose services in ${ds.url}`}
                             disabled={discoveringId !== null}
                             onclick={() => discover(ds.id)}
                         >
@@ -232,7 +227,7 @@
                         <Button
                             size="xs"
                             variant="tonal"
-                            aria-label={`Delete ${ds.path ?? ds.url}`}
+                            aria-label={`Delete ${ds.url}`}
                             onclick={() => deleting.set(ds.id)}
                         >
                             <Icon icon={deleteIcon} size={18} />
@@ -258,11 +253,17 @@
 
 <Dialog bind:open={createDialogOpen.current} headline="Add data source">
     <div class="flex flex-col gap-4">
-        <TextField
+        <TextFieldOutlined
             bind:value={url}
-            label="URL"
+            label="Git URL"
             required
-            placeholder="https://example.com/data"
+            placeholder="example.com/git/repo.git"
+        />
+        <TextFieldOutlined
+            bind:value={uncloudUrl}
+            label="Uncloud URL"
+            required
+            placeholder="example.com"
         />
     </div>
 

@@ -14,7 +14,7 @@
         LoadingIndicator,
         snackbar,
         Snackbar,
-        TextField,
+        TextFieldOutlined,
     } from "m3-svelte";
     import {
         parseAsBoolean,
@@ -48,9 +48,7 @@
         )
     );
     const selectedDataSourceLabel = $derived(
-        selectedDataSource?.path ??
-            selectedDataSource?.url ??
-            "Select a data source"
+        selectedDataSource?.url ?? "Select a data source"
     );
     const hasSelectedDataSource = $derived(selectedDataSource !== undefined);
 
@@ -151,7 +149,7 @@
     headline="Create Workspace"
 >
     <div class="flex flex-col gap-2">
-        <TextField
+        <TextFieldOutlined
             bind:value={newWorkspace.name.current}
             label="Name"
             required
@@ -187,12 +185,7 @@
                             {#each dataSources.current ?? [] as source (source.id)}
                                 <ExpressiveMenuItem
                                     leadingIcon={databaseIcon}
-                                    label={source.path ??
-                                        source.url ??
-                                        "Unnamed data source"}
-                                    details={source.path && source.url
-                                        ? source.url
-                                        : undefined}
+                                    label={source.url ?? "Unnamed data source"}
                                     selected={source.id ===
                                         dataSourceId.current}
                                     onclick={() => selectDataSource(source.id)}

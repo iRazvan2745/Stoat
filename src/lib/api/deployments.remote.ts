@@ -5,8 +5,8 @@ import { command, query } from "$app/server";
 import { and, asc, desc, eq, gt } from "drizzle-orm";
 import * as v from "valibot";
 
-import { db } from "#lib/server/db";
-import { deploymentLogs, deployments } from "#lib/server/db/schema";
+import { db } from "#lib/db";
+import { deploymentLogs, deployments } from "#lib/db/schema";
 import {
   reconcileFailedDeployments,
   cancelDeployment as runCancelDeployment,

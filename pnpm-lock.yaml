@@ -214,7 +214,7 @@ overrides:
 
 patchedDependencies:
   '@sveltejs/kit@2.70.3': 16c8f53914c427079860df9cd9a8c3cdc492196abfee13ecca6006cebde252ee
-  m3-svelte: e0a57e4afec2e39ddf91b81d699afdf614fdfae506dc43f054c056e48aaf895c
+  m3-svelte: 5a61004ddefa22ead7e31bed010222594d77ae6201f347d511664ccb4f374775
   nuqs-svelte: b8df5634270b5d3f24bc85985e28644d188b195607154b8798fbdb34520f21f8
 
 importers:
@@ -302,7 +302,7 @@ importers:
         version: 2.1.10
       m3-svelte:
         specifier: ^7.2.0
-        version: 7.2.0(patch_hash=e0a57e4afec2e39ddf91b81d699afdf614fdfae506dc43f054c056e48aaf895c)(svelte@5.56.8)(vite-plugin-functions-mixins@0.4.1(@voidzero-dev/vite-plus-core@0.2.8(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(typescript@6.0.3)(yaml@2.9.0)))
+        version: 7.2.0(patch_hash=5a61004ddefa22ead7e31bed010222594d77ae6201f347d511664ccb4f374775)(svelte@5.56.8)(vite-plugin-functions-mixins@0.4.1(@voidzero-dev/vite-plus-core@0.2.8(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(typescript@6.0.3)(yaml@2.9.0)))
       openapi-typescript:
         specifier: ^7.13.0
         version: 7.13.0(typescript@6.0.3)
@@ -5950,7 +5950,7 @@ snapshots:
 
   lz-string@1.5.0: {}
 
-  m3-svelte@7.2.0(patch_hash=e0a57e4afec2e39ddf91b81d699afdf614fdfae506dc43f054c056e48aaf895c)(svelte@5.56.8)(vite-plugin-functions-mixins@0.4.1(@voidzero-dev/vite-plus-core@0.2.8(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(typescript@6.0.3)(yaml@2.9.0))):
+  m3-svelte@7.2.0(patch_hash=5a61004ddefa22ead7e31bed010222594d77ae6201f347d511664ccb4f374775)(svelte@5.56.8)(vite-plugin-functions-mixins@0.4.1(@voidzero-dev/vite-plus-core@0.2.8(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(typescript@6.0.3)(yaml@2.9.0))):
     dependencies:
       '@iconify/types': 2.0.0
       '@ktibow/iconset-material-symbols': 0.0.1764827375

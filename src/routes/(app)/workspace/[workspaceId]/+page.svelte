@@ -15,7 +15,7 @@
         Icon,
         LoadingIndicator,
         Snackbar,
-        TextField,
+        TextFieldOutlined,
         snackbar,
     } from "m3-svelte";
     import { parseAsBoolean, useQueryState } from "nuqs-svelte";
@@ -264,7 +264,7 @@
 
 <Dialog bind:open={createDialogOpen.current} headline="Add service">
     <div class="flex flex-col gap-4">
-        <TextField
+        <TextFieldOutlined
             bind:value={serviceName}
             label="Name"
             required

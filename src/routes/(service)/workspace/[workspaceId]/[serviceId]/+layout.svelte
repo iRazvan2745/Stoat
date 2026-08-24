@@ -10,7 +10,7 @@
 
     import RailFooter from "#lib/components/rail-footer.svelte";
 
-    let { children, params } = $props();
+    let { children, data, params } = $props();
     let railOpen = $state(false);
 
     // svelte-ignore state_referenced_locally
@@ -61,7 +61,11 @@
                 icon={settingsIcon}
             />
         </NavigationRail>
-        <RailFooter open={railOpen} />
+        <RailFooter
+            open={railOpen}
+            initialGravatarUrl={data.gravatarUrl}
+            initialUser={data.session?.user}
+        />
     </div>
     <main
         class="bg-surface m:p-6 mt-6 h-[calc(100svh-1.5rem)] min-w-0 flex-1 overflow-y-auto p-4"

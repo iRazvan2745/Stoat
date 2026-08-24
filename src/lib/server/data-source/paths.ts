@@ -5,27 +5,23 @@ import { DATA_DIR } from "$app/env/private";
 
 export const getDataDir = (): string => DATA_DIR ?? "./data";
 
-export const resolveDataSourcePath = (dataSourcePath: string): string => {
-  if (path.isAbsolute(dataSourcePath)) {
-    return dataSourcePath;
-  }
-  return path.resolve(getDataDir(), dataSourcePath);
-};
+export const workspacePath = (workspaceId: string): string =>
+  path.resolve(getDataDir(), workspaceId);
 
-export const createDataSourceFolder = async (
-  dataSourcePath: string,
+export const createWorkspaceFolder = async (
+  rootPath: string,
   ...folders: string[]
 ): Promise<string> => {
-  const rootPath = path.resolve(dataSourcePath);
-  const folderPath = path.resolve(rootPath, ...folders);
-  const relativeFolderPath = path.relative(rootPath, folderPath);
+  const root = path.resolve(rootPath);
+  const folderPath = path.resolve(root, ...folders);
+  const relativeFolderPath = path.relative(root, folderPath);
 
   if (
     relativeFolderPath === ".." ||
     relativeFolderPath.startsWith(`..${path.sep}`) ||
     path.isAbsolute(relativeFolderPath)
   ) {
-    throw new Error("Folder path must be inside the data source");
+    throw new Error("Folder path must be inside the workspace");
   }
 
   await fs.mkdir(folderPath, { recursive: true });

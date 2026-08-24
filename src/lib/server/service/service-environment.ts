@@ -1,9 +1,9 @@
 // oxlint-disable func-style
 import { asc, eq } from "drizzle-orm";
 
+import { db } from "#lib/db";
+import { environmentVariables, services } from "#lib/db/schema";
 import type { EnvironmentVariable } from "#lib/environment";
-import { db } from "#lib/server/db";
-import { environmentVariables, services } from "#lib/server/db/schema";
 
 export async function listEnvironmentVariables(serviceId: string) {
   return await db

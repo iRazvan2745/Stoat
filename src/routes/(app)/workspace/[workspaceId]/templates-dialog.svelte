@@ -4,7 +4,7 @@
         Chip,
         Dialog,
         LoadingIndicator,
-        TextField,
+        TextFieldOutlined,
         snackbar,
     } from "m3-svelte";
     import { parseAsString, useQueryState } from "nuqs-svelte";
@@ -151,7 +151,7 @@
                             </div>
                         {/if}
 
-                        <TextField
+                        <TextFieldOutlined
                             bind:value={serviceName}
                             label="Name"
                             required

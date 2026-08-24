@@ -1,11 +1,11 @@
 import fs from "node:fs/promises";
-import path from "node:path";
 
 import { eq } from "drizzle-orm";
 
-import { createDataSourceFolder, resolveDataSourcePath } from "#lib/server/data-source/paths";
-import { db } from "#lib/server/db";
-import { dataSource, services, workspace } from "#lib/server/db/schema";
+import { db } from "#lib/db";
+import { dataSource, services, workspace } from "#lib/db/schema";
+import { createWorkspaceFolder, workspacePath } from "#lib/server/data-source/paths";
+import { getRepo } from "#lib/server/shared/git";
 import { uniqueSlug } from "#lib/server/shared/slugs";
 
 export const listWorkspaces = async () => {
@@ -33,10 +33,6 @@ export const createWorkspace = async ({
     throw new Error("Data source not found");
   }
 
-  if (!source.path) {
-    throw new Error("Data source does not have a path");
-  }
-
   const slug = await uniqueSlug(name, async (candidate) => {
     const matches = await db
       .select({ slug: workspace.slug })
@@ -52,10 +48,14 @@ export const createWorkspace = async ({
     throw new Error("Unable to create workspace");
   }
 
+  const repoPath = workspacePath(created.id);
+
   try {
-    await createDataSourceFolder(resolveDataSourcePath(source.path), created.slug);
+    await getRepo({ repoPath, repoUrl: source.url });
+    await createWorkspaceFolder(repoPath, created.slug);
   } catch (error) {
     await db.delete(workspace).where(eq(workspace.id, created.id));
+    await fs.rm(repoPath, { force: true, recursive: true });
     throw error;
   }
 
@@ -69,19 +69,13 @@ export const deleteWorkspace = async (id: string) => {
     throw new Error("Workspace not found");
   }
 
-  const [source] = await db.select().from(dataSource).where(eq(dataSource.id, wrk.dataSourceId));
-
-  if (!source?.path) {
-    throw new Error("Data source does not have a path");
-  }
-
   const deleted = await db.transaction(async (tx) => {
     await tx.delete(services).where(eq(services.workspaceId, id));
 
     return await tx.delete(workspace).where(eq(workspace.id, id)).returning();
   });
 
-  await fs.rm(path.join(resolveDataSourcePath(source.path), wrk.slug), {
+  await fs.rm(workspacePath(id), {
     force: true,
     recursive: true,
   });

@@ -1,0 +1,41 @@
+name: Build and push sidecar Docker image
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    paths:
+      - "sidecar/**"
+  workflow_dispatch: {}
+
+jobs:
+  build-and-push:
+    runs-on: docker
+
+    steps:
+      - name: Checkout Stoat
+        uses: actions/checkout@v4
+
+      - name: Checkout Uncloud
+        uses: actions/checkout@v4
+        with:
+          repository: stoat/uncloud
+          path: uncloud
+
+      - name: Build image
+        run: |
+          docker build \
+            -f sidecar/Dockerfile \
+            --build-context uncloud=uncloud \
+            -t git.irazz.lol/stoat/sidecar:latest \
+            -t git.irazz.lol/stoat/sidecar:${{ github.sha }} \
+            -t git.irazz.lol/stoat/uncloud-api:latest \
+            sidecar
+
+      - name: Push image
+        run: |
+          echo "${{ secrets.TOKEN }}" | docker login git.irazz.lol -u "${{ secrets.USERNAME }}" --password-stdin
+          docker push git.irazz.lol/stoat/sidecar:latest
+          docker push git.irazz.lol/stoat/sidecar:${{ github.sha }}
+          docker push git.irazz.lol/stoat/uncloud-api:latest

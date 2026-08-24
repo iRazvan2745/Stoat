@@ -9,12 +9,16 @@ import {
 } from "#lib/server/data-source/data-sources";
 
 const DataSource = v.object({
+  uncloudUrl: v.string(),
   url: v.string(),
 });
 
 export const listDataSources = query(async () => await loadDataSources());
 
-export const createDataSource = query(DataSource, async ({ url }) => await insertDataSource(url));
+export const createDataSource = query(
+  DataSource,
+  async ({ uncloudUrl, url }) => await insertDataSource(url, uncloudUrl),
+);
 
 export const discoverDataSource = command(v.string(), async (id) => await importDataSource(id));
 

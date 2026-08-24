@@ -4,14 +4,14 @@ import path from "node:path";
 
 import { describe, expect, it } from "vite-plus/test";
 
-import { createDataSourceFolder } from "#lib/server/data-source/paths";
+import { createWorkspaceFolder } from "#lib/server/data-source/paths";
 
-describe("data source folders", () => {
+describe("workspace folders", () => {
   it("creates nested workspace and service folders", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "stoat-data-source-"));
 
     try {
-      const folder = await createDataSourceFolder(root, "my-workspace", "my-service-abc12");
+      const folder = await createWorkspaceFolder(root, "my-workspace", "my-service-abc12");
 
       expect(folder).toBe(path.join(root, "my-workspace", "my-service-abc12"));
       await expect(access(folder)).resolves.toBeUndefined();
@@ -20,12 +20,12 @@ describe("data source folders", () => {
     }
   });
 
-  it("rejects folders outside the data source", async () => {
+  it("rejects folders outside the workspace", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "stoat-data-source-"));
 
     try {
-      await expect(createDataSourceFolder(root, "..", "outside")).rejects.toThrow(
-        "inside the data source",
+      await expect(createWorkspaceFolder(root, "..", "outside")).rejects.toThrow(
+        "inside the workspace",
       );
     } finally {
       await rm(root, { force: true, recursive: true });

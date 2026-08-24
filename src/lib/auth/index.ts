@@ -4,7 +4,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { betterAuth } from "better-auth/minimal";
 import { sveltekitCookies } from "better-auth/svelte-kit";
 
-import { db } from "#lib/server/db";
+import { db } from "#lib/db";
 
 export const auth = betterAuth({
   baseURL: ORIGIN,

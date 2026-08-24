@@ -3,14 +3,14 @@ import fs from "node:fs/promises";
 
 import { and, eq } from "drizzle-orm";
 
+import { db } from "#lib/db";
+import { dataSource, services, workspace } from "#lib/db/schema";
 import {
   composeServiceName,
   discoverComposeFiles,
   repositoryName,
 } from "#lib/server/data-source/discovery";
-import { createDataSourceFolder, resolveDataSourcePath } from "#lib/server/data-source/paths";
-import { db } from "#lib/server/db";
-import { dataSource, services, workspace } from "#lib/server/db/schema";
+import { createWorkspaceFolder, workspacePath } from "#lib/server/data-source/paths";
 import { getRepo } from "#lib/server/shared/git";
 import { uniqueSlug } from "#lib/server/shared/slugs";
 
@@ -26,24 +26,11 @@ export interface DataSourceDiscoveryResult {
 
 export const listDataSources = async () => await db.select().from(dataSource);
 
-export const createDataSource = async (url: string) => {
-  const id = crypto.randomUUID();
-  const dataSourcePath = id;
-
-  const [created] = await db
-    .insert(dataSource)
-    .values({ id, path: dataSourcePath, url })
-    .returning();
+export const createDataSource = async (url: string, uncloudUrl: string) => {
+  const [created] = await db.insert(dataSource).values({ uncloudUrl, url }).returning();
 
   if (!created) {
     throw new Error("Unable to create data source");
-  }
-
-  try {
-    await createDataSourceFolder(resolveDataSourcePath(dataSourcePath));
-  } catch (error) {
-    await db.delete(dataSource).where(eq(dataSource.id, created.id));
-    throw error;
   }
 
   return created;
@@ -56,11 +43,6 @@ export const deleteDataSource = async (id: string) => {
     throw new Error("Data source not found");
   }
 
-  await fs.rm(resolveDataSourcePath(deleted.path), {
-    force: true,
-    recursive: true,
-  });
-
   return [deleted];
 };
 
@@ -71,23 +53,7 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
     throw new Error("Data source not found");
   }
 
-  const repoPath = resolveDataSourcePath(source.path);
-  await getRepo({ repoPath, repoUrl: source.url });
-
-  const discovery = await discoverComposeFiles(repoPath);
   const name = repositoryName(source.url);
-
-  if (discovery.files.length === 0) {
-    return {
-      dataSourceId: source.id,
-      discovered: 0,
-      existing: 0,
-      imported: 0,
-      repositoryName: name,
-      skipped: discovery.skipped.length,
-      workspaceId: null,
-    };
-  }
 
   const [foundWorkspace] = await db
     .select()
@@ -96,6 +62,7 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
     .limit(1);
 
   let targetWorkspace = foundWorkspace;
+  let createdWorkspaceId: string | null = null;
 
   if (!targetWorkspace) {
     const slug = await uniqueSlug(name, async (candidate) => {
@@ -117,7 +84,30 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
     }
 
     targetWorkspace = createdWorkspace;
-    await createDataSourceFolder(repoPath, targetWorkspace.slug);
+    createdWorkspaceId = createdWorkspace.id;
+  }
+
+  const repoPath = workspacePath(targetWorkspace.id);
+  await getRepo({ repoPath, repoUrl: source.url });
+
+  const discovery = await discoverComposeFiles(repoPath);
+
+  if (discovery.files.length === 0) {
+    // Roll back a workspace that was only created for this discovery run.
+    if (createdWorkspaceId) {
+      await db.delete(workspace).where(eq(workspace.id, createdWorkspaceId));
+      await fs.rm(repoPath, { force: true, recursive: true });
+    }
+
+    return {
+      dataSourceId: source.id,
+      discovered: 0,
+      existing: 0,
+      imported: 0,
+      repositoryName: name,
+      skipped: discovery.skipped.length,
+      workspaceId: null,
+    };
   }
 
   const existingServices = await db
@@ -173,7 +163,7 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
       throw new Error(`Unable to import ${file.relativePath}`);
     }
 
-    await createDataSourceFolder(repoPath, targetWorkspace.slug, createdService.slug ?? slug);
+    await createWorkspaceFolder(repoPath, targetWorkspace.slug, createdService.slug ?? slug);
     existingServices.push(createdService);
     imported += 1;
   }

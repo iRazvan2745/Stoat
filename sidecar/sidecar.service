@@ -1,0 +1,18 @@
+[Unit]
+Description=Stoat Uncloud sidecar REST API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/sidecar --uncloud-config %h/.config/uncloud/config.yaml --listen 127.0.0.1:8080
+Restart=on-failure
+RestartSec=5s
+
+# The API is intended to be consumed locally by Stoat. Keep it on the
+# loopback interface and keep the process non-privileged.
+NoNewPrivileges=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=default.target
