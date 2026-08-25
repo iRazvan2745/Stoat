@@ -2,6 +2,7 @@
 import { command, getRequestEvent, query, requested } from "$app/server";
 import * as v from "valibot";
 
+import { requireSession } from "#lib/api/guard";
 import { ENV_NAME_PATTERN } from "#lib/environment";
 import { deployService as runDeployment } from "#lib/server/deployments/deployments";
 import { getPostgresConnection as loadPostgresConnection } from "#lib/server/service/service-connection";
@@ -25,10 +26,10 @@ import {
 import { isAbortError } from "#lib/server/shared/sse";
 import { ServiceSettingsSchema } from "#lib/service/settings";
 
-export const getServicesInWorkspace = query(
-  v.string(),
-  async (workspaceId) => await listServicesInWorkspace(workspaceId),
-);
+export const getServicesInWorkspace = query(v.string(), async (workspaceId) => {
+  requireSession();
+  return await listServicesInWorkspace(workspaceId);
+});
 
 const EnvironmentVariableInput = v.object({
   name: v.pipe(v.string(), v.regex(ENV_NAME_PATTERN)),
@@ -44,7 +45,10 @@ const CreateServiceInput = v.object({
   workspaceId: v.string(),
 });
 
-export const createService = query(CreateServiceInput, insertService);
+export const createService = command(CreateServiceInput, async (input) => {
+  requireSession();
+  return await insertService(input);
+});
 
 const CreateServiceFromTemplateInput = v.object({
   appId: v.pipe(v.string(), v.minLength(1)),
@@ -53,39 +57,45 @@ const CreateServiceFromTemplateInput = v.object({
   workspaceId: v.string(),
 });
 
-export const createServiceFromTemplate = query(
-  CreateServiceFromTemplateInput,
-  insertServiceFromTemplate,
-);
+export const createServiceFromTemplate = command(CreateServiceFromTemplateInput, async (input) => {
+  requireSession();
+  return await insertServiceFromTemplate(input);
+});
 
 const UpdateComposeInput = v.object({
   compose: v.string(),
   id: v.string(),
 });
 
-export const updateCompose = command(
-  UpdateComposeInput,
-  async ({ compose, id }) => await updateServiceCompose(id, compose),
-);
+export const updateCompose = command(UpdateComposeInput, async ({ compose, id }) => {
+  requireSession();
+  return await updateServiceCompose(id, compose);
+});
 
-export const previewCompose = command(
-  UpdateComposeInput,
-  async ({ compose, id }) => await loadPreviewCompose(id, compose),
-);
+export const previewCompose = command(UpdateComposeInput, async ({ compose, id }) => {
+  requireSession();
+  return await loadPreviewCompose(id, compose);
+});
 
-export const deleteService = query(v.string(), async (id) => await removeService(id));
+export const deleteService = command(v.string(), async (id) => {
+  requireSession();
+  return await removeService(id);
+});
 
-export const getService = query(v.string(), async (id) => await loadService(id));
+export const getService = query(v.string(), async (id) => {
+  requireSession();
+  return await loadService(id);
+});
 
-export const getPostgresConnection = query(
-  v.string(),
-  async (serviceId) => await loadPostgresConnection(serviceId),
-);
+export const getPostgresConnection = query(v.string(), async (serviceId) => {
+  requireSession();
+  return await loadPostgresConnection(serviceId);
+});
 
-export const getEnvironmentVariables = query(
-  v.string(),
-  async (serviceId) => await listEnvironmentVariables(serviceId),
-);
+export const getEnvironmentVariables = query(v.string(), async (serviceId) => {
+  requireSession();
+  return await listEnvironmentVariables(serviceId);
+});
 
 const UpdateEnvironmentInput = v.pipe(
   v.object({
@@ -101,21 +111,32 @@ const UpdateEnvironmentInput = v.pipe(
 
 export const updateEnvironmentVariables = command(
   UpdateEnvironmentInput,
-  async ({ serviceId, variables }) => await replaceEnvironmentVariables(serviceId, variables),
+  async ({ serviceId, variables }) => {
+    requireSession();
+    return await replaceEnvironmentVariables(serviceId, variables);
+  },
 );
 
-export const deployService = command(v.string(), async (id) => await runDeployment(id));
+export const deployService = command(v.string(), async (id) => {
+  requireSession();
+  return await runDeployment(id);
+});
 
-export const getServiceContainers = query(
-  v.string(),
-  async (id) => await listServiceContainers(id),
-);
+export const getServiceContainers = query(v.string(), async (id) => {
+  requireSession();
+  return await listServiceContainers(id);
+});
 
-export const getServiceIngresses = query(v.string(), async (id) => await listServiceIngresses(id));
+export const getServiceIngresses = query(v.string(), async (id) => {
+  requireSession();
+  return await listServiceIngresses(id);
+});
 
 const streamServiceContainerLogsRemote = async function* streamServiceContainerLogsRemote(
   serviceId: string,
 ) {
+  requireSession();
+
   const { request } = getRequestEvent();
 
   try {
@@ -151,6 +172,7 @@ const UpdateServiceSettingsInput = v.object({
 export const updateServiceSettings = command(
   UpdateServiceSettingsInput,
   async ({ serviceId, settings }) => {
+    requireSession();
     const updated = await saveServiceSettings(serviceId, settings);
     await refreshServiceQueries();
     return updated;

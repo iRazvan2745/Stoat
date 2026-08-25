@@ -14,8 +14,9 @@
     let { children, data, params } = $props();
     let railOpen = $state(false);
 
-    // svelte-ignore state_referenced_locally
-    const hrefRoute = `/workspace/${params.workspaceId}/${params.serviceId}/`;
+    const hrefRoute = $derived(
+        `/workspace/${params.workspaceId}/${params.serviceId}/`
+    );
 </script>
 
 <div class="flex h-full w-svw min-w-0">

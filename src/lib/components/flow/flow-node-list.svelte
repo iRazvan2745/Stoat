@@ -13,17 +13,21 @@
 	import type { Connector, NodeData } from './types';
 
 	interface Props {
+		/** Extra classes for the outer container. */
+		class?: string;
+		/** Replaces the default flex/grid layout classes on the list element. */
+		listClass?: string;
 		children?: Snippet;
 	}
 
-	let { children }: Props = $props();
+	let { class: className, listClass, children }: Props = $props();
 
 	const registrationId = $props.id();
 	const diagram = useDiagramContext();
 	const parentDescendants = useOptionalDescendantsContext<NodeData>();
 	const descendants = setDescendantsContext(createDescendantsState<NodeData>());
 
-	let containerRef = $state<HTMLDivElement | null>(null);
+	let containerRef = $state<HTMLElement | null>(null);
 	let connectors = $state<Connector[]>([]);
 
 	let orientation = $derived(diagram.orientation());
@@ -84,7 +88,8 @@
 				disabled: currentNode.props.disabled || nextNode.props.disabled,
 				single: true,
 				fromId: currentNode.id,
-				toId: nextNode.id
+				toId: nextNode.id,
+				label: currentNode.props.edgeLabel
 			});
 		}
 
@@ -128,13 +133,20 @@
 	});
 </script>
 
-<div class="relative" bind:this={containerRef}>
+<svelte:element
+	this={parentDescendants ? 'li' : 'div'}
+	class={cn('relative', parentDescendants && 'list-none', className)}
+	bind:this={containerRef}
+>
 	<ul
 		class={cn(
 			'ml-0 list-none',
-			orientation === 'vertical' ? 'grid auto-rows-min gap-16' : 'flex gap-16',
-			orientation === 'vertical' && (align === 'center' ? 'justify-items-center' : 'justify-items-start'),
-			orientation === 'horizontal' && (align === 'center' ? 'items-center' : 'items-start')
+			listClass ??
+				cn(
+					orientation === 'vertical' ? 'grid auto-rows-min gap-16' : 'flex gap-16',
+					orientation === 'vertical' && (align === 'center' ? 'justify-items-center' : 'justify-items-start'),
+					orientation === 'horizontal' && (align === 'center' ? 'items-center' : 'items-start')
+				)
 		)}
 	>
 		{@render children?.()}
@@ -143,4 +155,4 @@
 	<div class="pointer-events-none absolute inset-0">
 		<Connectors {connectors} {orientation} />
 	</div>
-</div>
+</svelte:element>

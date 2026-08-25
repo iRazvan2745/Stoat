@@ -1,9 +1,9 @@
 import fs from "node:fs/promises";
 
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import { db } from "#lib/db";
-import { dataSource, services, workspace } from "#lib/db/schema";
+import { dataSource, environmentVariables, services, workspace } from "#lib/db/schema";
 import { createWorkspaceFolder, workspacePath } from "#lib/server/data-source/paths";
 import { getRepo } from "#lib/server/shared/git";
 import { uniqueSlug } from "#lib/server/shared/slugs";
@@ -70,6 +70,15 @@ export const deleteWorkspace = async (id: string) => {
   }
 
   const deleted = await db.transaction(async (tx) => {
+    // environment_variables.service_id is onDelete: "restrict", so the
+    // services rows cannot be deleted while variables still reference them.
+    const workspaceServices = tx
+      .select({ id: services.id })
+      .from(services)
+      .where(eq(services.workspaceId, id));
+    await tx
+      .delete(environmentVariables)
+      .where(inArray(environmentVariables.serviceId, workspaceServices));
     await tx.delete(services).where(eq(services.workspaceId, id));
 
     return await tx.delete(workspace).where(eq(workspace.id, id)).returning();

@@ -1,6 +1,14 @@
 import { defineEnvVars } from "@sveltejs/kit/env";
+import * as v from "valibot";
 
 export const variables = defineEnvVars({
+  ALLOW_SIGNUP: {
+    description: "Whether to allow signup. Set to `true` to allow signup.",
+    schema: v.pipe(
+      v.optional(v.string(), "false"),
+      v.transform((value) => value === "true"),
+    ),
+  },
   BETTER_AUTH_SECRET: {
     description:
       "Secret used to sign tokens. For production use 32 characters generated with high entropy. See [Better Auth installation](https://www.better-auth.com/docs/installation).",

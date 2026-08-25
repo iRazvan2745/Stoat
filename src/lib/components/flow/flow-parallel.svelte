@@ -3,6 +3,7 @@
 	import { onMount, untrack, type Snippet } from "svelte";
 	import { watch } from "runed";
 	import Connectors from "./connectors.svelte";
+	import { FLAT_THRESHOLD } from "./connectors";
 	import { createDescendantsState, setDescendantsContext, useDescendantsContext } from "./descendants.svelte";
 	import { useDiagramContext } from "./diagram-context.svelte";
 	import type { Connector, NodeData, ParallelAlign, RectLike } from "./types";
@@ -19,19 +20,19 @@
 	interface FlowParallelProps {
 		align?: ParallelAlign;
 		class?: string;
+		/** Replaces the default flex layout classes on the branch list element. */
+		contentClass?: string;
 		children?: Snippet;
 	}
 
-	const FLAT_THRESHOLD = 2;
-
-	let { align = "start", class: className, children }: FlowParallelProps = $props();
+	let { align = "start", class: className, contentClass, children }: FlowParallelProps = $props();
 
 	const registrationId = $props.id();
 	const diagram = useDiagramContext();
 	const parentDescendants = useDescendantsContext<NodeData>();
 	const descendants = setDescendantsContext(createDescendantsState<NodeData>());
 
-	let containerRef = $state<HTMLDivElement | null>(null);
+	let containerRef = $state<HTMLLIElement | null>(null);
 	let contentRef = $state<HTMLUListElement | null>(null);
 	let measurements = $state<DOMRect | null>(null);
 	let links = $state<LinksResult | null>(null);
@@ -263,6 +264,7 @@
 					single: useSquareJunctions ? !hasOutgoingJunction : true,
 					fromId: descendant.id,
 					toId: nextNode?.id,
+					label: descendant.props.edgeLabel,
 				});
 			}
 
@@ -329,24 +331,6 @@
 		untrack(() => remeasure());
 	});
 
-	$effect(() => {
-		const onLayoutShift = () => {
-			remeasure();
-			parentDescendants.notifySizeChange();
-		};
-
-		window.addEventListener("scroll", onLayoutShift, {
-			capture: true,
-			passive: true,
-		});
-		window.addEventListener("resize", onLayoutShift, { passive: true });
-
-		return () => {
-			window.removeEventListener("scroll", onLayoutShift, { capture: true });
-			window.removeEventListener("resize", onLayoutShift);
-		};
-	});
-
 	watch(
 		[
 			() => descendants.measurementEpoch,
@@ -354,6 +338,8 @@
 			() => parentDescendants.measurementEpoch,
 			() => previousNode,
 			() => nextNode,
+			() => orientation,
+			() => useSquareJunctions,
 			() => diagramAlign,
 		],
 		() => {
@@ -362,7 +348,11 @@
 	);
 
 	$effect(() => {
-		const onLayoutShift = () => computeLinks();
+		const onLayoutShift = () => {
+			remeasure();
+			parentDescendants.notifySizeChange();
+			computeLinks();
+		};
 
 		window.addEventListener("scroll", onLayoutShift, {
 			capture: true,
@@ -377,10 +367,10 @@
 	});
 </script>
 
-<div
+<li
 	bind:this={containerRef}
 	class={cn(
-		"relative isolate",
+		"relative isolate list-none",
 		orientation === "horizontal" ? "px-16 -mr-16" : "py-16 -mb-16",
 		orientation === "horizontal"
 			? previousIsParallel
@@ -414,15 +404,19 @@
 	<ul
 		bind:this={contentRef}
 		class={cn(
-			"flex list-none gap-5",
-			align === "start" ? "items-start" : "items-end",
-			orientation === "horizontal"
-				? "ml-0 flex-col"
-				: diagramAlign === "center"
-					? "mx-auto w-fit gap-5"
-					: "mr-auto w-fit gap-5"
+			"list-none",
+			contentClass ??
+				cn(
+					"flex gap-5",
+					align === "start" ? "items-start" : "items-end",
+					orientation === "horizontal"
+						? "ml-0 flex-col"
+						: diagramAlign === "center"
+							? "mx-auto w-fit gap-5"
+							: "mr-auto w-fit gap-5"
+				)
 		)}
 	>
 		{@render children?.()}
 	</ul>
-</div>
+</li>

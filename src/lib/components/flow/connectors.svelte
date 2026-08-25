@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { createRoundedPath } from './connectors';
+	import { createRoundedPath, getLabelPosition } from './connectors';
 	import type { Connector, Orientation } from './types';
 	import { cn } from './cn';
 
@@ -53,18 +53,18 @@
 	</defs>
 
 	{#each orderedConnectors as connector, index (`${connector.fromId ?? 'from'}-${connector.toId ?? 'to'}-${index}`)}
-		{let path = $state(createRoundedPath(connector, {
+		{@const path = createRoundedPath(connector, {
 			cornerRadius,
 			midOffset,
 			arrowheadOffset,
 			isBottom: connector.isBottom,
 			single: connector.single,
 			orientation
-		}))}
-		{let pathId =
-			$state(connector.fromId && connector.toId
+		})}
+		{@const pathId =
+			connector.fromId && connector.toId
 				? `${connector.fromId}-${connector.toId}`
-				: `path-${index}`)}
+				: `path-${index}`}
 
 		<g class={cn(connector.disabled && 'opacity-40')}>
 			<path
@@ -76,6 +76,24 @@
 				data-index={index}
 				data-testid={pathId}
 			/>
+
+			{#if connector.label}
+				{@const labelPosition = getLabelPosition(connector, {
+					midOffset,
+					arrowheadOffset,
+					isBottom: connector.isBottom,
+					single: connector.single,
+					orientation
+				})}
+				<text
+					x={labelPosition.x}
+					y={labelPosition.y - 6}
+					text-anchor="middle"
+					class="fill-on-surface-variant m3-font-label-small font-mono"
+				>
+					{connector.label}
+				</text>
+			{/if}
 		</g>
 	{/each}
 

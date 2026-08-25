@@ -5,6 +5,7 @@ import { command, query } from "$app/server";
 import { and, asc, desc, eq, gt } from "drizzle-orm";
 import * as v from "valibot";
 
+import { requireSession } from "#lib/api/guard";
 import { db } from "#lib/db";
 import { deploymentLogs, deployments } from "#lib/db/schema";
 import {
@@ -16,6 +17,8 @@ import {
 const DEPLOYMENT_POLL_INTERVAL = 1000;
 
 const streamDeployments = async function* streamDeployments(serviceId: string) {
+  requireSession();
+
   let previousSnapshot: string | undefined;
 
   while (true) {
@@ -40,6 +43,8 @@ const streamDeployments = async function* streamDeployments(serviceId: string) {
 export const getDeployments = query.live(v.string(), streamDeployments);
 
 export const getLatestSuccessfulDeployment = query(v.string(), async (serviceId) => {
+  requireSession();
+
   const [deployment] = await db
     .select()
     .from(deployments)
@@ -51,6 +56,8 @@ export const getLatestSuccessfulDeployment = query(v.string(), async (serviceId)
 });
 
 const streamDeploymentLogs = async function* streamDeploymentLogs(deploymentId: string) {
+  requireSession();
+
   const logs: (typeof deploymentLogs.$inferSelect)[] = [];
   let lastId = 0;
   let emitted = false;
@@ -77,9 +84,11 @@ const streamDeploymentLogs = async function* streamDeploymentLogs(deploymentId: 
 export const getDeploymentLogs = query.live(v.string(), streamDeploymentLogs);
 
 export const cancelDeployment = command(v.string(), async (deploymentId) => {
+  requireSession();
   await runCancelDeployment(deploymentId);
 });
 
 export const deleteDeployment = command(v.string(), async (deploymentId) => {
+  requireSession();
   await runDeleteDeployment(deploymentId);
 });

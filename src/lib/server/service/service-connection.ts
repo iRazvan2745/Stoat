@@ -3,7 +3,7 @@ import { formatComposeFile } from "#lib/server/deployments/deployment-compose";
 import { findPublishedTcpPort, listComposePorts } from "#lib/server/service/compose-ports";
 import { listEnvironmentVariables } from "#lib/server/service/service-environment";
 import { getService, serviceComposePrefix } from "#lib/server/service/services";
-import { ucClient } from "#lib/server/uncloud";
+import { firstPublicHost } from "#lib/server/uncloud/public-host";
 import {
   DEFAULT_POSTGRES_PORT,
   buildPostgresUrl,
@@ -19,26 +19,6 @@ export interface PostgresConnectionInfo {
   password: string;
   user: string;
 }
-
-const firstPublicHost = async (): Promise<string | undefined> => {
-  try {
-    const { data, response } = await ucClient.GET("/api/v1/machines");
-
-    if (!response.ok || !data) {
-      return undefined;
-    }
-
-    for (const machine of data.items) {
-      if (machine.publicIp) {
-        return machine.publicIp;
-      }
-    }
-
-    return data.items[0]?.hostname ?? data.items[0]?.name;
-  } catch {
-    return undefined;
-  }
-};
 
 const externalHost = async (
   hostIp: string | undefined,

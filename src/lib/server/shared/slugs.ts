@@ -14,20 +14,24 @@ export const randomSlugSuffix = (): string =>
     () => SLUG_ALPHABET[Math.floor(Math.random() * SLUG_ALPHABET.length)],
   ).join("");
 
+const MAX_SLUG_ATTEMPTS = 5;
+
 export const uniqueSlug = async (
   name: string,
   exists: (slug: string) => Promise<boolean>,
 ): Promise<string> => {
-  let slug = `${toKebabCase(name)}-${randomSlugSuffix()}`;
+  const base = toKebabCase(name);
 
-  for (
-    let attempt = 0;
+  for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt += 1) {
+    const slug = `${base}-${randomSlugSuffix()}`;
+
     // oxlint-disable-next-line no-await-in-loop
-    attempt < 5 && (await exists(slug));
-    attempt += 1
-  ) {
-    slug = `${toKebabCase(name)}-${randomSlugSuffix()}`;
+    if (!(await exists(slug))) {
+      return slug;
+    }
   }
 
-  return slug;
+  throw new Error(
+    `Unable to generate a unique slug for "${name}" after ${MAX_SLUG_ATTEMPTS} attempts`,
+  );
 };

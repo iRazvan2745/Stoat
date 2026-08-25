@@ -1,6 +1,7 @@
 import { command, query } from "$app/server";
 import * as v from "valibot";
 
+import { requireSession } from "#lib/api/guard";
 import {
   createDataSource as insertDataSource,
   deleteDataSource as removeDataSource,
@@ -13,13 +14,22 @@ const DataSource = v.object({
   url: v.string(),
 });
 
-export const listDataSources = query(async () => await loadDataSources());
+export const listDataSources = query(async () => {
+  requireSession();
+  return await loadDataSources();
+});
 
-export const createDataSource = query(
-  DataSource,
-  async ({ uncloudUrl, url }) => await insertDataSource(url, uncloudUrl),
-);
+export const createDataSource = command(DataSource, async ({ uncloudUrl, url }) => {
+  requireSession();
+  return await insertDataSource(url, uncloudUrl);
+});
 
-export const discoverDataSource = command(v.string(), async (id) => await importDataSource(id));
+export const discoverDataSource = command(v.string(), async (id) => {
+  requireSession();
+  return await importDataSource(id);
+});
 
-export const deleteDataSource = query(v.string(), async (id) => await removeDataSource(id));
+export const deleteDataSource = command(v.string(), async (id) => {
+  requireSession();
+  return await removeDataSource(id);
+});

@@ -2,7 +2,7 @@
 	import { untrack, type Snippet } from "svelte";
 	import { watch } from "runed";
 	import { useFlowNodeAnchorContext } from "./node-context.svelte";
-	import { withElementAttachment } from "./render-props";
+	import { createElementAttachment } from "./render-props";
 
 	interface FlowAnchorProps {
 		type?: "start" | "end";
@@ -16,11 +16,11 @@
 
 	let anchorRef = $state<HTMLElement | null>(null);
 
-	let renderProps = $derived(
-		withElementAttachment({}, (element: HTMLElement | null) => {
-			anchorRef = element;
-		})
-	);
+	const attachAnchor = createElementAttachment<HTMLElement>((element) => {
+		anchorRef = element;
+	});
+
+	const renderProps = attachAnchor({});
 
 	watch([() => anchorRef, () => type], ([currentAnchor, currentType]) => {
 		if (!currentAnchor) return;

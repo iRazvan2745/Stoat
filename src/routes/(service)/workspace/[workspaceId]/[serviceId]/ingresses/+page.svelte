@@ -13,22 +13,25 @@
         Icon,
         LoadingIndicator,
         Snackbar,
-        snackbar,
     } from "m3-svelte";
 
     import { getService, getServiceIngresses } from "#lib/api/services.remote";
-    import { Flow, FlowNode, FlowParallel } from "#lib/components/flow";
+    import {
+        Flow,
+        FlowNode,
+        FlowNodeList,
+        FlowParallel,
+    } from "#lib/components/flow";
     import type { ServiceIngress } from "#lib/server/service/service-ingresses";
     import ServiceIcon from "#lib/service/icon.svelte";
+    import { copyToClipboard } from "#lib/ui/clipboard";
 
     const { params } = $props();
 
-    // svelte-ignore state_referenced_locally
-    const service = getService(params.serviceId);
-    // svelte-ignore state_referenced_locally
-    const ingressQuery = getServiceIngresses(params.serviceId);
+    const service = $derived(getService(params.serviceId));
+    const ingressQuery = $derived(getServiceIngresses(params.serviceId));
 
-    const svc = await service;
+    const svc = $derived(await service);
 
     const info = $derived(ingressQuery.current);
     const routes = $derived(info?.ingresses ?? []);
@@ -56,13 +59,69 @@
         return route.host ?? "Hostname assigned at deploy";
     };
 
-    const routeNodeLabel = (route: ServiceIngress): string => {
-        if (route.mode === "host") {
-            return `:${route.publishedPort ?? route.containerPort}`;
+    interface FlowPath {
+        id: string;
+        label: string;
+        port: number;
+        target: string;
+    }
+
+    interface FlowBranch {
+        https: boolean;
+        host: string;
+        id: string;
+        kind: "domain" | "port";
+        paths: FlowPath[];
+    }
+
+    const branches = $derived.by((): FlowBranch[] => {
+        const domains = new Map<string, FlowBranch>();
+        const result: FlowBranch[] = [];
+
+        for (const [index, route] of routes.entries()) {
+            if (route.mode === "host") {
+                result.push({
+                    host: `:${route.publishedPort ?? route.containerPort}`,
+                    https: false,
+                    id: `port-${index}`,
+                    kind: "port",
+                    paths: [
+                        {
+                            id: `port-${index}-target`,
+                            label: `:${route.containerPort}`,
+                            port: route.containerPort,
+                            target: route.composeService,
+                        },
+                    ],
+                });
+                continue;
+            }
+
+            const host = route.host ?? "auto hostname";
+            let branch = domains.get(host);
+
+            if (!branch) {
+                branch = {
+                    host,
+                    https: route.protocol === "https",
+                    id: `domain-${domains.size}`,
+                    kind: "domain",
+                    paths: [],
+                };
+                domains.set(host, branch);
+                result.push(branch);
+            }
+
+            branch.paths.push({
+                id: `${branch.id}-path-${branch.paths.length}`,
+                label: route.path ?? "/",
+                port: route.containerPort,
+                target: route.composeService,
+            });
         }
 
-        return route.host ?? "auto hostname";
-    };
+        return result;
+    });
 
     const routeTarget = (route: ServiceIngress): string =>
         `${route.composeService}:${route.containerPort}`;
@@ -81,20 +140,98 @@
         return undefined;
     };
 
-    const copy = async (value: string): Promise<void> => {
-        try {
-            await navigator.clipboard.writeText(value);
-            snackbar("Copied to clipboard");
-        } catch {
-            snackbar("Unable to copy");
-        }
-    };
-
     const modeClasses = (route: ServiceIngress): string =>
         route.mode === "ingress"
             ? "bg-primary-container-subtle text-on-primary-container-subtle"
             : "bg-secondary-container-subtle text-on-secondary-container-subtle";
+
+    const routeKey = (route: ServiceIngress): string =>
+        [
+            route.mode,
+            route.host ?? "",
+            route.path ?? "",
+            route.publishedPort ?? "",
+            route.containerPort,
+            route.composeService,
+        ].join("|");
 </script>
+
+{#snippet targetNode(id: string, name: string)}
+    <FlowNode {id}>
+        <span class="flex items-center gap-2">
+            {#if svc}
+                <ServiceIcon icon={svc.icon} type={svc.type} size={18} alt="" />
+            {:else}
+                <span class="text-on-surface-variant flex">
+                    <Icon icon={dnsIcon} size={18} />
+                </span>
+            {/if}
+            {name}
+        </span>
+    </FlowNode>
+{/snippet}
+
+{#snippet pathChain(path: FlowPath)}
+    <FlowNodeList
+        class="col-span-2 grid grid-cols-subgrid"
+        listClass="col-span-2 grid grid-cols-subgrid items-start"
+    >
+        <FlowNode id={path.id} edgeLabel={`:${path.port}`}>
+            <span class="font-mono">{path.label}</span>
+        </FlowNode>
+        {@render targetNode(`${path.id}-target`, path.target)}
+    </FlowNodeList>
+{/snippet}
+
+{#snippet branchChain(branch: FlowBranch)}
+    <FlowNodeList>
+        {#if branch.kind === "port"}
+            {@const path = branch.paths[0]}
+            <FlowNode
+                id={branch.id}
+                edgeLabel={path ? `:${path.port}` : undefined}
+            >
+                <span class="flex items-center gap-2">
+                    <span class="text-on-surface-variant flex">
+                        <Icon icon={settingsEthernetIcon} size={18} />
+                    </span>
+                    <span class="font-mono">{branch.host}</span>
+                </span>
+            </FlowNode>
+            {#if path}
+                {@render targetNode(`${branch.id}-target`, path.target)}
+            {/if}
+        {:else}
+            <FlowNode id={branch.id}>
+                <span class="flex items-center gap-2">
+                    <span class="text-on-surface-variant flex">
+                        <Icon
+                            icon={branch.https ? lockIcon : publicIcon}
+                            size={18}
+                        />
+                    </span>
+                    <span class="font-mono">{branch.host}</span>
+                </span>
+            </FlowNode>
+
+            {#if branch.paths.length > 1}
+                <FlowParallel
+                    contentClass="ml-0 grid w-fit grid-cols-[max-content_max-content] items-start gap-x-16 gap-y-5"
+                >
+                    {#each branch.paths as path (path.id)}
+                        {@render pathChain(path)}
+                    {/each}
+                </FlowParallel>
+            {:else if branch.paths[0]}
+                {@const path = branch.paths[0]}
+                <FlowNode id={path.id} edgeLabel={`:${path.port}`}>
+                    <span class="font-mono">{path.label}</span>
+                </FlowNode>
+                {@render targetNode(`${path.id}-target`, path.target)}
+            {/if}
+        {/if}
+    </FlowNodeList>
+{/snippet}
 
 <div class="flex h-full min-h-0 flex-col gap-4">
     <header class="flex flex-wrap items-center justify-between gap-3">
@@ -131,6 +268,17 @@
                 <p class="m3-font-body-small">{ingressQuery.error.message}</p>
             </div>
         </Card>
+    {:else if info === null}
+        <Card variant="elevated">
+            <div
+                class="bg-error-container-subtle text-on-error-container-subtle rounded-lg px-3 py-2"
+                role="status"
+            >
+                <p class="m3-font-body-small">
+                    Service not found. It may have been deleted.
+                </p>
+            </div>
+        </Card>
     {:else if routes.length === 0}
         <Card variant="elevated">
             <div
@@ -149,68 +297,21 @@
         <Card variant="elevated">
             <h2 class="m3-font-title-small text-on-surface">Traffic flow</h2>
 
-            <div class="flex min-h-56 [&>div]:flex [&>div]:min-h-56">
+            <div
+                class="flex min-h-56 [&>div]:flex [&>div]:min-h-56"
+                role="group"
+                aria-label="Traffic flow diagram showing how public hosts and ports route to service containers"
+            >
                 <Flow padding={{ x: 24, y: 40 }}>
-                    <FlowNode id="internet">
-                        <span class="flex items-center gap-2">
-                            <span class="text-on-surface-variant flex">
-                                <Icon icon={languageIcon} size={18} />
-                            </span>
-                            Internet
-                        </span>
-                    </FlowNode>
-
-                    {#if routes.length > 1}
+                    {#if branches.length > 1}
                         <FlowParallel>
-                            {#each routes as route, index (index)}
-                                <FlowNode id={`route-${index}`}>
-                                    <span class="flex items-center gap-2">
-                                        <span
-                                            class="text-on-surface-variant flex"
-                                        >
-                                            <Icon
-                                                icon={routeIcon(route)}
-                                                size={18}
-                                            />
-                                        </span>
-                                        <span class="font-mono">
-                                            {routeNodeLabel(route)}
-                                        </span>
-                                    </span>
-                                </FlowNode>
+                            {#each branches as branch (branch.id)}
+                                {@render branchChain(branch)}
                             {/each}
                         </FlowParallel>
-                    {:else if routes[0]}
-                        {@const route = routes[0]}
-                        <FlowNode id="route-0">
-                            <span class="flex items-center gap-2">
-                                <span class="text-on-surface-variant flex">
-                                    <Icon icon={routeIcon(route)} size={18} />
-                                </span>
-                                <span class="font-mono">
-                                    {routeNodeLabel(route)}
-                                </span>
-                            </span>
-                        </FlowNode>
+                    {:else if branches[0]}
+                        {@render branchChain(branches[0])}
                     {/if}
-
-                    <FlowNode id="service">
-                        <span class="flex items-center gap-2">
-                            {#if svc}
-                                <ServiceIcon
-                                    icon={svc.icon}
-                                    type={svc.type}
-                                    size={18}
-                                    alt=""
-                                />
-                            {:else}
-                                <span class="text-on-surface-variant flex">
-                                    <Icon icon={dnsIcon} size={18} />
-                                </span>
-                            {/if}
-                            {info?.serviceName ?? "Service"}
-                        </span>
-                    </FlowNode>
                 </Flow>
             </div>
         </Card>
@@ -228,7 +329,7 @@
             </div>
 
             <ul class="mt-1 flex flex-col gap-2">
-                {#each routes as route, index (index)}
+                {#each routes as route (routeKey(route))}
                     {@const copyValue = copyable(route)}
                     <li
                         class="flex min-w-0 items-center gap-3 rounded-md px-2 py-2"
@@ -266,7 +367,7 @@
                                 variant="text"
                                 square
                                 aria-label={`Copy ${copyValue}`}
-                                onclick={() => copy(copyValue)}
+                                onclick={() => copyToClipboard(copyValue)}
                             >
                                 <Icon icon={contentCopyIcon} size={18} />
                             </Button>

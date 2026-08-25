@@ -1,6 +1,7 @@
-import { query } from "$app/server";
+import { command, query } from "$app/server";
 import * as v from "valibot";
 
+import { requireSession } from "#lib/api/guard";
 import {
   createWorkspace as insertWorkspace,
   deleteWorkspace as removeWorkspace,
@@ -8,18 +9,27 @@ import {
   listWorkspaces as loadWorkspaces,
 } from "#lib/server/workspace";
 
-export const listWorkspaces = query(async () => await loadWorkspaces());
+export const listWorkspaces = query(async () => {
+  requireSession();
+  return await loadWorkspaces();
+});
 
-export const getWorkspace = query(v.string(), async (id) => await loadWorkspace(id));
+export const getWorkspace = query(v.string(), async (id) => {
+  requireSession();
+  return await loadWorkspace(id);
+});
 
 const CreateWorkspaceInput = v.object({
   dataSourceId: v.pipe(v.string(), v.minLength(1)),
   name: v.pipe(v.string(), v.minLength(3)),
 });
 
-export const createWorkspace = query(
-  CreateWorkspaceInput,
-  async (input) => await insertWorkspace(input),
-);
+export const createWorkspace = command(CreateWorkspaceInput, async (input) => {
+  requireSession();
+  return await insertWorkspace(input);
+});
 
-export const deleteWorkspace = query(v.string(), async (id) => await removeWorkspace(id));
+export const deleteWorkspace = command(v.string(), async (id) => {
+  requireSession();
+  return await removeWorkspace(id);
+});

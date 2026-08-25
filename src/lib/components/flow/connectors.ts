@@ -9,7 +9,38 @@ type PathProps = Partial<{
   orientation: Orientation;
 }>;
 
-const FLAT_THRESHOLD = 2;
+export const FLAT_THRESHOLD = 2;
+
+/**
+ * Position for a label sitting on the first straight segment of the
+ * connector, i.e. the part that leaves the source node.
+ */
+export function getLabelPosition(
+  { x1, y1, x2, y2 }: Connector,
+  {
+    midOffset = 32,
+    arrowheadOffset = 8,
+    isBottom = false,
+    single = false,
+    orientation = "vertical",
+  }: PathProps = {},
+) {
+  if (orientation === "horizontal") {
+    if (Math.abs(y2 - y1) <= FLAT_THRESHOLD) {
+      return { x: (x1 + x2 - arrowheadOffset) / 2, y: y1 };
+    }
+
+    const bendX = single || isBottom ? x2 - midOffset : x1 + midOffset;
+    return { x: (x1 + bendX) / 2, y: y1 };
+  }
+
+  if (Math.abs(x2 - x1) <= FLAT_THRESHOLD) {
+    return { x: x1, y: (y1 + y2 - arrowheadOffset) / 2 };
+  }
+
+  const bendY = single || isBottom ? y2 - midOffset : y1 + midOffset;
+  return { x: x1, y: (y1 + bendY) / 2 };
+}
 
 export function createRoundedPath(
   { x1, y1, x2, y2 }: Connector,

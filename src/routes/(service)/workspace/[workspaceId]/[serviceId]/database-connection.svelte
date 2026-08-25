@@ -2,13 +2,14 @@
     import contentCopyIcon from "@ktibow/iconset-material-symbols/content-copy";
     import visibilityIcon from "@ktibow/iconset-material-symbols/visibility";
     import visibilityOffIcon from "@ktibow/iconset-material-symbols/visibility-off";
-    import { Button, Card, Icon, LoadingIndicator, snackbar } from "m3-svelte";
+    import { Button, Card, Icon, LoadingIndicator } from "m3-svelte";
 
     import { getPostgresConnection } from "#lib/api/services.remote";
     import {
         maskPostgresUrl,
         wrapUrlSegments,
     } from "#lib/service/database-url";
+    import { copyToClipboard } from "#lib/ui/clipboard";
 
     interface Props {
         serviceId: string;
@@ -16,17 +17,14 @@
 
     let { serviceId }: Props = $props();
 
-    // svelte-ignore state_referenced_locally
-    const connectionQuery = getPostgresConnection(serviceId);
+    const connectionQuery = $derived(getPostgresConnection(serviceId));
     let revealPassword = $state(false);
 
     const copyText = async (value: string, label: string): Promise<void> => {
-        try {
-            await navigator.clipboard.writeText(value);
-            snackbar(`${label} copied`);
-        } catch {
-            snackbar(`Unable to copy ${label.toLowerCase()}`);
-        }
+        await copyToClipboard(value, {
+            failure: `Unable to copy ${label.toLowerCase()}`,
+            success: `${label} copied`,
+        });
     };
 </script>
 

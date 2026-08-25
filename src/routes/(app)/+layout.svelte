@@ -13,63 +13,85 @@
         NavigationRailItem,
     } from "m3-svelte";
 
-    let { children } = $props();
+    import RailFooter from "#lib/components/rail-footer.svelte";
+
+    let { children, data } = $props();
     let railOpen = $state(false);
     let fabMenuOpen = $state(false);
 </script>
 
 <div class="flex h-full w-svw">
-    <NavigationRail bind:open={railOpen}>
-        {#snippet fab(open)}
-            <FAB
-                icon={addIcon}
-                color="primary-container"
-                text={open ? "New" : undefined}
-                elevation="none"
-                style="anchor-name: --m3-menu-anchor"
-                onclick={() => (fabMenuOpen = !fabMenuOpen)}
+    <div class="relative z-10 shrink-0">
+        <NavigationRail bind:open={railOpen}>
+            {#snippet fab(open)}
+                <FAB
+                    icon={addIcon}
+                    color="primary-container"
+                    text={open ? "New" : undefined}
+                    elevation="none"
+                    style="anchor-name: --m3-menu-anchor"
+                    onclick={() => (fabMenuOpen = !fabMenuOpen)}
+                />
+                {#if fabMenuOpen}
+                    <div class="fab-menu">
+                        <ExpressiveMenu
+                            anchored
+                            x="start"
+                            y="down"
+                            label="Actions"
+                        >
+                            <ExpressiveMenuItem
+                                leadingIcon={addIcon}
+                                label="Create Workspace"
+                                onclick={() => (fabMenuOpen = false)}
+                            />
+                            <ExpressiveMenuItem
+                                leadingIcon={addIcon}
+                                label="Share"
+                                onclick={() => (fabMenuOpen = false)}
+                            />
+                        </ExpressiveMenu>
+                    </div>
+                {/if}
+            {/snippet}
+
+            <NavigationRailItem
+                href="/"
+                label="Overview"
+                icon={houseOutlineIcon}
             />
-            {#if fabMenuOpen}
-                <div class="fab-menu">
-                    <ExpressiveMenu anchored x="start" y="down" label="Actions">
-                        <ExpressiveMenuItem
-                            leadingIcon={addIcon}
-                            label="Create Workspace"
-                            onclick={() => (fabMenuOpen = false)}
-                        />
-                        <ExpressiveMenuItem
-                            leadingIcon={addIcon}
-                            label="Share"
-                            onclick={() => (fabMenuOpen = false)}
-                        />
-                    </ExpressiveMenu>
-                </div>
-            {/if}
-        {/snippet}
 
-        <NavigationRailItem href="/" label="Overview" icon={houseOutlineIcon} />
+            <NavigationRailItem
+                href="/workspace"
+                label="Workspace"
+                id="workspaces-rail-button"
+                icon={workspacesOutlineIcon}
+            />
 
-        <NavigationRailItem
-            href="/workspace"
-            label="Workspace"
-            id="workspaces-rail-button"
-            icon={workspacesOutlineIcon}
+            <NavigationRailItem
+                href="/data-sources"
+                label="Data Sources"
+                icon={databaseIcon}
+            />
+
+            <NavigationRailItem
+                href="/machines"
+                label="Machines"
+                icon={computerIcon}
+            />
+
+            <NavigationRailItem
+                href="/cluster"
+                label="Cluster"
+                icon={hiveIcon}
+            />
+        </NavigationRail>
+        <RailFooter
+            open={railOpen}
+            initialGravatarUrl={data.gravatarUrl}
+            initialUser={data.session?.user}
         />
-
-        <NavigationRailItem
-            href="/data-sources"
-            label="Data Sources"
-            icon={databaseIcon}
-        />
-
-        <NavigationRailItem
-            href="/machines"
-            label="Machines"
-            icon={computerIcon}
-        />
-
-        <NavigationRailItem href="/cluster" label="Cluster" icon={hiveIcon} />
-    </NavigationRail>
+    </div>
     <main
         class="bg-surface m:p-8 mt-6 h-[calc(100svh-1.5rem)] w-svw overflow-y-auto rounded-md p-4"
     >

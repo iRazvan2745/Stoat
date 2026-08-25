@@ -1,5 +1,5 @@
 import { building } from "$app/env";
-import type { Handle, ServerInit } from "@sveltejs/kit";
+import { type Handle, redirect, type ServerInit } from "@sveltejs/kit";
 import { sequence } from "@sveltejs/kit/hooks";
 import { svelteKitHandler } from "better-auth/svelte-kit";
 import { initLogger } from "evlog";
@@ -15,9 +15,32 @@ initLogger({
 const handleBetterAuth: Handle = ({ event, resolve }) =>
   svelteKitHandler({ auth, building, event, resolve });
 
+const PUBLIC_PATH_PREFIXES = ["/login", "/api/auth"];
+
+// SvelteKit internals (assets, remote function endpoints) must not be
+// redirected to HTML; remote functions enforce auth themselves via
+// requireSession and return 401 instead.
+const isGuardedPath = (pathname: string): boolean =>
+  !(
+    pathname.startsWith("/_app/") ||
+    PUBLIC_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+  );
+
+const handleSession: Handle = async ({ event, resolve }) => {
+  event.locals.session = await auth.api.getSession({
+    headers: event.request.headers,
+  });
+
+  if (!event.locals.session && isGuardedPath(event.url.pathname)) {
+    redirect(303, "/login");
+  }
+
+  return await resolve(event);
+};
+
 const evlogHooks = createEvlogHooks({ redact: true });
 
-export const handle: Handle = sequence(evlogHooks.handle, handleBetterAuth);
+export const handle: Handle = sequence(evlogHooks.handle, handleBetterAuth, handleSession);
 export const { handleError } = evlogHooks;
 
 export const init: ServerInit = async () => {

@@ -193,18 +193,18 @@
 		const handleWheel = (event: WheelEvent) => {
 			if (!bounds) return;
 
-			const allowX = bounds.x < 0;
-			const allowY = bounds.y < 0;
+			const consumesY = bounds.y < 0 && event.deltaY !== 0;
+			const consumesX = bounds.x < 0 && event.deltaX !== 0;
 
-			if (!allowX && !allowY) return;
+			if (!consumesX && !consumesY) return;
 
 			event.preventDefault();
 
-			if (allowY) {
+			if (consumesY) {
 				y.set(clamp(y.get() - event.deltaY, bounds.y, 0));
 			}
 
-			if (allowX) {
+			if (consumesX) {
 				x.set(clamp(x.get() - event.deltaX, bounds.x, 0));
 			}
 		};

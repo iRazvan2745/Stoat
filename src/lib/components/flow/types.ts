@@ -23,6 +23,8 @@ export type NodeData = {
   disabled?: boolean;
   start?: RectLike | null;
   end?: RectLike | null;
+  /** Label rendered on the connector leaving this node. */
+  edgeLabel?: string;
 };
 
 export type Connector = {
@@ -35,6 +37,7 @@ export type Connector = {
   single?: boolean;
   fromId?: string;
   toId?: string;
+  label?: string;
 };
 
 export function rectEquals(

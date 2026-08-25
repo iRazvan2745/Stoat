@@ -76,7 +76,7 @@
             backgroundColor:
                 "color-mix(in srgb, var(--m3c-primary) 12%, transparent)",
         },
-        ".cm-contnt": { padding: "1rem 0" },
+        ".cm-content": { padding: "1rem 0" },
         ".cm-cursor, .cm-dropCursor": {
             borderLeftColor: "var(--m3c-primary)",
         },
@@ -119,7 +119,7 @@
 </script>
 
 <div
-    class="relative min-h-72 overflow-hidden rounded-xl"
+    class="relative min-h-72 overflow-hidden"
     aria-busy={editorLoading}
     aria-label="Environment file editor"
 >

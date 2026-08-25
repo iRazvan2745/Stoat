@@ -35,9 +35,8 @@
 
     const { params } = $props();
 
-    // svelte-ignore state_referenced_locally
-    const variablesQuery = getEnvironmentVariables(params.serviceId);
-    const savedVariables = await variablesQuery;
+    const variablesQuery = $derived(getEnvironmentVariables(params.serviceId));
+    const savedVariables = $derived(await variablesQuery);
 
     const createDraft = (name = "", value = ""): DraftVariable => ({
         id: crypto.randomUUID(),
@@ -47,15 +46,29 @@
 
     const view = useQueryState(
         "view",
-        parseAsStringLiteral(["editor", "list"] as const).withDefault("list")
+        parseAsStringLiteral(["editor", "list"] as const).withDefault("editor")
     );
-    let variables = $state<DraftVariable[]>(
-        savedVariables.map((variable) =>
-            createDraft(variable.name, variable.value)
-        )
-    );
+    const draftsFrom = (rows: EnvironmentVariable[]): DraftVariable[] =>
+        rows.map((variable) => createDraft(variable.name, variable.value));
+
+    let variables = $state<DraftVariable[]>(draftsFrom(savedVariables));
     let envFile = $state(serializeEnvFile(savedVariables));
+    let seededServiceId = $state(params.serviceId);
     let saving = $state(false);
+
+    const applySaved = (rows: EnvironmentVariable[]): void => {
+        variables = draftsFrom(rows);
+        envFile = serializeEnvFile(rows);
+    };
+
+    $effect.pre(() => {
+        if (params.serviceId === seededServiceId) {
+            return;
+        }
+
+        applySaved(savedVariables);
+        seededServiceId = params.serviceId;
+    });
 
     const setView = (next: "editor" | "list"): void => {
         if (next === view.current) {
@@ -127,10 +140,12 @@
         saving = true;
 
         try {
-            await updateEnvironmentVariables({
+            const saved = await updateEnvironmentVariables({
                 serviceId: params.serviceId,
                 variables: nextVariables,
             });
+            await variablesQuery.refresh();
+            applySaved(variablesQuery.current ?? saved);
             snackbar("Environment saved");
         } catch (error) {
             snackbar(
@@ -155,26 +170,24 @@
 
         <div class="flex flex-wrap items-center gap-2">
             <ButtonGroup
-                selected={view.current === "list" ? 0 : 1}
+                selected={view.current === "editor" ? 0 : 1}
                 aria-label="Environment view"
             >
                 <Button
                     variant="filled"
-                    iconType="left"
-                    aria-pressed={view.current === "list"}
-                    onclick={() => setView("list")}
-                >
-                    <Icon icon={variablesIcon} size={18} />
-                    Variables
-                </Button>
-                <Button
-                    variant="filled"
-                    iconType="left"
                     aria-pressed={view.current === "editor"}
                     onclick={() => setView("editor")}
                 >
                     <Icon icon={codeIcon} size={18} />
                     .env
+                </Button>
+                <Button
+                    variant="filled"
+                    aria-pressed={view.current === "list"}
+                    onclick={() => setView("list")}
+                >
+                    <Icon icon={variablesIcon} size={18} />
+                    Variables
                 </Button>
             </ButtonGroup>
 

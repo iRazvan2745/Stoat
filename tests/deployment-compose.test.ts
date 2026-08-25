@@ -39,6 +39,47 @@ describe("formatComposeFile", () => {
     expect(formatted.serviceNames).toEqual(["app-abc12-web", "app-abc12-db"]);
   });
 
+  it("prefixes depends_on references and x-caddy upstreams", () => {
+    const formatted = formatComposeFile(
+      `services:
+  seafile:
+    image: seafileltd/seafile-pro-mc
+    x-caddy: |
+      files.example.com {
+        handle_path /sdoc-server/* {
+          reverse_proxy {{upstreams "seadoc" 80}}
+        }
+        reverse_proxy {{upstreams 80}}
+      }
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+  seadoc:
+    image: seafileltd/sdoc-server
+    depends_on:
+      - db
+  db:
+    image: mariadb
+  redis:
+    image: redis
+`,
+      "sf-abc12",
+    );
+
+    expect(formatted.serviceNames).toEqual([
+      "sf-abc12-seafile",
+      "sf-abc12-seadoc",
+      "sf-abc12-db",
+      "sf-abc12-redis",
+    ]);
+    expect(formatted.yaml).toContain('reverse_proxy {{upstreams "sf-abc12-seadoc" 80}}');
+    expect(formatted.yaml).toContain("reverse_proxy {{upstreams 80}}");
+    expect(formatted.yaml).toContain("sf-abc12-db:\n        condition: service_healthy");
+    expect(formatted.yaml).toContain("- sf-abc12-db");
+  });
+
   it("prefixes named volumes and volume mounts", () => {
     const formatted = formatComposeFile(
       `services:
@@ -178,6 +219,41 @@ describe("applyEnvironmentVariables", () => {
     expect(yaml).toContain("FOO=old");
     expect(yaml).toContain("BAR=baz");
     expect(yaml).not.toContain("env_file");
+  });
+
+  it("replaces existing keys in an environment list instead of duplicating them", () => {
+    const yaml = applyEnvironmentVariables(
+      `services:
+  web:
+    image: nginx
+    environment:
+      - FOO=old
+      - KEEP=yes
+`,
+      [{ name: "FOO", value: "new" }],
+    );
+
+    expect(yaml).toContain("FOO=new");
+    expect(yaml).toContain("KEEP=yes");
+    expect(yaml).not.toContain("FOO=old");
+    expect(yaml.match(/FOO=/gu)?.length).toBe(1);
+  });
+
+  it("replaces bare KEY entries in an environment list", () => {
+    const yaml = applyEnvironmentVariables(
+      `services:
+  web:
+    image: nginx
+    environment:
+      - FOO
+      - KEEP=yes
+`,
+      [{ name: "FOO", value: "new" }],
+    );
+
+    expect(yaml).toContain("FOO=new");
+    expect(yaml).toContain("KEEP=yes");
+    expect(yaml.match(/FOO/gu)?.length).toBe(1);
   });
 });
 

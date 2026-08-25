@@ -15,10 +15,12 @@
     import { parseAsStringLiteral, useQueryState } from "nuqs-svelte";
 
     import stoatLogo from "#lib/assets/stoat.png";
-    import { authClient } from "#lib/auth/auth-client";
+    import { authClient } from "#lib/auth/client";
 
     const POST_AUTH_PATH = "/workspace";
     const MIN_PASSWORD_LENGTH = 8;
+
+    let { data } = $props();
 
     let mode = useQueryState(
         "mode",
@@ -31,7 +33,7 @@
     let isSubmitting = $state(false);
     let showPassword = $state(false);
 
-    const isRegister = $derived(mode.current === "register");
+    const isRegister = $derived(data.allowSignup && mode.current === "register");
     const passwordType = $derived(showPassword ? "text" : "password");
     const passwordAutocomplete = $derived(
         isRegister ? "new-password" : "current-password"
@@ -110,17 +112,19 @@
                 </p>
             </div>
 
-            <div class="tabs">
-                <Tabs
-                    secondary
-                    bind:tab={mode.current}
-                    items={[
-                        { name: "Sign in", value: "sign-in" },
-                        { name: "Create account", value: "register" },
-                    ]}
-                    onchange={handleModeChange}
-                />
-            </div>
+            {#if data.allowSignup}
+                <div class="tabs">
+                    <Tabs
+                        secondary
+                        bind:tab={mode.current}
+                        items={[
+                            { name: "Sign in", value: "sign-in" },
+                            { name: "Create account", value: "register" },
+                        ]}
+                        onchange={handleModeChange}
+                    />
+                </div>
+            {/if}
 
             <form class="flex flex-col gap-4" onsubmit={handleSubmit}>
                 {#if isRegister}

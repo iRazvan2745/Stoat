@@ -4,12 +4,30 @@ import fs from "node:fs/promises";
 // oxlint-disable-next-line import/no-named-as-default stupid rule
 import simpleGit from "simple-git";
 
+const USERINFO_PATTERN = /\/\/[^@/]+@/u;
+
+/** Strips embedded credentials (user:password@) from a git URL for safe logging. */
+export function redactGitUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+
+    if (parsed.username || parsed.password) {
+      parsed.username = "***";
+      parsed.password = "";
+    }
+
+    return parsed.toString();
+  } catch {
+    return url.replace(USERINFO_PATTERN, "//***@");
+  }
+}
+
 export async function getRepo({ repoPath, repoUrl }: { repoPath: string; repoUrl: string }) {
   try {
-    console.log(`Found repo`, { repoPath, repoUrl });
     await fs.access(`${repoPath}/.git`);
+    console.log(`Found repo`, { repoPath, repoUrl: redactGitUrl(repoUrl) });
   } catch {
-    console.log(`Cloning repo`, { repoPath, repoUrl });
+    console.log(`Cloning repo`, { repoPath, repoUrl: redactGitUrl(repoUrl) });
     await simpleGit().clone(repoUrl, repoPath);
     return simpleGit(repoPath);
   }

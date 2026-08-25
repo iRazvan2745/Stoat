@@ -4,18 +4,20 @@
 	import { watch } from 'runed';
 	import { useDescendantsContext } from './descendants.svelte';
 	import { setFlowNodeAnchorContext } from './node-context.svelte';
-	import { withElementAttachment } from './render-props';
+	import { createElementAttachment } from './render-props';
 	import { rectEquals, type NodeData, type RectLike } from './types';
 
 	interface FlowNodeProps {
 		id?: string;
 		disabled?: boolean;
+		/** Label rendered on the connector leaving this node. */
+		edgeLabel?: string;
 		class?: string;
 		children?: Snippet;
 		render?: Snippet<[{ props: Record<string, unknown> }]>;
 	}
 
-	let { id, disabled = false, class: className, children, render }: FlowNodeProps = $props();
+	let { id, disabled = false, edgeLabel, class: className, children, render }: FlowNodeProps = $props();
 
 	const descendants = useDescendantsContext<NodeData>();
 	const generatedId = $props.id();
@@ -38,7 +40,8 @@
 		parallel: false,
 		disabled,
 		start: measurements.start,
-		end: measurements.end
+		end: measurements.end,
+		edgeLabel
 	});
 
 	setFlowNodeAnchorContext({
@@ -69,19 +72,18 @@
 		};
 	}
 
+	const attachNode = createElementAttachment<HTMLElement>((element) => {
+		nodeRef = element;
+	});
+
 	let renderProps = $derived(
-		withElementAttachment(
-			{
-				class: className,
-				style: 'cursor: default;',
-				'data-node-index': index,
-				'data-node-id': nodeId,
-				'data-testid': nodeId
-			},
-			(element: HTMLElement | null) => {
-				nodeRef = element;
-			}
-		)
+		attachNode({
+			class: className,
+			style: 'cursor: default;',
+			'data-node-index': index,
+			'data-node-id': nodeId,
+			'data-testid': nodeId
+		})
 	);
 
 	onMount(() => {

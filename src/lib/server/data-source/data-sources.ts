@@ -37,6 +37,18 @@ export const createDataSource = async (url: string, uncloudUrl: string) => {
 };
 
 export const deleteDataSource = async (id: string) => {
+  const linkedWorkspaces = await db
+    .select({ id: workspace.id })
+    .from(workspace)
+    .where(eq(workspace.dataSourceId, id));
+
+  if (linkedWorkspaces.length > 0) {
+    const noun = linkedWorkspaces.length === 1 ? "workspace" : "workspaces";
+    throw new Error(
+      `Data source has ${linkedWorkspaces.length} ${noun}; delete them before deleting the data source`,
+    );
+  }
+
   const [deleted] = await db.delete(dataSource).where(eq(dataSource.id, id)).returning();
 
   if (!deleted) {

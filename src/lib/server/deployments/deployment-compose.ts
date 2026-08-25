@@ -121,12 +121,70 @@ const prefixTopLevelVolumes = (volumes: unknown, prefix: string): void => {
   }
 };
 
+const prefixDependsOn = (service: YAMLMap, prefix: string): void => {
+  const dependsOn = service.get("depends_on", true);
+
+  if (isSeq(dependsOn)) {
+    for (const item of dependsOn.items) {
+      if (isScalar(item) && typeof item.value === "string") {
+        item.value = prefixName(item.value, prefix);
+      }
+    }
+    return;
+  }
+
+  if (isMap(dependsOn)) {
+    for (const pair of dependsOn.items) {
+      if (isScalar(pair.key) && typeof pair.key.value === "string") {
+        pair.key.value = prefixName(pair.key.value, prefix);
+      }
+    }
+  }
+};
+
+const CADDY_UPSTREAMS_SERVICE = /(\{\{\s*upstreams\s+")(?<name>[^"]+)(")/gu;
+
+const prefixCaddyUpstreams = (service: YAMLMap, prefix: string): void => {
+  const caddy = service.get("x-caddy", true);
+
+  if (!isScalar(caddy) || typeof caddy.value !== "string") {
+    return;
+  }
+
+  caddy.value = caddy.value.replace(
+    CADDY_UPSTREAMS_SERVICE,
+    (_match, open: string, name: string, close: string) =>
+      `${open}${prefixName(name, prefix)}${close}`,
+  );
+};
+
+const environmentListKey = (item: unknown): string | undefined => {
+  const entry = yamlString(item);
+
+  if (entry === undefined) {
+    return undefined;
+  }
+
+  const separatorIndex = entry.indexOf("=");
+  return separatorIndex === -1 ? entry : entry.slice(0, separatorIndex);
+};
+
 const overlayEnvironment = (service: YAMLMap, variables: readonly EnvironmentVariable[]): void => {
   const existing = service.get("environment", true);
 
   if (isSeq(existing)) {
     for (const variable of variables) {
-      existing.add(`${variable.name}=${variable.value}`);
+      const entry = `${variable.name}=${variable.value}`;
+      const index = existing.items.findIndex((item) => environmentListKey(item) === variable.name);
+      const item = index === -1 ? undefined : existing.items[index];
+
+      if (isScalar(item)) {
+        item.value = entry;
+      } else if (index === -1) {
+        existing.add(entry);
+      } else {
+        existing.set(index, entry);
+      }
     }
     return;
   }
@@ -228,6 +286,8 @@ export function formatComposeFile(compose: string, prefix?: string): FormattedCo
 
     if (prefix && isMap(pair.value)) {
       prefixServiceVolumes(pair.value, prefix);
+      prefixDependsOn(pair.value, prefix);
+      prefixCaddyUpstreams(pair.value, prefix);
     }
   }
 
