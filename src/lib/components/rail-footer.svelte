@@ -3,7 +3,7 @@
     import logoutIcon from "@ktibow/iconset-material-symbols/logout";
     import { ExpressiveMenu, ExpressiveMenuItem } from "m3-svelte";
 
-    import { authClient } from "#lib/auth/auth-client";
+    import { authClient } from "#lib/auth/client";
     import { getGravatarUrl } from "#lib/gravatar";
 
     interface User {

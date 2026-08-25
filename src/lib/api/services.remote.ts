@@ -5,6 +5,7 @@ import * as v from "valibot";
 import { ENV_NAME_PATTERN } from "#lib/environment";
 import { deployService as runDeployment } from "#lib/server/deployments/deployments";
 import { getPostgresConnection as loadPostgresConnection } from "#lib/server/service/service-connection";
+import { listServiceIngresses } from "#lib/server/service/service-ingresses";
 import { listServiceContainers } from "#lib/server/service/service-containers";
 import {
   listEnvironmentVariables,
@@ -110,6 +111,8 @@ export const getServiceContainers = query(
   async (id) => await listServiceContainers(id),
 );
 
+export const getServiceIngresses = query(v.string(), async (id) => await listServiceIngresses(id));
+
 const streamServiceContainerLogsRemote = async function* streamServiceContainerLogsRemote(
   serviceId: string,
 ) {
@@ -136,6 +139,7 @@ async function refreshServiceQueries(): Promise<void> {
   await requested(getPostgresConnection, SERVICE_QUERY_REFRESH_LIMIT).refreshAll();
   await requested(getEnvironmentVariables, SERVICE_QUERY_REFRESH_LIMIT).refreshAll();
   await requested(getServicesInWorkspace, SERVICE_QUERY_REFRESH_LIMIT).refreshAll();
+  await requested(getServiceIngresses, SERVICE_QUERY_REFRESH_LIMIT).refreshAll();
   await requested(getServiceContainerLogs, SERVICE_QUERY_REFRESH_LIMIT).reconnectAll();
 }
 

@@ -4,6 +4,7 @@
     import logsIcon from "@ktibow/iconset-material-symbols/article-outline";
     import dashboardIcon from "@ktibow/iconset-material-symbols/dashboard";
     import environmentOutlineIcon from "@ktibow/iconset-material-symbols/data-object";
+    import ingressesIcon from "@ktibow/iconset-material-symbols/language";
     import deploymentsIcon from "@ktibow/iconset-material-symbols/rocket-launch-outline";
     import settingsIcon from "@ktibow/iconset-material-symbols/settings-outline";
     import { FAB, NavigationRail, NavigationRailItem } from "m3-svelte";
@@ -41,6 +42,12 @@
                 label="Environment"
                 id="environment-rail-button"
                 icon={environmentOutlineIcon}
+            />
+            <NavigationRailItem
+                href={hrefRoute + "ingresses"}
+                label="Ingresses"
+                id="ingresses-rail-button"
+                icon={ingressesIcon}
             />
             <NavigationRailItem
                 href={hrefRoute + "deployments"}
