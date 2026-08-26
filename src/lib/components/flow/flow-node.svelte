@@ -72,8 +72,21 @@
 		};
 	}
 
+	const observeNodeSize = (element: HTMLElement) => {
+		const onResize = () => {
+			remeasure();
+			descendants.notifySizeChange();
+		};
+
+		const observer = new ResizeObserver(onResize);
+		observer.observe(element);
+		return () => observer.disconnect();
+	};
+
 	const attachNode = createElementAttachment<HTMLElement>((element) => {
 		nodeRef = element;
+		if (!element) return;
+		return observeNodeSize(element);
 	});
 
 	let renderProps = $derived(
@@ -87,11 +100,26 @@
 	);
 
 	onMount(() => {
+		const onLayoutShift = () => {
+			remeasure();
+			descendants.notifySizeChange();
+		};
+
+		window.addEventListener('scroll', onLayoutShift, {
+			capture: true,
+			passive: true
+		});
+		window.addEventListener('resize', onLayoutShift, { passive: true });
+
 		const unregister = descendants.mount(
 			untrack(() => nodeId),
 			untrack(() => nodeData)
 		);
-		return () => unregister();
+		return () => {
+			unregister();
+			window.removeEventListener('scroll', onLayoutShift, { capture: true });
+			window.removeEventListener('resize', onLayoutShift);
+		};
 	});
 
 	watch([() => nodeId, () => nodeData], ([nextId, nextData], previous) => {
@@ -106,50 +134,19 @@
 		descendants.update(nextId, nextData);
 	});
 
-	$effect(() => {
-		if (!nodeRef) return;
-
-		const onResize = () => {
-			remeasure();
-			descendants.notifySizeChange();
-		};
-
-		const observer = new ResizeObserver(onResize);
-		observer.observe(nodeRef);
-
-		return () => observer.disconnect();
-	});
-
 	watch(
 		() => descendants.measurementEpoch,
 		() => {
 			untrack(() => remeasure());
 		}
 	);
-
-	$effect(() => {
-		const onLayoutShift = () => {
-			remeasure();
-			descendants.notifySizeChange();
-		};
-
-		window.addEventListener('scroll', onLayoutShift, {
-			capture: true,
-			passive: true
-		});
-		window.addEventListener('resize', onLayoutShift, { passive: true });
-
-		return () => {
-			window.removeEventListener('scroll', onLayoutShift, { capture: true });
-			window.removeEventListener('resize', onLayoutShift);
-		};
-	});
 </script>
 
 {#if render}
 	{@render render({ props: renderProps })}
 {:else}
 	<li
+		{@attach observeNodeSize}
 		bind:this={nodeRef}
 		class={cn('bg-surface-container-high text-on-surface m3-font-body-medium ring-outline-variant rounded-md px-3 py-2 ring', className)}
 		style="cursor: default;"

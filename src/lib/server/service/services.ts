@@ -15,6 +15,8 @@ import {
 } from "#lib/server/service/service-environment";
 import { uniqueSlug } from "#lib/server/shared/slugs";
 import { readTemplateIconValue, readTemplateVersion } from "#lib/server/templates";
+import { normalizeServiceIcon } from "#lib/service/icon";
+import { normalizeServiceName } from "#lib/service/identity";
 import type { ServiceSettings } from "#lib/service/settings";
 import {
   mergeServiceSettings,
@@ -74,8 +76,8 @@ export async function createService({
   const [created] = await db
     .insert(services)
     .values({
-      icon: icon?.trim() ? icon.trim() : null,
-      name,
+      icon: normalizeServiceIcon(icon),
+      name: normalizeServiceName(name),
       slug,
       type,
       value,
@@ -156,6 +158,43 @@ export async function deleteService(id: string) {
   });
 
   return op;
+}
+
+export async function updateServiceIdentity(
+  serviceId: string,
+  patch: { icon?: string | null; name?: string },
+) {
+  const [svc] = await db.select().from(services).where(eq(services.id, serviceId));
+
+  if (!svc) {
+    throw new Error("Service not found");
+  }
+
+  const next: { icon?: string | null; name?: string } = {};
+
+  if (patch.name !== undefined) {
+    next.name = normalizeServiceName(patch.name);
+  }
+
+  if (patch.icon !== undefined) {
+    next.icon = normalizeServiceIcon(patch.icon);
+  }
+
+  if (next.name === undefined && next.icon === undefined) {
+    return svc;
+  }
+
+  const [updated] = await db
+    .update(services)
+    .set(next)
+    .where(eq(services.id, serviceId))
+    .returning();
+
+  if (!updated) {
+    throw new Error("Unable to update service");
+  }
+
+  return updated;
 }
 
 export async function updateServiceSettings(serviceId: string, settings: ServiceSettings) {

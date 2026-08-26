@@ -127,6 +127,17 @@
 		measurements = rect;
 	}
 
+	const observeContentSize = (element: HTMLUListElement) => {
+		const onResize = () => {
+			remeasure();
+			parentDescendants.notifySizeChange();
+		};
+
+		const observer = new ResizeObserver(onResize);
+		observer.observe(element);
+		return () => observer.disconnect();
+	};
+
 	function computeLinks() {
 		if (!containerRef) {
 			links = null;
@@ -294,11 +305,27 @@
 	}
 
 	onMount(() => {
+		const onLayoutShift = () => {
+			remeasure();
+			parentDescendants.notifySizeChange();
+			computeLinks();
+		};
+
+		window.addEventListener("scroll", onLayoutShift, {
+			capture: true,
+			passive: true,
+		});
+		window.addEventListener("resize", onLayoutShift, { passive: true });
+
 		const unregister = parentDescendants.mount(
 			untrack(() => registrationId),
 			untrack(() => nodeData)
 		);
-		return () => unregister();
+		return () => {
+			unregister();
+			window.removeEventListener("scroll", onLayoutShift, { capture: true });
+			window.removeEventListener("resize", onLayoutShift);
+		};
 	});
 
 	watch([() => registrationId, () => nodeData], ([nextId, nextNodeData], previous) => {
@@ -311,20 +338,6 @@
 		}
 
 		parentDescendants.update(nextId, nextNodeData);
-	});
-
-	$effect(() => {
-		if (!contentRef) return;
-
-		const onResize = () => {
-			remeasure();
-			parentDescendants.notifySizeChange();
-		};
-
-		const observer = new ResizeObserver(onResize);
-		observer.observe(contentRef);
-
-		return () => observer.disconnect();
 	});
 
 	watch(() => parentDescendants.measurementEpoch, () => {
@@ -346,25 +359,6 @@
 			untrack(() => computeLinks());
 		}
 	);
-
-	$effect(() => {
-		const onLayoutShift = () => {
-			remeasure();
-			parentDescendants.notifySizeChange();
-			computeLinks();
-		};
-
-		window.addEventListener("scroll", onLayoutShift, {
-			capture: true,
-			passive: true,
-		});
-		window.addEventListener("resize", onLayoutShift, { passive: true });
-
-		return () => {
-			window.removeEventListener("scroll", onLayoutShift, { capture: true });
-			window.removeEventListener("resize", onLayoutShift);
-		};
-	});
 </script>
 
 <li
@@ -402,6 +396,7 @@
 	</div>
 
 	<ul
+		{@attach observeContentSize}
 		bind:this={contentRef}
 		class={cn(
 			"list-none",

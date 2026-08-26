@@ -21,9 +21,11 @@ import {
   listServicesInWorkspace,
   previewServiceCompose as loadPreviewCompose,
   updateServiceCompose,
+  updateServiceIdentity as saveServiceIdentity,
   updateServiceSettings as saveServiceSettings,
 } from "#lib/server/service/services";
 import { isAbortError } from "#lib/server/shared/sse";
+import { MAX_SERVICE_NAME_LENGTH } from "#lib/service/identity";
 import { ServiceSettingsSchema } from "#lib/service/settings";
 
 export const getServicesInWorkspace = query(v.string(), async (workspaceId) => {
@@ -163,6 +165,30 @@ async function refreshServiceQueries(): Promise<void> {
   await requested(getServiceIngresses, SERVICE_QUERY_REFRESH_LIMIT).refreshAll();
   await requested(getServiceContainerLogs, SERVICE_QUERY_REFRESH_LIMIT).reconnectAll();
 }
+
+const UpdateServiceIdentityInput = v.pipe(
+  v.object({
+    icon: v.optional(v.nullable(v.string())),
+    name: v.optional(
+      v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(MAX_SERVICE_NAME_LENGTH)),
+    ),
+    serviceId: v.string(),
+  }),
+  v.check(
+    (input) => input.icon !== undefined || input.name !== undefined,
+    "Name or icon is required",
+  ),
+);
+
+export const updateServiceIdentity = command(
+  UpdateServiceIdentityInput,
+  async ({ icon, name, serviceId }) => {
+    requireSession();
+    const updated = await saveServiceIdentity(serviceId, { icon, name });
+    await refreshServiceQueries();
+    return updated;
+  },
+);
 
 const UpdateServiceSettingsInput = v.object({
   serviceId: v.string(),

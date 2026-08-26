@@ -53,22 +53,12 @@
 
     let variables = $state<DraftVariable[]>(draftsFrom(savedVariables));
     let envFile = $state(serializeEnvFile(savedVariables));
-    let seededServiceId = $state(params.serviceId);
     let saving = $state(false);
 
     const applySaved = (rows: EnvironmentVariable[]): void => {
         variables = draftsFrom(rows);
         envFile = serializeEnvFile(rows);
     };
-
-    $effect.pre(() => {
-        if (params.serviceId === seededServiceId) {
-            return;
-        }
-
-        applySaved(savedVariables);
-        seededServiceId = params.serviceId;
-    });
 
     const setView = (next: "editor" | "list"): void => {
         if (next === view.current) {

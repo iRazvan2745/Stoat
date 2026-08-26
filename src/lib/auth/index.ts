@@ -2,6 +2,7 @@ import { ALLOW_SIGNUP, BETTER_AUTH_SECRET, ORIGIN } from "$app/env/private";
 import { getRequestEvent } from "$app/server";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { betterAuth } from "better-auth/minimal";
+import { organization } from "better-auth/plugins";
 import { sveltekitCookies } from "better-auth/svelte-kit";
 
 import { db } from "#lib/db";
@@ -16,6 +17,7 @@ export const auth = betterAuth({
   plugins: [
     // Keep the cookie plugin last in the array.
     sveltekitCookies(getRequestEvent),
+    organization(),
   ],
   secret: BETTER_AUTH_SECRET,
 });

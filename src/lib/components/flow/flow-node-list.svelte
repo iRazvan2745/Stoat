@@ -97,12 +97,26 @@
 	}
 
 	onMount(() => {
-		if (!parentDescendants) return;
-		const unregister = parentDescendants.mount(
-			untrack(() => registrationId),
-			untrack(() => nodeData)
-		);
-		return () => unregister();
+		const onLayoutShift = () => computeConnectors();
+
+		window.addEventListener('scroll', onLayoutShift, {
+			capture: true,
+			passive: true
+		});
+		window.addEventListener('resize', onLayoutShift, { passive: true });
+
+		const unregister = parentDescendants
+			? parentDescendants.mount(
+					untrack(() => registrationId),
+					untrack(() => nodeData)
+				)
+			: undefined;
+
+		return () => {
+			unregister?.();
+			window.removeEventListener('scroll', onLayoutShift, { capture: true });
+			window.removeEventListener('resize', onLayoutShift);
+		};
 	});
 
 	watch(
@@ -115,21 +129,6 @@
 
 	watch([() => descendants.measurementEpoch, () => descendants.descendants, () => orientation, () => align], () => {
 		untrack(() => computeConnectors());
-	});
-
-	$effect(() => {
-		const onLayoutShift = () => computeConnectors();
-
-		window.addEventListener('scroll', onLayoutShift, {
-			capture: true,
-			passive: true
-		});
-		window.addEventListener('resize', onLayoutShift, { passive: true });
-
-		return () => {
-			window.removeEventListener('scroll', onLayoutShift, { capture: true });
-			window.removeEventListener('resize', onLayoutShift);
-		};
 	});
 </script>
 

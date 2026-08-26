@@ -11,6 +11,7 @@
         LoadingIndicator,
         snackbar,
     } from "m3-svelte";
+    import { onDestroy } from "svelte";
     import CodeMirror from "svelte-codemirror-editor";
 
     import { previewCompose, updateCompose } from "#lib/api/services.remote";
@@ -32,6 +33,7 @@
     let saving = $state(false);
     let pendingSave = $state(false);
     let saveInFlight = false;
+    let saveTimeoutId = 0;
     let previewOpen = $state(false);
     let previewLoading = $state(false);
     let previewYaml = $state("");
@@ -181,8 +183,8 @@
         }
     };
 
-    $effect(() => {
-        const draft = compose;
+    const scheduleSave = (draft: string): void => {
+        window.clearTimeout(saveTimeoutId);
 
         if (draft === lastSaved) {
             pendingSave = false;
@@ -190,15 +192,14 @@
         }
 
         pendingSave = true;
-
-        const timeoutId = window.setTimeout(() => {
+        saveTimeoutId = window.setTimeout(() => {
             pendingSave = false;
             void persist();
         }, SAVE_DEBOUNCE_MS);
+    };
 
-        return (): void => {
-            window.clearTimeout(timeoutId);
-        };
+    onDestroy(() => {
+        window.clearTimeout(saveTimeoutId);
     });
 </script>
 
@@ -236,6 +237,7 @@
         >
             <CodeMirror
                 bind:value={compose}
+                onchange={scheduleSave}
                 lang={composeLanguage}
                 syntaxHighlighting={composeSyntaxHighlighting}
                 styles={editorStyles}

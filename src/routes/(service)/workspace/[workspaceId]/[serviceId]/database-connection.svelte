@@ -32,10 +32,10 @@
 
 {#if connectionQuery.loading}
     <Card variant="elevated">
-        <div class="pane-bar">
-            <h2 class="pane-title">Connection</h2>
+        <div class="flex min-h-10 items-center justify-between gap-2">
+            <h2 class="m3-font-title-small text-on-surface">Connection</h2>
         </div>
-        <div class="pane-status">
+        <div class="flex justify-center py-2">
             <LoadingIndicator
                 size={24}
                 aria-label="Loading connection details"
@@ -44,16 +44,18 @@
     </Card>
 {:else if connectionQuery.error}
     <Card variant="elevated">
-        <div class="pane-bar">
-            <h2 class="pane-title">Connection</h2>
+        <div class="flex min-h-10 items-center justify-between gap-2">
+            <h2 class="m3-font-title-small text-on-surface">Connection</h2>
         </div>
-        <p class="error-text">{connectionQuery.error.message}</p>
+        <p class="m3-font-body-small text-error mt-2">
+            {connectionQuery.error.message}
+        </p>
     </Card>
 {:else if connectionQuery.current}
     {@const connection = connectionQuery.current}
     <Card variant="elevated">
-        <div class="pane-bar">
-            <h2 class="pane-title">Connection</h2>
+        <div class="flex min-h-10 items-center justify-between gap-2">
+            <h2 class="m3-font-title-small text-on-surface">Connection</h2>
 
             <Button
                 variant="text"
@@ -68,7 +70,7 @@
             </Button>
         </div>
 
-        <ul class="url-list">
+        <ul class="m-0 grid list-none gap-1 p-0">
             {@render copyUrl(
                 "Internal URL",
                 maskPostgresUrl(connection.internal.url, revealPassword),
@@ -89,17 +91,24 @@
     <li>
         <button
             type="button"
-            class="url-row"
+            class="hover:bg-on-surface/8 focus-visible:bg-on-surface/8 focus-visible:outline-primary grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_2.5rem] items-center gap-x-2 gap-y-1 rounded-md border-0 bg-transparent px-1 py-2 text-left text-on-surface transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2"
             title={copyValue}
             aria-label="Copy {label}"
             aria-describedby="click-to-copy-hint"
             onclick={() => copyText(copyValue, label)}
         >
-            <span class="url-label">{label}</span>
-            <span class="url-icon" aria-hidden="true">
+            <span class="m3-font-label-small text-on-surface-variant">
+                {label}
+            </span>
+            <span
+                class="text-on-surface-variant grid place-items-center"
+                aria-hidden="true"
+            >
                 <Icon icon={contentCopyIcon} size={20} />
             </span>
-            <span class="url-value">
+            <span
+                class="m3-font-body-small col-span-2 min-w-0 font-mono wrap-break-word"
+            >
                 {#each wrapUrlSegments(displayValue) as segment, index (index)}
                     {#if index > 0}<wbr />{/if}{segment}
                 {:else}
@@ -109,89 +118,3 @@
         </button>
     </li>
 {/snippet}
-
-<style>
-    .pane-bar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.5rem;
-        min-height: 2.5rem;
-    }
-
-    .pane-title {
-        @apply --m3-title-small;
-        margin: 0;
-        color: var(--m3c-on-surface);
-    }
-
-    .pane-status {
-        display: flex;
-        justify-content: center;
-        padding: 0.5rem 0;
-    }
-
-    .error-text {
-        @apply --m3-body-small;
-        margin: 0.5rem 0 0;
-        color: var(--m3c-error);
-    }
-
-    .url-list {
-        display: grid;
-        gap: 0.25rem;
-        margin: 0;
-        padding: 0;
-        list-style: none;
-    }
-
-    .url-row {
-        @apply --m3-focus-inward;
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) 2.5rem;
-        grid-template-areas:
-            "label copy"
-            "value value";
-        column-gap: 0.5rem;
-        row-gap: 0.25rem;
-        align-items: center;
-        width: 100%;
-        margin: 0;
-        padding: 0.5rem 0.25rem;
-        border: none;
-        border-radius: var(--m3-shape-small);
-        background: transparent;
-        color: var(--m3c-on-surface);
-        text-align: left;
-        cursor: pointer;
-    }
-
-    .url-row:hover {
-        background-color: color-mix(
-            in srgb,
-            var(--m3c-on-surface) 8%,
-            transparent
-        );
-    }
-
-    .url-label {
-        @apply --m3-label-small;
-        grid-area: label;
-        color: var(--m3c-on-surface-variant);
-    }
-
-    .url-value {
-        @apply --m3-body-small;
-        grid-area: value;
-        min-width: 0;
-        overflow-wrap: break-word;
-        font-family: var(--m3-font-mono, ui-monospace, monospace);
-    }
-
-    .url-icon {
-        display: grid;
-        grid-area: copy;
-        color: var(--m3c-on-surface-variant);
-        place-items: center;
-    }
-</style>

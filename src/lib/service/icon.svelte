@@ -16,9 +16,9 @@
         type?: string | null;
     } = $props();
 
-    let failed = $state(false);
+    let failedSrc = $state<string | null>(null);
     const src = $derived(resolveServiceIcon(icon, type));
-    const showImage = $derived(Boolean(src) && !failed);
+    const showImage = $derived(Boolean(src) && failedSrc !== src);
 </script>
 
 {#if src && showImage}
@@ -28,7 +28,7 @@
         class="object-contain"
         width={size}
         height={size}
-        onerror={() => (failed = true)}
+        onerror={() => (failedSrc = src)}
     />
 {:else}
     <Icon icon={widgetsIcon} {size} />

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { resolveServiceIcon, serviceIconSrc } from "#lib/service/icon";
+import {
+  MAX_SERVICE_ICON_LENGTH,
+  normalizeServiceIcon,
+  resolveServiceIcon,
+  serviceIconFromFile,
+  serviceIconSrc,
+} from "#lib/service/icon";
 
 describe("serviceIconSrc", () => {
   it("returns http(s) and relative URLs", () => {
@@ -34,5 +40,45 @@ describe("resolveServiceIcon", () => {
     expect(resolveServiceIcon("/custom.svg", "postgresql")).toBe("/custom.svg");
     expect(resolveServiceIcon(null, "postgresql")).toBe("/templates/postgresql/logo");
     expect(resolveServiceIcon(null, "compose")).toBeNull();
+  });
+});
+
+describe("normalizeServiceIcon", () => {
+  it("treats blank values as a cleared icon", () => {
+    expect(normalizeServiceIcon(null)).toBeNull();
+    expect(normalizeServiceIcon("")).toBeNull();
+    expect(normalizeServiceIcon("   ")).toBeNull();
+  });
+
+  it("keeps safe URLs and data URIs", () => {
+    expect(normalizeServiceIcon("https://api.svgl.app/svg/postgresql.svg")).toBe(
+      "https://api.svgl.app/svg/postgresql.svg",
+    );
+    expect(normalizeServiceIcon("data:image/png;base64,iVBORw0KGgo")).toBe(
+      "data:image/png;base64,iVBORw0KGgo",
+    );
+  });
+
+  it("rejects unsafe values and oversized icons", () => {
+    expect(() => normalizeServiceIcon(`javascript${":"}alert(1)`)).toThrow("Invalid service icon");
+    expect(() =>
+      normalizeServiceIcon(`data:image/png;base64,${"A".repeat(MAX_SERVICE_ICON_LENGTH)}`),
+    ).toThrow("Service icon is too large");
+  });
+});
+
+describe("serviceIconFromFile", () => {
+  it("encodes an image file as a data URI", async () => {
+    const file = new File([new Uint8Array([137, 80, 78, 71])], "icon.png", {
+      type: "image/png",
+    });
+
+    await expect(serviceIconFromFile(file)).resolves.toMatch(/^data:image\/png;base64,/u);
+  });
+
+  it("rejects an unsupported type", async () => {
+    const file = new File(["not-an-image"], "icon.txt", { type: "text/plain" });
+
+    await expect(serviceIconFromFile(file)).rejects.toThrow("PNG, JPEG, GIF, WebP, or SVG");
   });
 });

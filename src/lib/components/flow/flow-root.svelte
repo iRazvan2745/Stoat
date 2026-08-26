@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { motion, useMotionTemplate, useMotionValue, useTransform, type PanInfo } from "motion-sv";
-	import type { Snippet } from "svelte";
+	import { onMount, type Snippet } from "svelte";
 	import { cn } from "./cn";
 	import FlowNodeList from "./flow-node-list.svelte";
 	import { setDiagramContext } from "./diagram-context.svelte";
@@ -120,6 +120,9 @@
 
 		canPan = hasXOverflow || hasYOverflow;
 		onOverflowChange?.({ x: hasXOverflow, y: hasYOverflow });
+
+		if (x.get() < bounds.x) x.set(bounds.x);
+		if (y.get() < bounds.y) y.set(bounds.y);
 	}
 
 	function handlePanStart(event: PointerEvent) {
@@ -159,36 +162,19 @@
 	let scrollLeft = useMotionTemplate`${scrollbarXPercent}%`;
 	let scrollTop = useMotionTemplate`${scrollbarYPercent}%`;
 
-	$effect(() => {
-		if (!canvas || !wrapperRef || !contentRef) return;
+	onMount(() => {
+		if (!canvas) return;
+
+		const wrapper = wrapperRef;
+		const content = contentRef;
+
+		if (!wrapper || !content) return;
 
 		measureBounds();
 
 		const resizeObserver = new ResizeObserver(() => measureBounds());
-		resizeObserver.observe(wrapperRef);
-		resizeObserver.observe(contentRef);
-
-		return () => resizeObserver.disconnect();
-	});
-
-	$effect(() => {
-		if (!canvas || !bounds) return;
-
-		if (x.get() < bounds.x) x.set(bounds.x);
-		if (y.get() < bounds.y) y.set(bounds.y);
-	});
-
-	$effect(() => {
-		if (!canvas) return;
-
-		return () => {
-			document.body.style.cursor = "";
-			document.body.style.userSelect = "";
-		};
-	});
-
-	$effect(() => {
-		if (!canvas || !wrapperRef) return;
+		resizeObserver.observe(wrapper);
+		resizeObserver.observe(content);
 
 		const handleWheel = (event: WheelEvent) => {
 			if (!bounds) return;
@@ -209,9 +195,14 @@
 			}
 		};
 
-		wrapperRef.addEventListener("wheel", handleWheel, { passive: false });
+		wrapper.addEventListener("wheel", handleWheel, { passive: false });
 
-		return () => wrapperRef?.removeEventListener("wheel", handleWheel);
+		return () => {
+			resizeObserver.disconnect();
+			wrapper.removeEventListener("wheel", handleWheel);
+			document.body.style.cursor = "";
+			document.body.style.userSelect = "";
+		};
 	});
 </script>
 
