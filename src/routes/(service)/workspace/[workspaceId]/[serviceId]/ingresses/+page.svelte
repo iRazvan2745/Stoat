@@ -7,13 +7,7 @@
     import publicIcon from "@ktibow/iconset-material-symbols/public";
     import refreshIcon from "@ktibow/iconset-material-symbols/refresh";
     import settingsEthernetIcon from "@ktibow/iconset-material-symbols/settings-ethernet";
-    import {
-        Button,
-        Card,
-        Icon,
-        LoadingIndicator,
-        Snackbar,
-    } from "m3-svelte";
+    import { Button, Card, Icon, LoadingIndicator, Snackbar } from "m3-svelte";
 
     import { getService, getServiceIngresses } from "#lib/api/services.remote";
     import {

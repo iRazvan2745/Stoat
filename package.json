@@ -2,6 +2,7 @@
   "name": "stoat",
   "version": "0.0.1",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "imports": {
     "#lib": "./src/lib/index",
@@ -19,7 +20,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "auth:schema": "auth generate --config src/lib/server/auth/index --output src/lib/server/db/auth.schema.ts --yes",
+    "auth:schema": "auth generate --config src/lib/auth/index --output src/lib/db/auth.schema.ts --yes",
     "fix": "ultracite fix",
     "generate:schema": "openapi-typescript src/lib/api/openapi.yaml -o src/lib/api/schema.ts"
   },

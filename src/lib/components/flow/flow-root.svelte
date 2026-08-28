@@ -1,267 +1,293 @@
 <script lang="ts">
-	import { motion, useMotionTemplate, useMotionValue, useTransform, type PanInfo } from "motion-sv";
-	import { onMount, type Snippet } from "svelte";
-	import { cn } from "./cn";
-	import FlowNodeList from "./flow-node-list.svelte";
-	import { setDiagramContext } from "./diagram-context.svelte";
-	import type { Align, JunctionMarker, Orientation } from "./types";
+    import {
+        motion,
+        useMotionTemplate,
+        useMotionValue,
+        useTransform,
+        type PanInfo,
+    } from "motion-sv";
+    import { onMount, type Snippet } from "svelte";
 
-	const DEFAULT_PADDING = {
-		x: 16,
-		y: 64,
-	};
+    import { cn } from "./cn";
+    import { setDiagramContext } from "./diagram-context.svelte";
+    import FlowNodeList from "./flow-node-list.svelte";
+    import type { Align, JunctionMarker, Orientation } from "./types";
 
-	interface FlowRootProps {
-		orientation?: Orientation;
-		align?: Align;
-		junctionMarker?: JunctionMarker;
-		canvas?: boolean;
-		padding?: { x?: number; y?: number };
-		onOverflowChange?: (overflow: { x: boolean; y: boolean }) => void;
-		class?: string;
-		children?: Snippet;
-	}
+    const DEFAULT_PADDING = {
+        x: 16,
+        y: 64,
+    };
 
-	type Bounds = {
-		x: number;
-		y: number;
-	};
+    interface FlowRootProps {
+        orientation?: Orientation;
+        align?: Align;
+        junctionMarker?: JunctionMarker;
+        canvas?: boolean;
+        padding?: { x?: number; y?: number };
+        onOverflowChange?: (overflow: { x: boolean; y: boolean }) => void;
+        class?: string;
+        children?: Snippet;
+    }
 
-	type Dimensions = {
-		viewportWidth: number;
-		viewportHeight: number;
-		contentWidth: number;
-		contentHeight: number;
-	};
+    type Bounds = {
+        x: number;
+        y: number;
+    };
 
-	const MIN_SCROLLBAR_THUMB_SIZE = 10;
+    type Dimensions = {
+        viewportWidth: number;
+        viewportHeight: number;
+        contentWidth: number;
+        contentHeight: number;
+    };
 
-	let {
-		orientation = "horizontal",
-		align = "start",
-		junctionMarker = "square",
-		canvas = true,
-		padding,
-		onOverflowChange,
-		class: className,
-		children,
-	}: FlowRootProps = $props();
+    const MIN_SCROLLBAR_THUMB_SIZE = 10;
 
-	let wrapperRef = $state<HTMLDivElement | null>(null);
-	let contentRef = $state<HTMLDivElement | null>(null);
-	let bounds = $state<Bounds | null>(null);
-	let dimensions = $state<Dimensions | null>(null);
-	let isPanning = $state(false);
-	let canPan = $state(false);
+    let {
+        orientation = "horizontal",
+        align = "start",
+        junctionMarker = "square",
+        canvas = true,
+        padding,
+        onOverflowChange,
+        class: className,
+        children,
+    }: FlowRootProps = $props();
 
-	let x = useMotionValue(0);
-	let y = useMotionValue(0);
+    let wrapperRef = $state<HTMLDivElement | null>(null);
+    let contentRef = $state<HTMLDivElement | null>(null);
+    let bounds = $state<Bounds | null>(null);
+    let dimensions = $state<Dimensions | null>(null);
+    let isPanning = $state(false);
+    let canPan = $state(false);
 
-	let paddingX = $derived(padding?.x ?? DEFAULT_PADDING.x);
-	let paddingY = $derived(padding?.y ?? DEFAULT_PADDING.y);
-	let canScrollX = $derived(Boolean(bounds && bounds.x < 0));
-	let canScrollY = $derived(Boolean(bounds && bounds.y < 0));
-	let scrollThumbWidth = $derived(
-		dimensions && dimensions.contentWidth > 0 && dimensions.viewportWidth > 0
-			? Math.max(
-					MIN_SCROLLBAR_THUMB_SIZE,
-					(dimensions.viewportWidth / dimensions.contentWidth) * 100
-				)
-			: 0
-	);
-	let scrollThumbHeight = $derived(
-		dimensions && dimensions.contentHeight > 0 && dimensions.viewportHeight > 0
-			? Math.max(
-					MIN_SCROLLBAR_THUMB_SIZE,
-					(dimensions.viewportHeight / dimensions.contentHeight) * 100
-				)
-			: 0
-	);
+    let x = useMotionValue(0);
+    let y = useMotionValue(0);
 
-	setDiagramContext({
-		orientation: () => orientation,
-		align: () => align,
-		junctionMarker: () => junctionMarker,
-		x,
-		y,
-		wrapper: () => wrapperRef,
-	});
+    let paddingX = $derived(padding?.x ?? DEFAULT_PADDING.x);
+    let paddingY = $derived(padding?.y ?? DEFAULT_PADDING.y);
+    let canScrollX = $derived(Boolean(bounds && bounds.x < 0));
+    let canScrollY = $derived(Boolean(bounds && bounds.y < 0));
+    let scrollThumbWidth = $derived(
+        dimensions &&
+            dimensions.contentWidth > 0 &&
+            dimensions.viewportWidth > 0
+            ? Math.max(
+                  MIN_SCROLLBAR_THUMB_SIZE,
+                  (dimensions.viewportWidth / dimensions.contentWidth) * 100
+              )
+            : 0
+    );
+    let scrollThumbHeight = $derived(
+        dimensions &&
+            dimensions.contentHeight > 0 &&
+            dimensions.viewportHeight > 0
+            ? Math.max(
+                  MIN_SCROLLBAR_THUMB_SIZE,
+                  (dimensions.viewportHeight / dimensions.contentHeight) * 100
+              )
+            : 0
+    );
 
-	function isEventFromNode(target: EventTarget | null) {
-		return target instanceof Element && target.closest("[data-node-id]") !== null;
-	}
+    setDiagramContext({
+        orientation: () => orientation,
+        align: () => align,
+        junctionMarker: () => junctionMarker,
+        x,
+        y,
+        wrapper: () => wrapperRef,
+    });
 
-	function clamp(value: number, min: number, max: number) {
-		return Math.max(min, Math.min(max, value));
-	}
+    function isEventFromNode(target: EventTarget | null) {
+        return (
+            target instanceof Element &&
+            target.closest("[data-node-id]") !== null
+        );
+    }
 
-	function measureBounds() {
-		if (!wrapperRef || !contentRef) return;
+    function clamp(value: number, min: number, max: number) {
+        return Math.max(min, Math.min(max, value));
+    }
 
-		const wrapper = wrapperRef.getBoundingClientRect();
-		const content = contentRef.getBoundingClientRect();
-		const availableWidth = wrapper.width - paddingX * 2;
-		const availableHeight = wrapper.height - paddingY * 2;
+    function measureBounds() {
+        if (!wrapperRef || !contentRef) return;
 
-		bounds = {
-			x: Math.min(0, availableWidth - content.width),
-			y: Math.min(0, availableHeight - content.height),
-		};
+        const wrapper = wrapperRef.getBoundingClientRect();
+        const content = contentRef.getBoundingClientRect();
+        const availableWidth = wrapper.width - paddingX * 2;
+        const availableHeight = wrapper.height - paddingY * 2;
 
-		dimensions = {
-			viewportWidth: availableWidth,
-			viewportHeight: availableHeight,
-			contentWidth: content.width,
-			contentHeight: content.height,
-		};
+        bounds = {
+            x: Math.min(0, availableWidth - content.width),
+            y: Math.min(0, availableHeight - content.height),
+        };
 
-		const hasXOverflow = content.width > availableWidth;
-		const hasYOverflow = content.height > availableHeight;
+        dimensions = {
+            viewportWidth: availableWidth,
+            viewportHeight: availableHeight,
+            contentWidth: content.width,
+            contentHeight: content.height,
+        };
 
-		canPan = hasXOverflow || hasYOverflow;
-		onOverflowChange?.({ x: hasXOverflow, y: hasYOverflow });
+        const hasXOverflow = content.width > availableWidth;
+        const hasYOverflow = content.height > availableHeight;
 
-		if (x.get() < bounds.x) x.set(bounds.x);
-		if (y.get() < bounds.y) y.set(bounds.y);
-	}
+        canPan = hasXOverflow || hasYOverflow;
+        onOverflowChange?.({ x: hasXOverflow, y: hasYOverflow });
 
-	function handlePanStart(event: PointerEvent) {
-		if (!canvas || isEventFromNode(event.target)) return;
-		isPanning = true;
-		document.body.style.cursor = "grabbing";
-		document.body.style.userSelect = "none";
-	}
+        if (x.get() < bounds.x) x.set(bounds.x);
+        if (y.get() < bounds.y) y.set(bounds.y);
+    }
 
-	function handlePan(_event: PointerEvent, info: PanInfo) {
-		if (!canvas || !bounds || !isPanning) return;
-		x.set(clamp(x.get() + info.delta.x, bounds.x, 0));
-		y.set(clamp(y.get() + info.delta.y, bounds.y, 0));
-	}
+    function handlePanStart(event: PointerEvent) {
+        if (!canvas || isEventFromNode(event.target)) return;
+        isPanning = true;
+        document.body.style.cursor = "grabbing";
+        document.body.style.userSelect = "none";
+    }
 
-	function handlePanEnd() {
-		if (!canvas || !isPanning) return;
-		isPanning = false;
-		document.body.style.cursor = "";
-		document.body.style.userSelect = "";
-	}
+    function handlePan(_event: PointerEvent, info: PanInfo) {
+        if (!canvas || !bounds || !isPanning) return;
+        x.set(clamp(x.get() + info.delta.x, bounds.x, 0));
+        y.set(clamp(y.get() + info.delta.y, bounds.y, 0));
+    }
 
-	let scrollbarXPercent = useTransform(() => {
-		const maxOffset = bounds?.x ?? 0;
-		if (!maxOffset) return 0;
-		const maxThumbTravel = 100 - scrollThumbWidth;
-		return clamp((-x.get() / Math.abs(maxOffset)) * maxThumbTravel, 0, maxThumbTravel);
-	});
+    function handlePanEnd() {
+        if (!canvas || !isPanning) return;
+        isPanning = false;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+    }
 
-	const scrollbarYPercent = useTransform(() => {
-		const maxOffset = bounds?.y ?? 0;
-		if (!maxOffset) return 0;
-		const maxThumbTravel = 100 - scrollThumbHeight;
-		return clamp((-y.get() / Math.abs(maxOffset)) * maxThumbTravel, 0, maxThumbTravel);
-	});
+    let scrollbarXPercent = useTransform(() => {
+        const maxOffset = bounds?.x ?? 0;
+        if (!maxOffset) return 0;
+        const maxThumbTravel = 100 - scrollThumbWidth;
+        return clamp(
+            (-x.get() / Math.abs(maxOffset)) * maxThumbTravel,
+            0,
+            maxThumbTravel
+        );
+    });
 
-	let scrollLeft = useMotionTemplate`${scrollbarXPercent}%`;
-	let scrollTop = useMotionTemplate`${scrollbarYPercent}%`;
+    const scrollbarYPercent = useTransform(() => {
+        const maxOffset = bounds?.y ?? 0;
+        if (!maxOffset) return 0;
+        const maxThumbTravel = 100 - scrollThumbHeight;
+        return clamp(
+            (-y.get() / Math.abs(maxOffset)) * maxThumbTravel,
+            0,
+            maxThumbTravel
+        );
+    });
 
-	onMount(() => {
-		if (!canvas) return;
+    let scrollLeft = useMotionTemplate`${scrollbarXPercent}%`;
+    let scrollTop = useMotionTemplate`${scrollbarYPercent}%`;
 
-		const wrapper = wrapperRef;
-		const content = contentRef;
+    onMount(() => {
+        if (!canvas) return;
 
-		if (!wrapper || !content) return;
+        const wrapper = wrapperRef;
+        const content = contentRef;
 
-		measureBounds();
+        if (!wrapper || !content) return;
 
-		const resizeObserver = new ResizeObserver(() => measureBounds());
-		resizeObserver.observe(wrapper);
-		resizeObserver.observe(content);
+        measureBounds();
 
-		const handleWheel = (event: WheelEvent) => {
-			if (!bounds) return;
+        const resizeObserver = new ResizeObserver(() => measureBounds());
+        resizeObserver.observe(wrapper);
+        resizeObserver.observe(content);
 
-			const consumesY = bounds.y < 0 && event.deltaY !== 0;
-			const consumesX = bounds.x < 0 && event.deltaX !== 0;
+        const handleWheel = (event: WheelEvent) => {
+            if (!bounds) return;
 
-			if (!consumesX && !consumesY) return;
+            const consumesY = bounds.y < 0 && event.deltaY !== 0;
+            const consumesX = bounds.x < 0 && event.deltaX !== 0;
 
-			event.preventDefault();
+            if (!consumesX && !consumesY) return;
 
-			if (consumesY) {
-				y.set(clamp(y.get() - event.deltaY, bounds.y, 0));
-			}
+            event.preventDefault();
 
-			if (consumesX) {
-				x.set(clamp(x.get() - event.deltaX, bounds.x, 0));
-			}
-		};
+            if (consumesY) {
+                y.set(clamp(y.get() - event.deltaY, bounds.y, 0));
+            }
 
-		wrapper.addEventListener("wheel", handleWheel, { passive: false });
+            if (consumesX) {
+                x.set(clamp(x.get() - event.deltaX, bounds.x, 0));
+            }
+        };
 
-		return () => {
-			resizeObserver.disconnect();
-			wrapper.removeEventListener("wheel", handleWheel);
-			document.body.style.cursor = "";
-			document.body.style.userSelect = "";
-		};
-	});
+        wrapper.addEventListener("wheel", handleWheel, { passive: false });
+
+        return () => {
+            resizeObserver.disconnect();
+            wrapper.removeEventListener("wheel", handleWheel);
+            document.body.style.cursor = "";
+            document.body.style.userSelect = "";
+        };
+    });
 </script>
 
 {#if canvas}
-	<motion.div
-		bind:ref={wrapperRef}
-		class={cn("relative isolate grow overflow-hidden group", className)}
-		style={{
-			paddingTop: `${paddingY}px`,
-			paddingBottom: `${paddingY}px`,
-			paddingLeft: `${paddingX}px`,
-			paddingRight: `${paddingX}px`,
-			cursor: canPan && !isPanning ? "grab" : undefined,
-		}}
-		onPanStart={handlePanStart}
-		onPan={handlePan}
-		onPanEnd={handlePanEnd}
-	>
-		<motion.div
-			bind:ref={contentRef}
-			data-testid="flow-contents"
-			class="mx-auto w-max"
-			style={{ x, y }}
-		>
-			<FlowNodeList>
-				{@render children?.()}
-			</FlowNodeList>
-		</motion.div>
+    <motion.div
+        bind:ref={wrapperRef}
+        class={cn("group relative isolate grow overflow-hidden", className)}
+        style={{
+            paddingTop: `${paddingY}px`,
+            paddingBottom: `${paddingY}px`,
+            paddingLeft: `${paddingX}px`,
+            paddingRight: `${paddingX}px`,
+            cursor: canPan && !isPanning ? "grab" : undefined,
+        }}
+        onPanStart={handlePanStart}
+        onPan={handlePan}
+        onPanEnd={handlePanEnd}
+    >
+        <motion.div
+            bind:ref={contentRef}
+            data-testid="flow-contents"
+            class="mx-auto w-max"
+            style={{ x, y }}
+        >
+            <FlowNodeList>
+                {@render children?.()}
+            </FlowNodeList>
+        </motion.div>
 
-		{#if canScrollY}
-			<div class="absolute top-1 right-1 bottom-1 w-1.5 rounded-full bg-outline-variant/50 opacity-0 group-hover:opacity-100">
-				<motion.div
-					class="absolute w-full rounded-full bg-outline"
-					style={{
-						height: `${scrollThumbHeight}%`,
-						top: scrollTop,
-					}}
-				/>
-			</div>
-		{/if}
+        {#if canScrollY}
+            <div
+                class="bg-outline-variant/50 absolute top-1 right-1 bottom-1 w-1.5 rounded-full opacity-0 group-hover:opacity-100"
+            >
+                <motion.div
+                    class="bg-outline absolute w-full rounded-full"
+                    style={{
+                        height: `${scrollThumbHeight}%`,
+                        top: scrollTop,
+                    }}
+                />
+            </div>
+        {/if}
 
-		{#if canScrollX}
-			<div class="absolute right-1 bottom-1 left-1 h-1.5 rounded-full bg-outline-variant/50 opacity-0 group-hover:opacity-100">
-				<motion.div
-					class="absolute h-full rounded-full bg-outline"
-					style={{
-						width: `${scrollThumbWidth}%`,
-						left: scrollLeft,
-					}}
-				/>
-			</div>
-		{/if}
-	</motion.div>
+        {#if canScrollX}
+            <div
+                class="bg-outline-variant/50 absolute right-1 bottom-1 left-1 h-1.5 rounded-full opacity-0 group-hover:opacity-100"
+            >
+                <motion.div
+                    class="bg-outline absolute h-full rounded-full"
+                    style={{
+                        width: `${scrollThumbWidth}%`,
+                        left: scrollLeft,
+                    }}
+                />
+            </div>
+        {/if}
+    </motion.div>
 {:else}
-	<div bind:this={wrapperRef} class={className}>
-		<div bind:this={contentRef}>
-			<FlowNodeList>
-				{@render children?.()}
-			</FlowNodeList>
-		</div>
-	</div>
+    <div bind:this={wrapperRef} class={className}>
+        <div bind:this={contentRef}>
+            <FlowNodeList>
+                {@render children?.()}
+            </FlowNodeList>
+        </div>
+    </div>
 {/if}

@@ -1,7 +1,9 @@
 import { command, query } from "$app/server";
+import { error } from "@sveltejs/kit";
 import * as v from "valibot";
 
-import { requireSession } from "#lib/api/guard";
+import { requireDataSourceAccess, requireSession } from "#lib/api/guard";
+import { getOrganizationIdForUser } from "#lib/server/access";
 import {
   createDataSource as insertDataSource,
   deleteDataSource as removeDataSource,
@@ -15,21 +17,30 @@ const DataSource = v.object({
 });
 
 export const listDataSources = query(async () => {
-  requireSession();
-  return await loadDataSources();
+  const session = requireSession();
+  return await loadDataSources(session.user.id);
 });
 
 export const createDataSource = command(DataSource, async ({ uncloudUrl, url }) => {
-  requireSession();
-  return await insertDataSource(url, uncloudUrl);
+  const session = requireSession();
+  const organizationId = await getOrganizationIdForUser(
+    session.user.id,
+    session.session.activeOrganizationId,
+  );
+
+  if (!organizationId) {
+    error(403, "No organization membership");
+  }
+
+  return await insertDataSource(url, uncloudUrl, organizationId);
 });
 
 export const discoverDataSource = command(v.string(), async (id) => {
-  requireSession();
+  await requireDataSourceAccess(id);
   return await importDataSource(id);
 });
 
 export const deleteDataSource = command(v.string(), async (id) => {
-  requireSession();
+  await requireDataSourceAccess(id);
   return await removeDataSource(id);
 });

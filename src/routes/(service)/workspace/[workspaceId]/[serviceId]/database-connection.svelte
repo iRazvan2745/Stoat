@@ -91,7 +91,7 @@
     <li>
         <button
             type="button"
-            class="hover:bg-on-surface/8 focus-visible:bg-on-surface/8 focus-visible:outline-primary grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_2.5rem] items-center gap-x-2 gap-y-1 rounded-md border-0 bg-transparent px-1 py-2 text-left text-on-surface transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2"
+            class="hover:bg-on-surface/8 focus-visible:bg-on-surface/8 focus-visible:outline-primary text-on-surface grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_2.5rem] items-center gap-x-2 gap-y-1 rounded-md border-0 bg-transparent px-1 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2"
             title={copyValue}
             aria-label="Copy {label}"
             aria-describedby="click-to-copy-hint"

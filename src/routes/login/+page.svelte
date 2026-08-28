@@ -33,7 +33,9 @@
     let isSubmitting = $state(false);
     let showPassword = $state(false);
 
-    const isRegister = $derived(data.allowSignup && mode.current === "register");
+    const isRegister = $derived(
+        data.allowSignup && mode.current === "register"
+    );
     const passwordType = $derived(showPassword ? "text" : "password");
     const passwordAutocomplete = $derived(
         isRegister ? "new-password" : "current-password"

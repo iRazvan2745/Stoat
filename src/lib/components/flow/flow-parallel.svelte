@@ -1,417 +1,508 @@
 <script lang="ts">
-	import { cn } from "./cn";
-	import { onMount, untrack, type Snippet } from "svelte";
-	import { watch } from "runed";
-	import Connectors from "./connectors.svelte";
-	import { FLAT_THRESHOLD } from "./connectors";
-	import { createDescendantsState, setDescendantsContext, useDescendantsContext } from "./descendants.svelte";
-	import { useDiagramContext } from "./diagram-context.svelte";
-	import type { Connector, NodeData, ParallelAlign, RectLike } from "./types";
+    import { watch } from "runed";
+    import { onMount, untrack, type Snippet } from "svelte";
 
-	type LinksResult = {
-		connectors: Connector[];
-		junctions: {
-			start?: { x: number; y: number };
-			end?: { x: number; y: number };
-		};
-		containerRect: DOMRect;
-	};
+    import { cn } from "./cn";
+    import { FLAT_THRESHOLD } from "./connectors";
+    import Connectors from "./connectors.svelte";
+    import {
+        createDescendantsState,
+        setDescendantsContext,
+        useDescendantsContext,
+    } from "./descendants.svelte";
+    import { useDiagramContext } from "./diagram-context.svelte";
+    import type { Connector, NodeData, ParallelAlign, RectLike } from "./types";
 
-	interface FlowParallelProps {
-		align?: ParallelAlign;
-		class?: string;
-		/** Replaces the default flex layout classes on the branch list element. */
-		contentClass?: string;
-		children?: Snippet;
-	}
+    type LinksResult = {
+        connectors: Connector[];
+        junctions: {
+            start?: { x: number; y: number };
+            end?: { x: number; y: number };
+        };
+        containerRect: DOMRect;
+    };
 
-	let { align = "start", class: className, contentClass, children }: FlowParallelProps = $props();
+    interface FlowParallelProps {
+        align?: ParallelAlign;
+        class?: string;
+        /** Replaces the default flex layout classes on the branch list element. */
+        contentClass?: string;
+        children?: Snippet;
+    }
 
-	const registrationId = $props.id();
-	const diagram = useDiagramContext();
-	const parentDescendants = useDescendantsContext<NodeData>();
-	const descendants = setDescendantsContext(createDescendantsState<NodeData>());
+    let {
+        align = "start",
+        class: className,
+        contentClass,
+        children,
+    }: FlowParallelProps = $props();
 
-	let containerRef = $state<HTMLLIElement | null>(null);
-	let contentRef = $state<HTMLUListElement | null>(null);
-	let measurements = $state<DOMRect | null>(null);
-	let links = $state<LinksResult | null>(null);
+    const registrationId = $props.id();
+    const diagram = useDiagramContext();
+    const parentDescendants = useDescendantsContext<NodeData>();
+    const descendants = setDescendantsContext(
+        createDescendantsState<NodeData>()
+    );
 
-	let orientation = $derived(diagram.orientation());
-	let diagramAlign = $derived(diagram.align());
-	let junctionMarker = $derived(diagram.junctionMarker());
-	let useSquareJunctions = $derived(junctionMarker === "square");
-	let firstBranch = $derived(descendants.descendants[0]);
-	let startAnchor = $derived<RectLike | null>(firstBranch?.props.start ?? measurements);
-	let endAnchor = $derived<RectLike | null>(firstBranch?.props.end ?? measurements);
-	let nodeData = $derived<NodeData>({
-		element: containerRef,
-		parallel: true,
-		start: startAnchor,
-		end: endAnchor,
-	});
-	let index = $derived(parentDescendants.getIndex(registrationId));
-	let previousNode = $derived(parentDescendants.getPrevious(registrationId));
-	let nextNode = $derived(parentDescendants.getNext(registrationId));
-	let previousIsParallel = $derived(previousNode?.props.parallel === true);
+    let containerRef = $state<HTMLLIElement | null>(null);
+    let contentRef = $state<HTMLUListElement | null>(null);
+    let measurements = $state<DOMRect | null>(null);
+    let links = $state<LinksResult | null>(null);
 
-	function getStartAndEndPoints({
-		container,
-		previous,
-		next,
-		orientation,
-	}: {
-		container: RectLike;
-		previous: RectLike | null;
-		next: RectLike | null;
-		orientation: "horizontal" | "vertical";
-	}) {
-		if (orientation === "vertical") {
-			const startX = previous
-				? previous.left - container.left + previous.width / 2
-				: container.width / 2;
-			const endX = next ? next.left - container.left + next.width / 2 : container.width / 2;
+    let orientation = $derived(diagram.orientation());
+    let diagramAlign = $derived(diagram.align());
+    let junctionMarker = $derived(diagram.junctionMarker());
+    let useSquareJunctions = $derived(junctionMarker === "square");
+    let firstBranch = $derived(descendants.descendants[0]);
+    let startAnchor = $derived<RectLike | null>(
+        firstBranch?.props.start ?? measurements
+    );
+    let endAnchor = $derived<RectLike | null>(
+        firstBranch?.props.end ?? measurements
+    );
+    let nodeData = $derived<NodeData>({
+        element: containerRef,
+        parallel: true,
+        start: startAnchor,
+        end: endAnchor,
+    });
+    let index = $derived(parentDescendants.getIndex(registrationId));
+    let previousNode = $derived(parentDescendants.getPrevious(registrationId));
+    let nextNode = $derived(parentDescendants.getNext(registrationId));
+    let previousIsParallel = $derived(previousNode?.props.parallel === true);
 
-			return {
-				start: {
-					x: startX,
-					y: 0,
-				},
-				end: {
-					x: endX,
-					y: container.height,
-				},
-			};
-		}
+    function getStartAndEndPoints({
+        container,
+        previous,
+        next,
+        orientation,
+    }: {
+        container: RectLike;
+        previous: RectLike | null;
+        next: RectLike | null;
+        orientation: "horizontal" | "vertical";
+    }) {
+        if (orientation === "vertical") {
+            const startX = previous
+                ? previous.left - container.left + previous.width / 2
+                : container.width / 2;
+            const endX = next
+                ? next.left - container.left + next.width / 2
+                : container.width / 2;
 
-		let start = {
-			x: 0,
-			y: container.height / 2,
-		};
-		let end = {
-			x: container.width,
-			y: container.height / 2,
-		};
+            return {
+                start: {
+                    x: startX,
+                    y: 0,
+                },
+                end: {
+                    x: endX,
+                    y: container.height,
+                },
+            };
+        }
 
-		if (previous) {
-			start.y = previous.top - container.top + previous.height / 2;
-		}
+        let start = {
+            x: 0,
+            y: container.height / 2,
+        };
+        let end = {
+            x: container.width,
+            y: container.height / 2,
+        };
 
-		if (next) {
-			end.y = next.top - container.top + next.height / 2;
-		}
+        if (previous) {
+            start.y = previous.top - container.top + previous.height / 2;
+        }
 
-		return { start, end };
-	}
+        if (next) {
+            end.y = next.top - container.top + next.height / 2;
+        }
 
-	function remeasure() {
-		if (!contentRef) return;
+        return { start, end };
+    }
 
-		const rect = contentRef.getBoundingClientRect();
-		const current = measurements;
+    function remeasure() {
+        if (!contentRef) return;
 
-		if (
-			current &&
-			current.x === rect.x &&
-			current.y === rect.y &&
-			current.top === rect.top &&
-			current.left === rect.left &&
-			current.right === rect.right &&
-			current.bottom === rect.bottom &&
-			current.width === rect.width &&
-			current.height === rect.height
-		) {
-			return;
-		}
+        const rect = contentRef.getBoundingClientRect();
+        const current = measurements;
 
-		measurements = rect;
-	}
+        if (
+            current &&
+            current.x === rect.x &&
+            current.y === rect.y &&
+            current.top === rect.top &&
+            current.left === rect.left &&
+            current.right === rect.right &&
+            current.bottom === rect.bottom &&
+            current.width === rect.width &&
+            current.height === rect.height
+        ) {
+            return;
+        }
 
-	const observeContentSize = (element: HTMLUListElement) => {
-		const onResize = () => {
-			remeasure();
-			parentDescendants.notifySizeChange();
-		};
+        measurements = rect;
+    }
 
-		const observer = new ResizeObserver(onResize);
-		observer.observe(element);
-		return () => observer.disconnect();
-	};
+    const observeContentSize = (element: HTMLUListElement) => {
+        const onResize = () => {
+            remeasure();
+            parentDescendants.notifySizeChange();
+        };
 
-	function computeLinks() {
-		if (!containerRef) {
-			links = null;
-			return;
-		}
+        const observer = new ResizeObserver(onResize);
+        observer.observe(element);
+        return () => observer.disconnect();
+    };
 
-		const containerRect = containerRef.getBoundingClientRect();
-		const previousNodeRect = previousNode?.props.start ?? null;
-		const nextNodeRect = nextNode?.props.end ?? null;
-		const { start, end } = getStartAndEndPoints({
-			container: containerRect,
-			previous: previousNodeRect,
-			next: nextNodeRect,
-			orientation,
-		});
+    function computeLinks() {
+        if (!containerRef) {
+            links = null;
+            return;
+        }
 
-		const incomingBranchPoints: Array<{ y: number }> = [];
-		const outgoingBranchPoints: Array<{ y: number }> = [];
+        const containerRect = containerRef.getBoundingClientRect();
+        const previousNodeRect = previousNode?.props.start ?? null;
+        const nextNodeRect = nextNode?.props.end ?? null;
+        const { start, end } = getStartAndEndPoints({
+            container: containerRect,
+            previous: previousNodeRect,
+            next: nextNodeRect,
+            orientation,
+        });
 
-		for (const descendant of descendants.descendants) {
-			const endAnchorRect = descendant.props.end;
-			const startAnchorRect = descendant.props.start;
+        const incomingBranchPoints: Array<{ y: number }> = [];
+        const outgoingBranchPoints: Array<{ y: number }> = [];
 
-			if (previousNodeRect && endAnchorRect) {
-				const anchorCenter =
-					orientation === "horizontal"
-						? endAnchorRect.top - containerRect.top + endAnchorRect.height / 2
-						: endAnchorRect.left - containerRect.left + endAnchorRect.width / 2;
+        for (const descendant of descendants.descendants) {
+            const endAnchorRect = descendant.props.end;
+            const startAnchorRect = descendant.props.start;
 
-				incomingBranchPoints.push({ y: anchorCenter });
-			}
+            if (previousNodeRect && endAnchorRect) {
+                const anchorCenter =
+                    orientation === "horizontal"
+                        ? endAnchorRect.top -
+                          containerRect.top +
+                          endAnchorRect.height / 2
+                        : endAnchorRect.left -
+                          containerRect.left +
+                          endAnchorRect.width / 2;
 
-			if (nextNodeRect && startAnchorRect) {
-				const anchorCenter =
-					orientation === "horizontal"
-						? startAnchorRect.top - containerRect.top + startAnchorRect.height / 2
-						: startAnchorRect.left - containerRect.left + startAnchorRect.width / 2;
+                incomingBranchPoints.push({ y: anchorCenter });
+            }
 
-				outgoingBranchPoints.push({ y: anchorCenter });
-			}
-		}
+            if (nextNodeRect && startAnchorRect) {
+                const anchorCenter =
+                    orientation === "horizontal"
+                        ? startAnchorRect.top -
+                          containerRect.top +
+                          startAnchorRect.height / 2
+                        : startAnchorRect.left -
+                          containerRect.left +
+                          startAnchorRect.width / 2;
 
-		const hasIncomingJunction = (() => {
-			if (incomingBranchPoints.length <= 1) return false;
+                outgoingBranchPoints.push({ y: anchorCenter });
+            }
+        }
 
-			const hasAbove = incomingBranchPoints.some((point) => point.y < start.y - FLAT_THRESHOLD);
-			const hasBelow = incomingBranchPoints.some((point) => point.y > start.y + FLAT_THRESHOLD);
-			const hasInline = incomingBranchPoints.some(
-				(point) => Math.abs(point.y - start.y) <= FLAT_THRESHOLD
-			);
+        const hasIncomingJunction = (() => {
+            if (incomingBranchPoints.length <= 1) return false;
 
-			return [hasAbove, hasBelow, hasInline].filter(Boolean).length > 1;
-		})();
+            const hasAbove = incomingBranchPoints.some(
+                (point) => point.y < start.y - FLAT_THRESHOLD
+            );
+            const hasBelow = incomingBranchPoints.some(
+                (point) => point.y > start.y + FLAT_THRESHOLD
+            );
+            const hasInline = incomingBranchPoints.some(
+                (point) => Math.abs(point.y - start.y) <= FLAT_THRESHOLD
+            );
 
-		const hasOutgoingJunction = (() => {
-			if (outgoingBranchPoints.length <= 1) return false;
+            return [hasAbove, hasBelow, hasInline].filter(Boolean).length > 1;
+        })();
 
-			const hasAbove = outgoingBranchPoints.some((point) => point.y < end.y - FLAT_THRESHOLD);
-			const hasBelow = outgoingBranchPoints.some((point) => point.y > end.y + FLAT_THRESHOLD);
-			const hasInline = outgoingBranchPoints.some(
-				(point) => Math.abs(point.y - end.y) <= FLAT_THRESHOLD
-			);
+        const hasOutgoingJunction = (() => {
+            if (outgoingBranchPoints.length <= 1) return false;
 
-			return [hasAbove, hasBelow, hasInline].filter(Boolean).length > 1;
-		})();
+            const hasAbove = outgoingBranchPoints.some(
+                (point) => point.y < end.y - FLAT_THRESHOLD
+            );
+            const hasBelow = outgoingBranchPoints.some(
+                (point) => point.y > end.y + FLAT_THRESHOLD
+            );
+            const hasInline = outgoingBranchPoints.some(
+                (point) => Math.abs(point.y - end.y) <= FLAT_THRESHOLD
+            );
 
-		const branchConnectors = descendants.descendants.flatMap((descendant) => {
-			const connectors: Connector[] = [];
-			const endAnchorRect = descendant.props.end;
-			const startAnchorRect = descendant.props.start;
-			const isDescendantDisabled = descendant.props.disabled;
+            return [hasAbove, hasBelow, hasInline].filter(Boolean).length > 1;
+        })();
 
-			if (previousNodeRect && endAnchorRect) {
-				let branchStart: { x: number; y: number };
+        const branchConnectors = descendants.descendants.flatMap(
+            (descendant) => {
+                const connectors: Connector[] = [];
+                const endAnchorRect = descendant.props.end;
+                const startAnchorRect = descendant.props.start;
+                const isDescendantDisabled = descendant.props.disabled;
 
-				if (orientation === "vertical") {
-					const anchorCenter =
-						endAnchorRect.left - containerRect.left + endAnchorRect.width / 2;
+                if (previousNodeRect && endAnchorRect) {
+                    let branchStart: { x: number; y: number };
 
-					branchStart = {
-						x: anchorCenter,
-						y: endAnchorRect.top - containerRect.top,
-					};
-				} else {
-					const anchorCenter =
-						endAnchorRect.top - containerRect.top + endAnchorRect.height / 2;
+                    if (orientation === "vertical") {
+                        const anchorCenter =
+                            endAnchorRect.left -
+                            containerRect.left +
+                            endAnchorRect.width / 2;
 
-					branchStart = {
-						x: endAnchorRect.left - containerRect.left,
-						y: anchorCenter,
-					};
-				}
+                        branchStart = {
+                            x: anchorCenter,
+                            y: endAnchorRect.top - containerRect.top,
+                        };
+                    } else {
+                        const anchorCenter =
+                            endAnchorRect.top -
+                            containerRect.top +
+                            endAnchorRect.height / 2;
 
-				connectors.push({
-					x1: start.x,
-					y1: start.y,
-					x2: branchStart.x,
-					y2: branchStart.y,
-					isBottom: false,
-					disabled: previousNode?.props.disabled || isDescendantDisabled,
-					single: useSquareJunctions ? !hasIncomingJunction : true,
-					fromId: previousNode?.id,
-					toId: descendant.id,
-				});
-			}
+                        branchStart = {
+                            x: endAnchorRect.left - containerRect.left,
+                            y: anchorCenter,
+                        };
+                    }
 
-			if (nextNodeRect && startAnchorRect) {
-				let branchEnd: { x: number; y: number };
+                    connectors.push({
+                        x1: start.x,
+                        y1: start.y,
+                        x2: branchStart.x,
+                        y2: branchStart.y,
+                        isBottom: false,
+                        disabled:
+                            previousNode?.props.disabled ||
+                            isDescendantDisabled,
+                        single: useSquareJunctions
+                            ? !hasIncomingJunction
+                            : true,
+                        fromId: previousNode?.id,
+                        toId: descendant.id,
+                    });
+                }
 
-				if (orientation === "vertical") {
-					const anchorCenter =
-						startAnchorRect.left - containerRect.left + startAnchorRect.width / 2;
+                if (nextNodeRect && startAnchorRect) {
+                    let branchEnd: { x: number; y: number };
 
-					branchEnd = {
-						x: anchorCenter,
-						y: startAnchorRect.bottom - containerRect.top,
-					};
-				} else {
-					const anchorCenter =
-						startAnchorRect.top - containerRect.top + startAnchorRect.height / 2;
+                    if (orientation === "vertical") {
+                        const anchorCenter =
+                            startAnchorRect.left -
+                            containerRect.left +
+                            startAnchorRect.width / 2;
 
-					branchEnd = {
-						x: startAnchorRect.right - containerRect.left,
-						y: anchorCenter,
-					};
-				}
+                        branchEnd = {
+                            x: anchorCenter,
+                            y: startAnchorRect.bottom - containerRect.top,
+                        };
+                    } else {
+                        const anchorCenter =
+                            startAnchorRect.top -
+                            containerRect.top +
+                            startAnchorRect.height / 2;
 
-				connectors.push({
-					x1: branchEnd.x,
-					y1: branchEnd.y,
-					x2: end.x,
-					y2: end.y,
-					isBottom: true,
-					disabled: isDescendantDisabled || nextNode?.props.disabled,
-					single: useSquareJunctions ? !hasOutgoingJunction : true,
-					fromId: descendant.id,
-					toId: nextNode?.id,
-					label: descendant.props.edgeLabel,
-				});
-			}
+                        branchEnd = {
+                            x: startAnchorRect.right - containerRect.left,
+                            y: anchorCenter,
+                        };
+                    }
 
-			return connectors;
-		});
+                    connectors.push({
+                        x1: branchEnd.x,
+                        y1: branchEnd.y,
+                        x2: end.x,
+                        y2: end.y,
+                        isBottom: true,
+                        disabled:
+                            isDescendantDisabled || nextNode?.props.disabled,
+                        single: useSquareJunctions
+                            ? !hasOutgoingJunction
+                            : true,
+                        fromId: descendant.id,
+                        toId: nextNode?.id,
+                        label: descendant.props.edgeLabel,
+                    });
+                }
 
-		links = {
-			connectors: branchConnectors,
-			junctions: {
-				start:
-					useSquareJunctions && previousNodeRect && hasIncomingJunction
-						? {
-								x: orientation === "vertical" ? start.x : start.x + 32,
-								y: orientation === "vertical" ? start.y + 32 : start.y,
-							}
-						: undefined,
-				end:
-					useSquareJunctions && nextNodeRect && hasOutgoingJunction
-						? {
-								x: orientation === "vertical" ? end.x : end.x - 32,
-								y: orientation === "vertical" ? end.y - 32 : end.y,
-							}
-						: undefined,
-			},
-			containerRect,
-		};
-	}
+                return connectors;
+            }
+        );
 
-	onMount(() => {
-		const onLayoutShift = () => {
-			remeasure();
-			parentDescendants.notifySizeChange();
-			computeLinks();
-		};
+        links = {
+            connectors: branchConnectors,
+            junctions: {
+                start:
+                    useSquareJunctions &&
+                    previousNodeRect &&
+                    hasIncomingJunction
+                        ? {
+                              x:
+                                  orientation === "vertical"
+                                      ? start.x
+                                      : start.x + 32,
+                              y:
+                                  orientation === "vertical"
+                                      ? start.y + 32
+                                      : start.y,
+                          }
+                        : undefined,
+                end:
+                    useSquareJunctions && nextNodeRect && hasOutgoingJunction
+                        ? {
+                              x:
+                                  orientation === "vertical"
+                                      ? end.x
+                                      : end.x - 32,
+                              y:
+                                  orientation === "vertical"
+                                      ? end.y - 32
+                                      : end.y,
+                          }
+                        : undefined,
+            },
+            containerRect,
+        };
+    }
 
-		window.addEventListener("scroll", onLayoutShift, {
-			capture: true,
-			passive: true,
-		});
-		window.addEventListener("resize", onLayoutShift, { passive: true });
+    onMount(() => {
+        const onLayoutShift = () => {
+            remeasure();
+            parentDescendants.notifySizeChange();
+            computeLinks();
+        };
 
-		const unregister = parentDescendants.mount(
-			untrack(() => registrationId),
-			untrack(() => nodeData)
-		);
-		return () => {
-			unregister();
-			window.removeEventListener("scroll", onLayoutShift, { capture: true });
-			window.removeEventListener("resize", onLayoutShift);
-		};
-	});
+        window.addEventListener("scroll", onLayoutShift, {
+            capture: true,
+            passive: true,
+        });
+        window.addEventListener("resize", onLayoutShift, { passive: true });
 
-	watch([() => registrationId, () => nodeData], ([nextId, nextNodeData], previous) => {
-		const previousId = previous?.[0];
+        const unregister = parentDescendants.mount(
+            untrack(() => registrationId),
+            untrack(() => nodeData)
+        );
+        return () => {
+            unregister();
+            window.removeEventListener("scroll", onLayoutShift, {
+                capture: true,
+            });
+            window.removeEventListener("resize", onLayoutShift);
+        };
+    });
 
-		if (previousId && previousId !== nextId) {
-			parentDescendants.unmount(previousId);
-			parentDescendants.mount(nextId, nextNodeData);
-			return;
-		}
+    watch(
+        [() => registrationId, () => nodeData],
+        ([nextId, nextNodeData], previous) => {
+            const previousId = previous?.[0];
 
-		parentDescendants.update(nextId, nextNodeData);
-	});
+            if (previousId && previousId !== nextId) {
+                parentDescendants.unmount(previousId);
+                parentDescendants.mount(nextId, nextNodeData);
+                return;
+            }
 
-	watch(() => parentDescendants.measurementEpoch, () => {
-		untrack(() => remeasure());
-	});
+            parentDescendants.update(nextId, nextNodeData);
+        }
+    );
 
-	watch(
-		[
-			() => descendants.measurementEpoch,
-			() => descendants.descendants,
-			() => parentDescendants.measurementEpoch,
-			() => previousNode,
-			() => nextNode,
-			() => orientation,
-			() => useSquareJunctions,
-			() => diagramAlign,
-		],
-		() => {
-			untrack(() => computeLinks());
-		}
-	);
+    watch(
+        () => parentDescendants.measurementEpoch,
+        () => {
+            untrack(() => remeasure());
+        }
+    );
+
+    watch(
+        [
+            () => descendants.measurementEpoch,
+            () => descendants.descendants,
+            () => parentDescendants.measurementEpoch,
+            () => previousNode,
+            () => nextNode,
+            () => orientation,
+            () => useSquareJunctions,
+            () => diagramAlign,
+        ],
+        () => {
+            untrack(() => computeLinks());
+        }
+    );
 </script>
 
 <li
-	bind:this={containerRef}
-	class={cn(
-		"relative isolate list-none",
-		orientation === "horizontal" ? "px-16 -mr-16" : "py-16 -mb-16",
-		orientation === "horizontal"
-			? previousIsParallel
-				? "-ml-3"
-				: "-ml-16"
-			: previousIsParallel
-				? "-mt-3"
-				: "-mt-16",
-		className
-	)}
-	data-node-index={index}
+    bind:this={containerRef}
+    class={cn(
+        "relative isolate list-none",
+        orientation === "horizontal" ? "-mr-16 px-16" : "-mb-16 py-16",
+        orientation === "horizontal"
+            ? previousIsParallel
+                ? "-ml-3"
+                : "-ml-16"
+            : previousIsParallel
+              ? "-mt-3"
+              : "-mt-16",
+        className
+    )}
+    data-node-index={index}
 >
-	<div class="pointer-events-none absolute inset-0 z-1">
-		{#if links}
-			<Connectors connectors={links.connectors} {orientation}>
-				{#if junctionMarker === "square" && links.junctions.start}
-					<g transform={`translate(${links.junctions.start.x} ${links.junctions.start.y})`}>
-						<rect x="-3" y="-3" width="6" height="6" fill="currentColor" rx="1" />
-					</g>
-				{/if}
+    <div class="pointer-events-none absolute inset-0 z-1">
+        {#if links}
+            <Connectors connectors={links.connectors} {orientation}>
+                {#if junctionMarker === "square" && links.junctions.start}
+                    <g
+                        transform={`translate(${links.junctions.start.x} ${links.junctions.start.y})`}
+                    >
+                        <rect
+                            x="-3"
+                            y="-3"
+                            width="6"
+                            height="6"
+                            fill="currentColor"
+                            rx="1"
+                        />
+                    </g>
+                {/if}
 
-				{#if junctionMarker === "square" && links.junctions.end}
-					<g transform={`translate(${links.junctions.end.x} ${links.junctions.end.y})`}>
-						<rect x="-3" y="-3" width="6" height="6" fill="currentColor" rx="1" />
-					</g>
-				{/if}
-			</Connectors>
-		{/if}
-	</div>
+                {#if junctionMarker === "square" && links.junctions.end}
+                    <g
+                        transform={`translate(${links.junctions.end.x} ${links.junctions.end.y})`}
+                    >
+                        <rect
+                            x="-3"
+                            y="-3"
+                            width="6"
+                            height="6"
+                            fill="currentColor"
+                            rx="1"
+                        />
+                    </g>
+                {/if}
+            </Connectors>
+        {/if}
+    </div>
 
-	<ul
-		{@attach observeContentSize}
-		bind:this={contentRef}
-		class={cn(
-			"list-none",
-			contentClass ??
-				cn(
-					"flex gap-5",
-					align === "start" ? "items-start" : "items-end",
-					orientation === "horizontal"
-						? "ml-0 flex-col"
-						: diagramAlign === "center"
-							? "mx-auto w-fit gap-5"
-							: "mr-auto w-fit gap-5"
-				)
-		)}
-	>
-		{@render children?.()}
-	</ul>
+    <ul
+        {@attach observeContentSize}
+        bind:this={contentRef}
+        class={cn(
+            "list-none",
+            contentClass ??
+                cn(
+                    "flex gap-5",
+                    align === "start" ? "items-start" : "items-end",
+                    orientation === "horizontal"
+                        ? "ml-0 flex-col"
+                        : diagramAlign === "center"
+                          ? "mx-auto w-fit gap-5"
+                          : "mr-auto w-fit gap-5"
+                )
+        )}
+    >
+        {@render children?.()}
+    </ul>
 </li>

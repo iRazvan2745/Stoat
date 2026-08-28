@@ -130,7 +130,7 @@ const stripMatcherQuotes = (token: string): string => {
 const parseUpstreamRoutes = (body: string, serviceName: string): UpstreamRoute[] => {
   const routes: UpstreamRoute[] = [];
   // Path matcher active at each brace depth (undefined for unmatched blocks).
-  const matcherStack: Array<string | undefined> = [];
+  const matcherStack: (string | undefined)[] = [];
 
   for (const rawLine of body.split("\n")) {
     const line = rawLine.trim();

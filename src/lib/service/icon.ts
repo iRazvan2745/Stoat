@@ -6,7 +6,7 @@ const SVG_MAGIC = "PHN2Zy";
 const XML_MAGIC = "PD94bW";
 const BASE64_BODY = /^[A-Za-z0-9+/]+=*$/u;
 const POSTGRES_FALLBACK_ICON = "/templates/postgresql/logo";
-const BASE64_CHUNK_SIZE = 0x8000;
+const BASE64_CHUNK_SIZE = 0x80_00;
 
 export const MAX_SERVICE_ICON_LENGTH = 400_000;
 export const MAX_SERVICE_ICON_FILE_BYTES = 256 * 1024;

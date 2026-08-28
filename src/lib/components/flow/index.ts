@@ -1,8 +1,8 @@
-import Root from "./flow-root.svelte";
-import Node from "./flow-node.svelte";
-import Parallel from "./flow-parallel.svelte";
 import Anchor from "./flow-anchor.svelte";
 import List from "./flow-node-list.svelte";
+import Node from "./flow-node.svelte";
+import Parallel from "./flow-parallel.svelte";
+import Root from "./flow-root.svelte";
 
 export {
   Root,

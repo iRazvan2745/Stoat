@@ -1,7 +1,7 @@
 import { command, query } from "$app/server";
 import * as v from "valibot";
 
-import { requireSession } from "#lib/api/guard";
+import { requireDataSourceAccess, requireSession, requireWorkspaceAccess } from "#lib/api/guard";
 import {
   createWorkspace as insertWorkspace,
   deleteWorkspace as removeWorkspace,
@@ -10,12 +10,12 @@ import {
 } from "#lib/server/workspace";
 
 export const listWorkspaces = query(async () => {
-  requireSession();
-  return await loadWorkspaces();
+  const session = requireSession();
+  return await loadWorkspaces(session.user.id);
 });
 
 export const getWorkspace = query(v.string(), async (id) => {
-  requireSession();
+  await requireWorkspaceAccess(id);
   return await loadWorkspace(id);
 });
 
@@ -25,11 +25,11 @@ const CreateWorkspaceInput = v.object({
 });
 
 export const createWorkspace = command(CreateWorkspaceInput, async (input) => {
-  requireSession();
+  await requireDataSourceAccess(input.dataSourceId);
   return await insertWorkspace(input);
 });
 
 export const deleteWorkspace = command(v.string(), async (id) => {
-  requireSession();
+  await requireWorkspaceAccess(id);
   return await removeWorkspace(id);
 });

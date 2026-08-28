@@ -9,8 +9,8 @@ export function withKeyedLock<T>(key: string, fn: () => Promise<T>): Promise<T> 
   const previous = chains.get(key) ?? Promise.resolve();
   const run = previous.then(fn, fn);
   const settled = run.then(
-    () => undefined,
-    () => undefined,
+    () => {},
+    () => {},
   );
 
   chains.set(key, settled);

@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "#lib/db";
-import { dataSource, services, workspace } from "#lib/db/schema";
+import { dataSource, member, services, workspace } from "#lib/db/schema";
 import {
   composeServiceName,
   discoverComposeFiles,
@@ -24,10 +24,22 @@ export interface DataSourceDiscoveryResult {
   workspaceId: string | null;
 }
 
-export const listDataSources = async () => await db.select().from(dataSource);
+export const listDataSources = async (userId: string) => {
+  const rows = await db
+    .select({ dataSource })
+    .from(dataSource)
+    .innerJoin(member, eq(member.organizationId, dataSource.organizationId))
+    .where(eq(member.userId, userId))
+    .orderBy(dataSource.createdAt);
 
-export const createDataSource = async (url: string, uncloudUrl: string) => {
-  const [created] = await db.insert(dataSource).values({ uncloudUrl, url }).returning();
+  return rows.map((row) => row.dataSource).toReversed();
+};
+
+export const createDataSource = async (url: string, uncloudUrl: string, organizationId: string) => {
+  const [created] = await db
+    .insert(dataSource)
+    .values({ organizationId, uncloudUrl, url })
+    .returning();
 
   if (!created) {
     throw new Error("Unable to create data source");
@@ -70,7 +82,13 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
   const [foundWorkspace] = await db
     .select()
     .from(workspace)
-    .where(and(eq(workspace.dataSourceId, source.id), eq(workspace.name, name)))
+    .where(
+      and(
+        eq(workspace.dataSourceId, source.id),
+        eq(workspace.name, name),
+        eq(workspace.organizationId, source.organizationId),
+      ),
+    )
     .limit(1);
 
   let targetWorkspace = foundWorkspace;
@@ -88,7 +106,12 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
 
     const [createdWorkspace] = await db
       .insert(workspace)
-      .values({ dataSourceId: source.id, name, slug })
+      .values({
+        dataSourceId: source.id,
+        name,
+        organizationId: source.organizationId,
+        slug,
+      })
       .returning();
 
     if (!createdWorkspace) {

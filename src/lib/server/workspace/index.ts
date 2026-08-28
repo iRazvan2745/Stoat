@@ -3,15 +3,20 @@ import fs from "node:fs/promises";
 import { eq, inArray } from "drizzle-orm";
 
 import { db } from "#lib/db";
-import { dataSource, environmentVariables, services, workspace } from "#lib/db/schema";
+import { dataSource, environmentVariables, member, services, workspace } from "#lib/db/schema";
 import { createWorkspaceFolder, workspacePath } from "#lib/server/data-source/paths";
 import { getRepo } from "#lib/server/shared/git";
 import { uniqueSlug } from "#lib/server/shared/slugs";
 
-export const listWorkspaces = async () => {
-  const workspaces = await db.select().from(workspace).orderBy(workspace.createdAt);
+export const listWorkspaces = async (userId: string) => {
+  const rows = await db
+    .select({ workspace })
+    .from(workspace)
+    .innerJoin(member, eq(member.organizationId, workspace.organizationId))
+    .where(eq(member.userId, userId))
+    .orderBy(workspace.createdAt);
 
-  return workspaces.toReversed();
+  return rows.map((row) => row.workspace).toReversed();
 };
 
 export const getWorkspace = async (id: string) => {
@@ -42,7 +47,15 @@ export const createWorkspace = async ({
     return matches.length > 0;
   });
 
-  const [created] = await db.insert(workspace).values({ dataSourceId, name, slug }).returning();
+  const [created] = await db
+    .insert(workspace)
+    .values({
+      dataSourceId,
+      name,
+      organizationId: source.organizationId,
+      slug,
+    })
+    .returning();
 
   if (!created) {
     throw new Error("Unable to create workspace");

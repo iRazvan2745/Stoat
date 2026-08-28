@@ -27,7 +27,10 @@ export async function getRepo({ repoPath, repoUrl }: { repoPath: string; repoUrl
     await fs.access(`${repoPath}/.git`);
     console.log(`Found repo`, { repoPath, repoUrl: redactGitUrl(repoUrl) });
   } catch {
-    console.log(`Cloning repo`, { repoPath, repoUrl: redactGitUrl(repoUrl) });
+    console.log(`Cloning repo`, {
+      repoPath,
+      repoUrl: redactGitUrl(repoUrl),
+    });
     await simpleGit().clone(repoUrl, repoPath);
     return simpleGit(repoPath);
   }

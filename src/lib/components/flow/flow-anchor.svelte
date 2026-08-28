@@ -1,54 +1,55 @@
 <script lang="ts">
-	import { untrack, type Snippet } from "svelte";
-	import { watch } from "runed";
-	import { useFlowNodeAnchorContext } from "./node-context.svelte";
-	import { createElementAttachment } from "./render-props";
+    import { watch } from "runed";
+    import { untrack, type Snippet } from "svelte";
 
-	interface FlowAnchorProps {
-		type?: "start" | "end";
-		children?: Snippet;
-		render?: Snippet<[{ props: Record<string, unknown> }]>;
-	}
+    import { useFlowNodeAnchorContext } from "./node-context.svelte";
+    import { createElementAttachment } from "./render-props";
 
-	let { type, children, render }: FlowAnchorProps = $props();
+    interface FlowAnchorProps {
+        type?: "start" | "end";
+        children?: Snippet;
+        render?: Snippet<[{ props: Record<string, unknown> }]>;
+    }
 
-	const context = useFlowNodeAnchorContext();
+    let { type, children, render }: FlowAnchorProps = $props();
 
-	let anchorRef = $state<HTMLElement | null>(null);
+    const context = useFlowNodeAnchorContext();
 
-	const attachAnchor = createElementAttachment<HTMLElement>((element) => {
-		anchorRef = element;
-	});
+    let anchorRef = $state<HTMLElement | null>(null);
 
-	const renderProps = attachAnchor({});
+    const attachAnchor = createElementAttachment<HTMLElement>((element) => {
+        anchorRef = element;
+    });
 
-	watch([() => anchorRef, () => type], ([currentAnchor, currentType]) => {
-		if (!currentAnchor) return;
+    const renderProps = attachAnchor({});
 
-		if (currentType === "start" || currentType === undefined) {
-			untrack(() => context.registerStartAnchor(currentAnchor));
-		}
+    watch([() => anchorRef, () => type], ([currentAnchor, currentType]) => {
+        if (!currentAnchor) return;
 
-		if (currentType === "end" || currentType === undefined) {
-			untrack(() => context.registerEndAnchor(currentAnchor));
-		}
+        if (currentType === "start" || currentType === undefined) {
+            untrack(() => context.registerStartAnchor(currentAnchor));
+        }
 
-		return () => {
-			if (currentType === "start" || currentType === undefined) {
-				context.registerStartAnchor(null);
-			}
+        if (currentType === "end" || currentType === undefined) {
+            untrack(() => context.registerEndAnchor(currentAnchor));
+        }
 
-			if (currentType === "end" || currentType === undefined) {
-				context.registerEndAnchor(null);
-			}
-		};
-	});
+        return () => {
+            if (currentType === "start" || currentType === undefined) {
+                context.registerStartAnchor(null);
+            }
+
+            if (currentType === "end" || currentType === undefined) {
+                context.registerEndAnchor(null);
+            }
+        };
+    });
 </script>
 
 {#if render}
-	{@render render({ props: renderProps })}
+    {@render render({ props: renderProps })}
 {:else}
-	<div bind:this={anchorRef}>
-		{@render children?.()}
-	</div>
+    <div bind:this={anchorRef}>
+        {@render children?.()}
+    </div>
 {/if}

@@ -1,159 +1,175 @@
 <script lang="ts">
-	import { cn } from './cn';
-	import { onMount, untrack, type Snippet } from 'svelte';
-	import { watch } from 'runed';
-	import { useDescendantsContext } from './descendants.svelte';
-	import { setFlowNodeAnchorContext } from './node-context.svelte';
-	import { createElementAttachment } from './render-props';
-	import { rectEquals, type NodeData, type RectLike } from './types';
+    import { watch } from "runed";
+    import { onMount, untrack, type Snippet } from "svelte";
 
-	interface FlowNodeProps {
-		id?: string;
-		disabled?: boolean;
-		/** Label rendered on the connector leaving this node. */
-		edgeLabel?: string;
-		class?: string;
-		children?: Snippet;
-		render?: Snippet<[{ props: Record<string, unknown> }]>;
-	}
+    import { cn } from "./cn";
+    import { useDescendantsContext } from "./descendants.svelte";
+    import { setFlowNodeAnchorContext } from "./node-context.svelte";
+    import { createElementAttachment } from "./render-props";
+    import { rectEquals, type NodeData, type RectLike } from "./types";
 
-	let { id, disabled = false, edgeLabel, class: className, children, render }: FlowNodeProps = $props();
+    interface FlowNodeProps {
+        id?: string;
+        disabled?: boolean;
+        /** Label rendered on the connector leaving this node. */
+        edgeLabel?: string;
+        class?: string;
+        children?: Snippet;
+        render?: Snippet<[{ props: Record<string, unknown> }]>;
+    }
 
-	const descendants = useDescendantsContext<NodeData>();
-	const generatedId = $props.id();
-	let nodeId = $derived(id ?? generatedId);
+    let {
+        id,
+        disabled = false,
+        edgeLabel,
+        class: className,
+        children,
+        render,
+    }: FlowNodeProps = $props();
 
-	let nodeRef = $state<HTMLElement | null>(null);
-	let startAnchorRef = $state<HTMLElement | null>(null);
-	let endAnchorRef = $state<HTMLElement | null>(null);
-	let measurements = $state<{
-		start: RectLike | null;
-		end: RectLike | null;
-	}>({
-		start: null,
-		end: null
-	});
+    const descendants = useDescendantsContext<NodeData>();
+    const generatedId = $props.id();
+    let nodeId = $derived(id ?? generatedId);
 
-	let index = $derived(descendants.getIndex(nodeId));
-	let nodeData = $derived<NodeData>({
-		element: nodeRef,
-		parallel: false,
-		disabled,
-		start: measurements.start,
-		end: measurements.end,
-		edgeLabel
-	});
+    let nodeRef = $state<HTMLElement | null>(null);
+    let startAnchorRef = $state<HTMLElement | null>(null);
+    let endAnchorRef = $state<HTMLElement | null>(null);
+    let measurements = $state<{
+        start: RectLike | null;
+        end: RectLike | null;
+    }>({
+        start: null,
+        end: null,
+    });
 
-	setFlowNodeAnchorContext({
-		registerStartAnchor: (anchor) => {
-			startAnchorRef = anchor;
-			remeasure();
-		},
-		registerEndAnchor: (anchor) => {
-			endAnchorRef = anchor;
-			remeasure();
-		}
-	});
+    let index = $derived(descendants.getIndex(nodeId));
+    let nodeData = $derived<NodeData>({
+        element: nodeRef,
+        parallel: false,
+        disabled,
+        start: measurements.start,
+        end: measurements.end,
+        edgeLabel,
+    });
 
-	function remeasure() {
-		if (!nodeRef) return;
+    setFlowNodeAnchorContext({
+        registerStartAnchor: (anchor) => {
+            startAnchorRef = anchor;
+            remeasure();
+        },
+        registerEndAnchor: (anchor) => {
+            endAnchorRef = anchor;
+            remeasure();
+        },
+    });
 
-		const nodeRect = nodeRef.getBoundingClientRect();
-		const startRect = startAnchorRef?.getBoundingClientRect() ?? nodeRect;
-		const endRect = endAnchorRef?.getBoundingClientRect() ?? nodeRect;
+    function remeasure() {
+        if (!nodeRef) return;
 
-		if (rectEquals(measurements.start, startRect) && rectEquals(measurements.end, endRect)) {
-			return;
-		}
+        const nodeRect = nodeRef.getBoundingClientRect();
+        const startRect = startAnchorRef?.getBoundingClientRect() ?? nodeRect;
+        const endRect = endAnchorRef?.getBoundingClientRect() ?? nodeRect;
 
-		measurements = {
-			start: startRect,
-			end: endRect
-		};
-	}
+        if (
+            rectEquals(measurements.start, startRect) &&
+            rectEquals(measurements.end, endRect)
+        ) {
+            return;
+        }
 
-	const observeNodeSize = (element: HTMLElement) => {
-		const onResize = () => {
-			remeasure();
-			descendants.notifySizeChange();
-		};
+        measurements = {
+            start: startRect,
+            end: endRect,
+        };
+    }
 
-		const observer = new ResizeObserver(onResize);
-		observer.observe(element);
-		return () => observer.disconnect();
-	};
+    const observeNodeSize = (element: HTMLElement) => {
+        const onResize = () => {
+            remeasure();
+            descendants.notifySizeChange();
+        };
 
-	const attachNode = createElementAttachment<HTMLElement>((element) => {
-		nodeRef = element;
-		if (!element) return;
-		return observeNodeSize(element);
-	});
+        const observer = new ResizeObserver(onResize);
+        observer.observe(element);
+        return () => observer.disconnect();
+    };
 
-	let renderProps = $derived(
-		attachNode({
-			class: className,
-			style: 'cursor: default;',
-			'data-node-index': index,
-			'data-node-id': nodeId,
-			'data-testid': nodeId
-		})
-	);
+    const attachNode = createElementAttachment<HTMLElement>((element) => {
+        nodeRef = element;
+        if (!element) return;
+        return observeNodeSize(element);
+    });
 
-	onMount(() => {
-		const onLayoutShift = () => {
-			remeasure();
-			descendants.notifySizeChange();
-		};
+    let renderProps = $derived(
+        attachNode({
+            class: className,
+            style: "cursor: default;",
+            "data-node-index": index,
+            "data-node-id": nodeId,
+            "data-testid": nodeId,
+        })
+    );
 
-		window.addEventListener('scroll', onLayoutShift, {
-			capture: true,
-			passive: true
-		});
-		window.addEventListener('resize', onLayoutShift, { passive: true });
+    onMount(() => {
+        const onLayoutShift = () => {
+            remeasure();
+            descendants.notifySizeChange();
+        };
 
-		const unregister = descendants.mount(
-			untrack(() => nodeId),
-			untrack(() => nodeData)
-		);
-		return () => {
-			unregister();
-			window.removeEventListener('scroll', onLayoutShift, { capture: true });
-			window.removeEventListener('resize', onLayoutShift);
-		};
-	});
+        window.addEventListener("scroll", onLayoutShift, {
+            capture: true,
+            passive: true,
+        });
+        window.addEventListener("resize", onLayoutShift, { passive: true });
 
-	watch([() => nodeId, () => nodeData], ([nextId, nextData], previous) => {
-		const previousId = previous?.[0];
+        const unregister = descendants.mount(
+            untrack(() => nodeId),
+            untrack(() => nodeData)
+        );
+        return () => {
+            unregister();
+            window.removeEventListener("scroll", onLayoutShift, {
+                capture: true,
+            });
+            window.removeEventListener("resize", onLayoutShift);
+        };
+    });
 
-		if (previousId && previousId !== nextId) {
-			descendants.unmount(previousId);
-			descendants.mount(nextId, nextData);
-			return;
-		}
+    watch([() => nodeId, () => nodeData], ([nextId, nextData], previous) => {
+        const previousId = previous?.[0];
 
-		descendants.update(nextId, nextData);
-	});
+        if (previousId && previousId !== nextId) {
+            descendants.unmount(previousId);
+            descendants.mount(nextId, nextData);
+            return;
+        }
 
-	watch(
-		() => descendants.measurementEpoch,
-		() => {
-			untrack(() => remeasure());
-		}
-	);
+        descendants.update(nextId, nextData);
+    });
+
+    watch(
+        () => descendants.measurementEpoch,
+        () => {
+            untrack(() => remeasure());
+        }
+    );
 </script>
 
 {#if render}
-	{@render render({ props: renderProps })}
+    {@render render({ props: renderProps })}
 {:else}
-	<li
-		{@attach observeNodeSize}
-		bind:this={nodeRef}
-		class={cn('bg-surface-container-high text-on-surface m3-font-body-medium ring-outline-variant rounded-md px-3 py-2 ring', className)}
-		style="cursor: default;"
-		data-node-index={index}
-		data-node-id={nodeId}
-		data-testid={nodeId}
-	>
-		{@render children?.()}
-	</li>
+    <li
+        {@attach observeNodeSize}
+        bind:this={nodeRef}
+        class={cn(
+            "bg-surface-container-high text-on-surface m3-font-body-medium ring-outline-variant rounded-md px-3 py-2 ring",
+            className
+        )}
+        style="cursor: default;"
+        data-node-index={index}
+        data-node-id={nodeId}
+        data-testid={nodeId}
+    >
+        {@render children?.()}
+    </li>
 {/if}

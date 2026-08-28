@@ -77,7 +77,9 @@ describe("serviceIconFromFile", () => {
   });
 
   it("rejects an unsupported type", async () => {
-    const file = new File(["not-an-image"], "icon.txt", { type: "text/plain" });
+    const file = new File(["not-an-image"], "icon.txt", {
+      type: "text/plain",
+    });
 
     await expect(serviceIconFromFile(file)).rejects.toThrow("PNG, JPEG, GIF, WebP, or SVG");
   });

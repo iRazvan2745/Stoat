@@ -1,4 +1,5 @@
 // oxlint-disable oxc/no-barrel-file sort-keys
+import { relations } from "drizzle-orm";
 import {
   bigserial,
   index,
@@ -11,20 +12,29 @@ import {
 
 import type { ServiceSettings } from "#lib/service/settings";
 
-export const dataSource = pgTable("data_source", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  url: text("url").notNull(),
-  uncloudUrl: text("uncloud_url").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .$defaultFn(() => new Date()),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .$defaultFn(() => new Date())
-    .$onUpdate(() => new Date()),
-});
+import { organization } from "./auth.schema";
+
+export const dataSource = pgTable(
+  "data_source",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "restrict" }),
+    url: text("url").notNull(),
+    uncloudUrl: text("uncloud_url").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [index("data_source_organization_id_idx").on(table.organizationId)],
+);
 
 export const workspace = pgTable(
   "workspace",
@@ -35,6 +45,9 @@ export const workspace = pgTable(
     dataSourceId: text("data_source_id")
       .notNull()
       .references(() => dataSource.id, { onDelete: "restrict" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "restrict" }),
     name: text("name"),
     slug: text("slug").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -48,6 +61,7 @@ export const workspace = pgTable(
   (table) => [
     // Discovery looks up workspaces by data source (and name).
     index("workspace_data_source_id_idx").on(table.dataSourceId, table.name),
+    index("workspace_organization_id_idx").on(table.organizationId),
     // uniqueSlug() already assumes global uniqueness; enforce it.
     uniqueIndex("workspace_slug_idx").on(table.slug),
   ],
@@ -82,6 +96,33 @@ export const services = pgTable(
     uniqueIndex("services_slug_idx").on(table.slug),
   ],
 );
+
+export const dataSourceRelations = relations(dataSource, ({ many, one }) => ({
+  organization: one(organization, {
+    fields: [dataSource.organizationId],
+    references: [organization.id],
+  }),
+  workspaces: many(workspace),
+}));
+
+export const workspaceRelations = relations(workspace, ({ many, one }) => ({
+  dataSource: one(dataSource, {
+    fields: [workspace.dataSourceId],
+    references: [dataSource.id],
+  }),
+  organization: one(organization, {
+    fields: [workspace.organizationId],
+    references: [organization.id],
+  }),
+  services: many(services),
+}));
+
+export const servicesRelations = relations(services, ({ one }) => ({
+  workspace: one(workspace, {
+    fields: [services.workspaceId],
+    references: [workspace.id],
+  }),
+}));
 
 export const deployments = pgTable(
   "deployments",

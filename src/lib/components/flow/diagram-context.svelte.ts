@@ -1,5 +1,6 @@
 import type { MotionValue } from "motion-sv";
 import { getContext, setContext } from "svelte";
+
 import type { Align, JunctionMarker, Orientation } from "./types";
 
 export type DiagramContextValue = {

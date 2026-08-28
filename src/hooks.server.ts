@@ -1,5 +1,6 @@
 import { building } from "$app/env";
-import { type Handle, redirect, type ServerInit } from "@sveltejs/kit";
+import { redirect } from "@sveltejs/kit";
+import type { Handle, ServerInit } from "@sveltejs/kit";
 import { sequence } from "@sveltejs/kit/hooks";
 import { svelteKitHandler } from "better-auth/svelte-kit";
 import { initLogger } from "evlog";
