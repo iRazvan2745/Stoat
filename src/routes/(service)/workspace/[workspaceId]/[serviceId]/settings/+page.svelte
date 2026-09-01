@@ -20,27 +20,27 @@
 
     import { getLatestSuccessfulDeployment } from "#lib/api/deployments.remote";
     import {
-        getEnvironmentVariables,
+        listEnvironmentVariables,
         getPostgresConnection,
         getService,
-        getServiceContainerLogs,
-        getServiceContainers,
-        getServicesInWorkspace,
+        listServiceContainers,
+        listServicesInWorkspace,
+        streamServiceContainerLogs,
         updateServiceIdentity,
         updateServiceSettings,
     } from "#lib/api/services.remote";
+    import ServiceIcon from "#lib/components/services/service-icon.svelte";
     import {
         SERVICE_ICON_ACCEPT,
         normalizeServiceIcon,
         serviceIconFromFile,
-    } from "#lib/service/icon";
-    import ServiceIcon from "#lib/service/icon.svelte";
-    import { MAX_SERVICE_NAME_LENGTH } from "#lib/service/identity";
+    } from "#lib/domain/services/icon";
+    import { MAX_SERVICE_NAME_LENGTH } from "#lib/domain/services/identity";
     import {
         parseServiceSettings,
         prefixChangeWarning,
         shouldPrefixServices,
-    } from "#lib/service/settings";
+    } from "#lib/domain/services/settings";
 
     const SAVE_DEBOUNCE_MS = 400;
 
@@ -86,11 +86,11 @@
 
     const refreshAfterSave = [
         getService,
-        getServiceContainers,
+        listServiceContainers,
         getPostgresConnection,
-        getEnvironmentVariables,
-        getServicesInWorkspace,
-        getServiceContainerLogs,
+        listEnvironmentVariables,
+        listServicesInWorkspace,
+        streamServiceContainerLogs,
     ] as const;
 
     const persistPrefix = async (next: boolean): Promise<void> => {

@@ -16,16 +16,16 @@
     import { parseAsStringLiteral, useQueryState } from "nuqs-svelte";
 
     import {
-        getEnvironmentVariables,
+        listEnvironmentVariables,
         updateEnvironmentVariables,
     } from "#lib/api/services.remote";
-    import type { EnvironmentVariable } from "#lib/environment";
+    import type { EnvironmentVariable } from "#lib/domain/environment";
     import {
         normalizeEnvironmentVariables,
         parseEnvFile,
         serializeEnvFile,
         validateEnvironmentVariables,
-    } from "#lib/environment";
+    } from "#lib/domain/environment";
 
     import EnvironmentEditor from "./environment-editor.svelte";
 
@@ -35,7 +35,7 @@
 
     const { params } = $props();
 
-    const variablesQuery = $derived(getEnvironmentVariables(params.serviceId));
+    const variablesQuery = $derived(listEnvironmentVariables(params.serviceId));
     const savedVariables = $derived(await variablesQuery);
 
     const createDraft = (name = "", value = ""): DraftVariable => ({

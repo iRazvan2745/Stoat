@@ -9,6 +9,8 @@
     import { LoadingIndicator } from "m3-svelte";
     import CodeMirror from "svelte-codemirror-editor";
 
+    import { codeMirrorSearchExtensions } from "#lib/shared/ui/code-mirror-search";
+
     interface Props {
         value?: string;
     }
@@ -128,6 +130,7 @@
         lang={dotenvLanguage}
         syntaxHighlighting={envSyntaxHighlighting}
         styles={editorStyles}
+        extensions={codeMirrorSearchExtensions}
         foldGutter={false}
         closeBrackets={false}
         autocompletion={false}

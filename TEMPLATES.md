@@ -32,11 +32,11 @@ Apps with a missing or invalid manifest, or with no version folders, are skipped
 
 ```json
 {
-  "name": "PostgreSQL",
-  "description": "Relational database for apps that need durable SQL storage.",
-  "type": "postgresql",
-  "icon": "postgresql",
-  "tags": ["database"]
+    "name": "PostgreSQL",
+    "description": "Relational database for apps that need durable SQL storage.",
+    "type": "postgresql",
+    "icon": "postgresql",
+    "tags": ["database"]
 }
 ```
 

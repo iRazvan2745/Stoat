@@ -1,2 +1,2 @@
-// place files you want to import through the `#lib` alias in this folder.
+// Import library modules through the `#lib/<path>` aliases.
 export {};

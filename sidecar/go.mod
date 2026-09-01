@@ -10,10 +10,11 @@ require (
 	github.com/docker/docker v28.5.0+incompatible
 	github.com/goccy/go-yaml v1.17.1
 	github.com/gofiber/fiber/v2 v2.52.15
-	github.com/psviderski/uncloud v0.0.0
+	github.com/psviderski/uncloud v0.20.0
 	github.com/spf13/cobra v1.10.1
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.74.2
+	google.golang.org/protobuf v1.36.9
 )
 
 require (
@@ -71,7 +72,6 @@ require (
 	github.com/containerd/stargz-snapshotter/estargz v0.16.3 // indirect
 	github.com/containerd/ttrpc v1.2.7 // indirect
 	github.com/containerd/typeurl/v2 v2.2.3 // indirect
-	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/deckarep/golang-set/v2 v2.8.0 // indirect
@@ -286,7 +286,6 @@ require (
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230429144221-925a1e7659e6 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250528174236-200df99c418a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250528174236-200df99c418a // indirect
-	google.golang.org/protobuf v1.36.9 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gvisor.dev/gvisor v0.0.0-20230927004350-cbd86285d259 // indirect
@@ -297,5 +296,3 @@ require (
 	modernc.org/sqlite v1.36.3 // indirect
 	tags.cncf.io/container-device-interface v1.0.1 // indirect
 )
-
-replace github.com/psviderski/uncloud => ../../uncloud

@@ -3,14 +3,19 @@
     import addIcon from "@ktibow/iconset-material-symbols/add";
     import databaseIcon from "@ktibow/iconset-material-symbols/database";
     import deleteIcon from "@ktibow/iconset-material-symbols/delete";
+    import editIcon from "@ktibow/iconset-material-symbols/edit";
+    import moreVertIcon from "@ktibow/iconset-material-symbols/more-vert";
     import searchIcon from "@ktibow/iconset-material-symbols/search";
     import {
         Button,
         Card,
         Dialog,
         Divider,
+        ExpressiveMenu,
+        ExpressiveMenuItem,
         Icon,
         LoadingIndicator,
+        MenuDivider,
         Snackbar,
         TextFieldOutlined,
         snackbar,
@@ -22,7 +27,8 @@
         deleteDataSource,
         discoverDataSource,
         listDataSources,
-    } from "#lib/api/data-source.remote";
+        updateDataSource,
+    } from "#lib/api/data-sources.remote";
 
     const dataSources = listDataSources();
 
@@ -31,13 +37,32 @@
         parseAsBoolean.withDefault(false)
     );
     let deleting = useQueryState("deleting", parseAsString.withDefault(""));
-    let url = $state("");
+    let editing = useQueryState("editing", parseAsString.withDefault(""));
+    let gitUrl = $state("");
     let uncloudUrl = $state("");
+    let editingGitUrl = $state("");
+    let editingUncloudUrl = $state("");
     let submitting = $state(false);
     let discoveringId = $state<string | null>(null);
+    let actionsMenuOpen = $state<string | null>(null);
+
+    const closeActionsMenuOnOutsideClick = ({ target }: MouseEvent): void => {
+        if (
+            target instanceof Element &&
+            !target.closest("[data-data-source-actions]")
+        ) {
+            actionsMenuOpen = null;
+        }
+    };
+
+    const closeActionsMenuOnEscape = ({ key }: KeyboardEvent): void => {
+        if (key === "Escape") {
+            actionsMenuOpen = null;
+        }
+    };
 
     const create = async (): Promise<void> => {
-        if (!(url.trim() && uncloudUrl.trim())) {
+        if (!uncloudUrl.trim()) {
             return;
         }
 
@@ -45,12 +70,12 @@
 
         try {
             await createDataSource({
+                gitUrl: gitUrl.trim() || undefined,
                 uncloudUrl: uncloudUrl.trim(),
-                url: url.trim(),
             });
 
             createDialogOpen.set(false);
-            url = "";
+            gitUrl = "";
             uncloudUrl = "";
 
             snackbar("Data source added");
@@ -61,6 +86,63 @@
                 error instanceof Error
                     ? error.message
                     : "Unable to add data source"
+            );
+        } finally {
+            submitting = false;
+        }
+    };
+
+    const openEditDialog = (source: {
+        gitUrl: string | null;
+        id: string;
+        uncloudUrl: string;
+    }): void => {
+        actionsMenuOpen = null;
+        editingGitUrl = source.gitUrl ?? "";
+        editingUncloudUrl = source.uncloudUrl;
+        editing.set(source.id);
+    };
+
+    const openDeleteDialog = (id: string): void => {
+        actionsMenuOpen = null;
+        deleting.set(id);
+    };
+
+    const toggleActionsMenu = (id: string): void => {
+        actionsMenuOpen = actionsMenuOpen === id ? null : id;
+    };
+
+    const closeEditDialog = (): void => {
+        editing.set("");
+        editingGitUrl = "";
+        editingUncloudUrl = "";
+    };
+
+    const save = async (): Promise<void> => {
+        const id = editing.current;
+
+        if (!id || !editingUncloudUrl.trim()) {
+            return;
+        }
+
+        submitting = true;
+
+        try {
+            await updateDataSource({
+                gitUrl: editingGitUrl.trim() || undefined,
+                id,
+                uncloudUrl: editingUncloudUrl.trim(),
+            });
+
+            closeEditDialog();
+            await dataSources.refresh();
+
+            snackbar("Data source updated");
+        } catch (error) {
+            snackbar(
+                error instanceof Error
+                    ? error.message
+                    : "Unable to update data source"
             );
         } finally {
             submitting = false;
@@ -90,6 +172,8 @@
     };
 
     const discover = async (id: string): Promise<void> => {
+        actionsMenuOpen = null;
+
         if (discoveringId !== null) {
             return;
         }
@@ -121,7 +205,12 @@
     };
 </script>
 
-<div class="flex items-center justify-between gap-4 p-5">
+<svelte:window
+    onclick={closeActionsMenuOnOutsideClick}
+    onkeydown={closeActionsMenuOnEscape}
+/>
+
+<div class="flex items-center justify-between gap-4 py-5">
     <div>
         <h1 class="text-on-surface text-lg font-medium">Data Sources</h1>
 
@@ -201,37 +290,59 @@
                         <div
                             class="text-on-surface min-w-0 truncate font-mono text-sm"
                         >
-                            {ds.url ?? "—"}
+                            {ds.gitUrl ?? ds.uncloudUrl}
                         </div>
                     </div>
 
-                    <div class="flex items-center justify-end gap-1">
+                    <div
+                        data-data-source-actions
+                        class="relative flex items-center justify-end [&_:global(.m3-container.expressive-menu.anchored)]:z-20"
+                    >
                         <Button
+                            iconType="full"
                             size="xs"
-                            variant="tonal"
-                            aria-label={`Autodiscover Compose services in ${ds.url}`}
-                            disabled={discoveringId !== null}
-                            onclick={() => discover(ds.id)}
+                            variant="text"
+                            aria-label={`Actions for ${ds.gitUrl ?? ds.uncloudUrl}`}
+                            aria-haspopup="menu"
+                            aria-expanded={actionsMenuOpen === ds.id}
+                            style={actionsMenuOpen === ds.id
+                                ? "anchor-name: --m3-menu-anchor"
+                                : undefined}
+                            onclick={() => toggleActionsMenu(ds.id)}
                         >
-                            {#if discoveringId === ds.id}
-                                <LoadingIndicator
-                                    size={18}
-                                    center={false}
-                                    aria-label="Autodiscovering Compose services"
-                                />
-                            {:else}
-                                <Icon icon={searchIcon} size={18} />
-                            {/if}
+                            <Icon icon={moreVertIcon} size={18} />
                         </Button>
 
-                        <Button
-                            size="xs"
-                            variant="tonal"
-                            aria-label={`Delete ${ds.url}`}
-                            onclick={() => deleting.set(ds.id)}
-                        >
-                            <Icon icon={deleteIcon} size={18} />
-                        </Button>
+                        {#if actionsMenuOpen === ds.id}
+                            <ExpressiveMenu
+                                anchored
+                                x="end"
+                                y="down"
+                                label="Actions"
+                            >
+                                <ExpressiveMenuItem
+                                    leadingIcon={editIcon}
+                                    label="Edit"
+                                    onclick={() => openEditDialog(ds)}
+                                />
+                                <ExpressiveMenuItem
+                                    leadingIcon={searchIcon}
+                                    label="Autodiscover"
+                                    details={!ds.gitUrl
+                                        ? "Requires a git repo"
+                                        : undefined}
+                                    disabled={discoveringId !== null ||
+                                        !ds.gitUrl}
+                                    onclick={() => discover(ds.id)}
+                                />
+                                <MenuDivider />
+                                <ExpressiveMenuItem
+                                    leadingIcon={deleteIcon}
+                                    label="Delete"
+                                    onclick={() => openDeleteDialog(ds.id)}
+                                />
+                            </ExpressiveMenu>
+                        {/if}
                     </div>
                 </div>
 
@@ -254,9 +365,8 @@
 <Dialog bind:open={createDialogOpen.current} headline="Add data source">
     <div class="flex flex-col gap-4">
         <TextFieldOutlined
-            bind:value={url}
+            bind:value={gitUrl}
             label="Git URL"
-            required
             placeholder="example.com/git/repo.git"
         />
         <TextFieldOutlined
@@ -273,6 +383,39 @@
         </Button>
 
         <Button disabled={submitting} onclick={create}>Add</Button>
+    {/snippet}
+</Dialog>
+
+<Dialog
+    open={editing.current !== ""}
+    onclose={closeEditDialog}
+    headline="Edit data source"
+>
+    <div class="flex flex-col gap-4">
+        <TextFieldOutlined
+            bind:value={editingGitUrl}
+            label="Git URL"
+            placeholder="example.com/git/repo.git"
+        />
+        <TextFieldOutlined
+            bind:value={editingUncloudUrl}
+            label="Uncloud URL"
+            required
+            placeholder="example.com"
+        />
+    </div>
+
+    {#snippet buttons()}
+        <Button variant="text" disabled={submitting} onclick={closeEditDialog}>
+            Cancel
+        </Button>
+
+        <Button
+            disabled={submitting || !editingUncloudUrl.trim()}
+            onclick={save}
+        >
+            Save
+        </Button>
     {/snippet}
 </Dialog>
 

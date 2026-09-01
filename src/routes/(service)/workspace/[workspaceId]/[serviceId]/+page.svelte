@@ -21,9 +21,9 @@
         deleteService,
         deployService,
         getService,
-        getServiceContainers,
+        listServiceContainers,
     } from "#lib/api/services.remote";
-    import ServiceIcon from "#lib/service/icon.svelte";
+    import ServiceIcon from "#lib/components/services/service-icon.svelte";
 
     import ComposeEditor from "./compose-editor.svelte";
     import DatabaseConnection from "./database-connection.svelte";
@@ -35,7 +35,7 @@
     // svelte-ignore state_referenced_locally
     const service = getService(params.serviceId);
     // svelte-ignore state_referenced_locally
-    const containers = getServiceContainers(params.serviceId);
+    const containers = listServiceContainers(params.serviceId);
 
     const svc = await service;
     let actionsMenuOpen = $state(false);

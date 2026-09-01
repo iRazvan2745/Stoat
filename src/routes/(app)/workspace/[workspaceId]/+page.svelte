@@ -22,14 +22,14 @@
 
     import {
         createService,
-        getServicesInWorkspace,
+        listServicesInWorkspace,
     } from "#lib/api/services.remote";
     import {
         deleteWorkspace,
         getWorkspace,
         listWorkspaces,
-    } from "#lib/api/workspace.remote";
-    import ServiceIcon from "#lib/service/icon.svelte";
+    } from "#lib/api/workspaces.remote";
+    import ServiceIcon from "#lib/components/services/service-icon.svelte";
 
     import type { PageProps } from "./$types";
     import TemplatesDialog from "./templates-dialog.svelte";
@@ -39,7 +39,7 @@
     // svelte-ignore state_referenced_locally
     const workspace = getWorkspace(params.workspaceId);
     // svelte-ignore state_referenced_locally
-    const services = getServicesInWorkspace(params.workspaceId);
+    const services = listServicesInWorkspace(params.workspaceId);
 
     let createDialogOpen = useQueryState(
         "createDialogOpen",

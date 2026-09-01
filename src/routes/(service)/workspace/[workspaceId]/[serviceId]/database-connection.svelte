@@ -8,8 +8,8 @@
     import {
         maskPostgresUrl,
         wrapUrlSegments,
-    } from "#lib/service/database-url";
-    import { copyToClipboard } from "#lib/ui/clipboard";
+    } from "#lib/domain/services/database-url";
+    import { copyToClipboard } from "#lib/shared/ui/clipboard";
 
     interface Props {
         serviceId: string;

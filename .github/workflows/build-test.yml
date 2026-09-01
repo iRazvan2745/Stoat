@@ -1,0 +1,130 @@
+name: Build and test
+
+on:
+    pull_request:
+        branches:
+            - main
+            - master
+    push:
+        branches:
+            - main
+            - master
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: stoat-ci-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    checks:
+        name: Check, test, and build
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check out repository
+              uses: actions/checkout@v4
+
+            - name: Set up pnpm
+              uses: pnpm/action-setup@v4
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Install JavaScript dependencies
+              id: install
+              run: pnpm install --frozen-lockfile
+
+            - name: Check lint and types
+              id: check
+              if: always() && steps.install.outcome == 'success'
+              run: pnpm exec vp check --no-fmt
+
+            - name: Run JavaScript tests
+              id: test
+              if: always() && steps.install.outcome == 'success'
+              run: pnpm exec vp test
+
+            - name: Build Stoat
+              id: build
+              if: always() && steps.install.outcome == 'success'
+              env:
+                  APP_SECRET: ci-only-secret
+                  APP_URL: http://localhost:3000
+                  DATABASE_URL: postgres://stoat:stoat@localhost:5434/stoat
+              run: pnpm run build
+
+            - name: Set up Go
+              id: setup-go
+              if: always()
+              uses: actions/setup-go@v5
+              with:
+                  go-version-file: sidecar/go.mod
+                  cache-dependency-path: sidecar/go.sum
+
+            - name: Check sidecar formatting
+              id: gofmt
+              if: always() && steps.setup-go.outcome == 'success'
+              working-directory: sidecar
+              run: test -z "$(gofmt -l .)"
+
+            - name: Run sidecar tests
+              id: go-test
+              if: always() && steps.setup-go.outcome == 'success'
+              working-directory: sidecar
+              run: go test ./...
+
+            - name: Vet sidecar
+              id: go-vet
+              if: always() && steps.setup-go.outcome == 'success'
+              working-directory: sidecar
+              run: go vet ./...
+
+            - name: Build sidecar binary
+              id: go-build
+              if: always() && steps.setup-go.outcome == 'success'
+              working-directory: sidecar
+              run: CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /tmp/stoat-sidecar ./cmd/sidecar
+
+            - name: Build sidecar image
+              id: sidecar-image
+              if: always() && steps.install.outcome == 'success'
+              run: docker build -f sidecar/Dockerfile -t stoat-sidecar:test sidecar
+
+            - name: Build Stoat image
+              id: app-image
+              if: always() && steps.install.outcome == 'success'
+              run: docker build -f Dockerfile -t stoat:test .
+
+            - name: Validate production Compose configuration
+              id: compose
+              if: always()
+              env:
+                  APP_SECRET: ci-only-secret
+                  APP_URL: http://localhost:3000
+              run: docker compose -f compose.yaml config --quiet
+
+            - name: Add CI summary
+              if: always()
+              run: |
+                  {
+                    echo "### Stoat CI"
+                    echo ""
+                    echo "| Check | Result |"
+                    echo "| --- | --- |"
+                    echo "| Install | ${{ steps.install.conclusion }} |"
+                    echo "| JavaScript check | ${{ steps.check.conclusion }} |"
+                    echo "| JavaScript tests | ${{ steps.test.conclusion }} |"
+                    echo "| Stoat build | ${{ steps.build.conclusion }} |"
+                    echo "| Go format | ${{ steps.gofmt.conclusion }} |"
+                    echo "| Sidecar tests | ${{ steps.go-test.conclusion }} |"
+                    echo "| Sidecar vet | ${{ steps.go-vet.conclusion }} |"
+                    echo "| Sidecar binary | ${{ steps.go-build.conclusion }} |"
+                    echo "| Sidecar image | ${{ steps.sidecar-image.conclusion }} |"
+                    echo "| Stoat image | ${{ steps.app-image.conclusion }} |"
+                    echo "| Compose config | ${{ steps.compose.conclusion }} |"
+                  } >> "$GITHUB_STEP_SUMMARY"

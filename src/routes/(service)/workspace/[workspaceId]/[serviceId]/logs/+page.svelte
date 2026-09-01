@@ -4,18 +4,18 @@
     import { Button, Chip, Icon, LoadingIndicator } from "m3-svelte";
     import { parseAsArrayOf, parseAsString, useQueryState } from "nuqs-svelte";
 
-    import { getServiceContainerLogs } from "#lib/api/services.remote";
-    import type { ContainerLogRecord } from "#lib/service/container-logs";
+    import { streamServiceContainerLogs } from "#lib/api/services.remote";
+    import type { ContainerLogRecord } from "#lib/domain/services/container-logs";
     import {
         filterContainerLogs,
         matchContainerId,
-    } from "#lib/service/container-logs";
-    import { attachFollowScroll } from "#lib/ui/follow-scroll";
+    } from "#lib/domain/services/container-logs";
+    import { attachFollowScroll } from "#lib/shared/ui/follow-scroll";
 
     const { params } = $props();
 
     // svelte-ignore state_referenced_locally
-    const logsQuery = getServiceContainerLogs(params.serviceId);
+    const logsQuery = streamServiceContainerLogs(params.serviceId);
 
     const snapshot = $derived(logsQuery.current);
     const containers = $derived(snapshot?.containers ?? []);

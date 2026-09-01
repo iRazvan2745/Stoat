@@ -1,30 +1,61 @@
 import { query } from "$app/server";
+import { error as kitError } from "@sveltejs/kit";
 
-import { ucClient } from "#lib/server/uncloud";
+import { requireSession } from "#lib/api/guard";
+import { withRemoteLogging } from "#lib/api/remote-logging";
+import { getOrganizationIdForUser } from "#lib/server/access";
+import {
+    listDataSourceConnectionsForOrganization,
+    type OrganizationDataSourceConnection,
+} from "#lib/server/data-sources/data-sources";
+import { createUncloudClient } from "#lib/server/uncloud";
 
-const getErrorMessage = (error: unknown): string =>
-  error instanceof Error && error.message ? error.message : "Unable to load machines.";
+import type { components } from "../../../../schema";
+import { loadClusterItems, type ClusterListResult } from "./response";
 
-export const getServices = query(async () => {
-  try {
-    const { data, response } = await ucClient.GET("/api/v1/services");
+type Service = components["schemas"]["Service"];
 
-    if (!response.ok) {
-      return {
-        error: `Uncloud API returned HTTP ${response.status}.`,
-        items: [],
-      };
-    }
+export type OrganizationService = Service & {
+    dataSourceId: string;
+};
 
-    if (!data) {
-      return {
-        error: "Uncloud API returned an empty response.",
-        items: [],
-      };
-    }
+const loadDataSourceServices = async (
+    source: OrganizationDataSourceConnection,
+): Promise<ClusterListResult<OrganizationService>> => {
+    const result = await loadClusterItems("services", () =>
+        createUncloudClient({
+            uncloudToken: source.uncloudToken,
+            uncloudUrl: source.uncloudUrl,
+        }).GET("/api/v1/services"),
+    );
 
-    return { error: null, items: data.items };
-  } catch (error) {
-    return { error: getErrorMessage(error), items: [] };
-  }
-});
+    return {
+        error: result.error,
+        items: result.items.map((service) => ({
+            ...service,
+            dataSourceId: source.id,
+        })),
+    };
+};
+
+export const listServices = query(
+    withRemoteLogging("cluster.listServices", "query", async () => {
+        const session = requireSession();
+        const organizationId = await getOrganizationIdForUser(
+            session.user.id,
+            session.session.activeOrganizationId,
+        );
+
+        if (!organizationId) {
+            kitError(403, "No organization membership");
+        }
+
+        const sources = await listDataSourceConnectionsForOrganization(organizationId);
+        const results = await Promise.all(sources.map((source) => loadDataSourceServices(source)));
+        const items = results.flatMap((result) => result.items);
+        const error =
+            items.length === 0 ? (results.find((result) => result.error)?.error ?? null) : null;
+
+        return { error, items };
+    }),
+);

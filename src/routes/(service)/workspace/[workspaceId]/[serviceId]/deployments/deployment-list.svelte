@@ -2,7 +2,7 @@
     import deploymentsIcon from "@ktibow/iconset-material-symbols/deployed-code-outline";
     import { Card, Icon, LoadingIndicator } from "m3-svelte";
 
-    import type { DeploymentLogRecord } from "#lib/deployments/logs";
+    import type { DeploymentLogRecord } from "#lib/domain/deployments/logs";
 
     import type { Deployment } from "./deployment";
     import DeploymentRow from "./deployment-row.svelte";

@@ -5,25 +5,25 @@ import Parallel from "./flow-parallel.svelte";
 import Root from "./flow-root.svelte";
 
 export {
-  Root,
-  Node,
-  Parallel,
-  List,
-  Anchor,
-  //
-  Root as Flow,
-  Node as FlowNode,
-  Parallel as FlowParallel,
-  List as FlowNodeList,
-  Anchor as FlowAnchor,
+    Root,
+    Node,
+    Parallel,
+    List,
+    Anchor,
+    //
+    Root as Flow,
+    Node as FlowNode,
+    Parallel as FlowParallel,
+    List as FlowNodeList,
+    Anchor as FlowAnchor,
 };
 
 export type {
-  Align,
-  Connector,
-  JunctionMarker,
-  NodeData,
-  Orientation,
-  ParallelAlign,
-  RectLike,
+    Align,
+    Connector,
+    JunctionMarker,
+    NodeData,
+    Orientation,
+    ParallelAlign,
+    RectLike,
 } from "./types";

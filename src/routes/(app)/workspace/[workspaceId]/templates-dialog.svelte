@@ -10,8 +10,8 @@
     import { parseAsString, useQueryState } from "nuqs-svelte";
 
     import { createServiceFromTemplate } from "#lib/api/services.remote";
-    import { getTemplates } from "#lib/api/templates.remote";
-    import type { ServiceTemplate } from "#lib/templates";
+    import { listTemplates } from "#lib/api/templates.remote";
+    import type { ServiceTemplate } from "#lib/domain/templates";
 
     import TemplateCard from "./template-card.svelte";
 
@@ -23,7 +23,7 @@
 
     let { oncreated, open = $bindable(false), workspaceId }: Props = $props();
 
-    const templatesQuery = getTemplates();
+    const templatesQuery = listTemplates();
 
     const selectedAppId = useQueryState(
         "selectedTemplate",

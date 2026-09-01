@@ -1,0 +1,17 @@
+**/.git
+**/.github
+**/.forgejo
+**/node_modules
+**/.svelte-kit
+**/build
+**/.output
+**/.wrangler
+**/data
+**/*.log
+.env
+.env.*
+!.env.example
+Dockerfile*
+compose*.yml
+compose*.yaml
+sidecar/sidecar

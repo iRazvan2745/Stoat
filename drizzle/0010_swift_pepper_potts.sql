@@ -1,1 +1,0 @@
-ALTER TABLE "services" ADD COLUMN "settings" jsonb DEFAULT '{}'::jsonb NOT NULL;

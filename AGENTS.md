@@ -77,6 +77,29 @@ Write code that is **accessible, performant, type-safe, and maintainable**. Focu
 - Prefer simple conditionals over nested ternary operators
 - Group related code together and separate concerns
 
+### Remote API Conventions
+
+- Keep server-side remote functions in feature-oriented `.remote.ts` modules under `src/lib/api`
+- Use plural resource names for modules, such as `data-sources.remote.ts`, `workspaces.remote.ts`, and `services.remote.ts`
+- Name collection reads `listX`, single-resource reads `getX`, live queries or streams `streamX`, and mutations `createX`, `updateX`, or `deleteX`
+- Give Valibot schemas descriptive `*Input` names, such as `CreateServiceInput` or `UpdateServiceSettingsInput`
+- Use explicit resource identifiers such as `serviceId`, `workspaceId`, and `deploymentId` instead of generic `id` parameters where possible
+- Order each remote module as ordinary queries, live queries, then commands; keep related schemas and private helpers in the same feature module
+- Authorize remote calls at the beginning of every handler with the appropriate guard from `src/lib/api/guard.ts`
+- Import remote functions directly from their feature module; do not add an API barrel file
+- Share transport and response handling through non-remote helpers, such as `src/lib/api/cluster/response.ts`, instead of duplicating it in each endpoint module
+
+### `src/lib` Layout
+
+- `api/` contains SvelteKit remote functions and their API-specific guards/helpers; keep remote modules feature-oriented
+- `domain/` contains client-safe domain types, schemas, and pure business logic; it must not import from `server/`
+- `server/` contains server-only persistence, integrations, orchestration, and domain implementations, grouped by plural feature names such as `data-sources/`, `services/`, and `workspaces/`
+- `components/` contains reusable Svelte components; keep feature-specific components in a matching subdirectory, such as `components/services/`
+- `shared/` contains cross-cutting code that is safe to use from both client and server, including `shared/ui/`
+- `auth/`, `db/`, and `assets/` are dedicated infrastructure and static-asset boundaries
+- Route and client code should import shared types and pure logic from `domain/`, never from `server/`; server implementations may depend on `domain/`
+- Do not move server-only code into client-safe directories or expose database, credentials, or integration clients through shared modules
+
 ### Security
 
 - Add `rel="noopener"` when using `target="_blank"` on links

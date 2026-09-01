@@ -3,7 +3,7 @@
     import chevronRightIcon from "@ktibow/iconset-material-symbols/chevron-right";
     import { Icon } from "m3-svelte";
 
-    import type { ServiceTemplate } from "#lib/templates";
+    import type { ServiceTemplate } from "#lib/domain/templates";
 
     interface Props {
         selected: boolean;

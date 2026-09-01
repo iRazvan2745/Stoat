@@ -4,6 +4,40 @@
  */
 
 export interface paths {
+    "/api/v1/caddy/configs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List active Caddy configurations */
+        get: operations["listCaddyConfigs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cluster/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Inspect cluster health */
+        get: operations["clusterDiagnostics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cluster/domain": {
         parameters: {
             query?: never;
@@ -47,6 +81,40 @@ export interface paths {
         };
         /** Inspect an image */
         get: operations["inspectImage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/images/{id}/remote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Inspect an image in its remote registry */
+        get: operations["inspectRemoteImage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/images/{id}/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Check an image for updates */
+        get: operations["inspectImageUpdate"];
         put?: never;
         post?: never;
         delete?: never;
@@ -177,6 +245,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/services/{id}/containers/{container}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Inspect a service container */
+        get: operations["inspectContainer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/services/{id}/containers/{container}/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Control a service container */
+        post: operations["containerAction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/services/{id}/containers/{container}/exec": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Execute a command in a service container */
+        post: operations["execContainer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/services/{id}/logs": {
         parameters: {
             query?: never;
@@ -246,6 +365,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/volumes/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List volume attachments */
+        get: operations["listVolumeAttachments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -263,14 +399,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/readyz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Uncloud readiness check */
+        get: operations["readiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        CaddyConfig: {
+            caddyfile?: string;
+            error?: string;
+            machineId: string;
+            machineName: string;
+            /** Format: date-time */
+            modifiedAt?: string;
+            sha256?: string;
+        };
+        CaddyConfigs: {
+            drift: boolean;
+            items: components["schemas"]["CaddyConfig"][];
+        };
+        ClusterDiagnostics: {
+            issues: string[];
+            links: components["schemas"]["ClusterLink"][];
+            machines: components["schemas"]["DiagnosticMachine"][];
+            /** @enum {string} */
+            status: "healthy" | "degraded";
+            versionDrift: boolean;
+        };
+        ClusterLink: {
+            from: string;
+            /** Format: double */
+            medianMs: number;
+            /** Format: double */
+            standardDevMs: number;
+            to: string;
+        };
         ConfigSpec: {
             /** Format: byte */
             content?: string;
             name?: string;
+        };
+        ContainerActionRequest: {
+            /** @enum {string} */
+            action: "start" | "stop" | "restart" | "remove";
         };
         ContainerSpec: {
             command?: string[];
@@ -338,16 +524,47 @@ export interface components {
             compose: string;
             options?: components["schemas"]["DeployComposeOptions"];
         };
+        DiagnosticMachine: {
+            daemonVersion?: string;
+            dockerVersion?: string;
+            error?: string;
+            id: string;
+            name: string;
+            state: string;
+            storeVersion?: Record<string, never>;
+            wireGuard?: components["schemas"]["WireGuard"];
+        };
         DomainResponse: {
             domain: string;
         };
         ErrorResponse: {
             error: string;
         };
+        ExecContainerRequest: {
+            command: string[];
+            stdin?: string;
+            tty?: boolean;
+        };
+        ExecContainerResponse: {
+            /** Format: int32 */
+            exitCode: number;
+            stderr: string;
+            stdout: string;
+            truncated: boolean;
+        };
         ImageGroup: {
             containerdStore?: boolean;
             images?: Record<string, never>[];
             metadata?: Record<string, never>;
+        };
+        ImageUpdate: {
+            error?: string;
+            imageId?: string;
+            localDigests: string[];
+            machineId?: string;
+            machineName?: string;
+            remoteDigest?: string;
+            updateAvailable?: boolean;
         };
         LogEvent: {
             error?: string;
@@ -407,6 +624,17 @@ export interface components {
             /** Format: int32 */
             publishedPort?: number;
         };
+        ReadinessResponse: {
+            message?: string;
+            status: string;
+        };
+        RemoteImage: {
+            canonicalReference?: string;
+            digest?: string;
+            error?: string;
+            machineId?: string;
+            machineName?: string;
+        };
         RenameMachineRequest: {
             name: string;
         };
@@ -451,6 +679,17 @@ export interface components {
             /** @description Docker volume metadata. */
             volume: Record<string, never>;
         };
+        VolumeAttachment: {
+            attached: boolean;
+            containerId?: string;
+            containerName?: string;
+            destination?: string;
+            machineId: string;
+            machineName: string;
+            serviceId?: string;
+            serviceName?: string;
+            volumeName: string;
+        };
         VolumeMount: {
             containerPath?: string;
             readOnly?: boolean;
@@ -464,6 +703,22 @@ export interface components {
             type?: "bind" | "volume" | "tmpfs";
             volumeOptions?: Record<string, never>;
         };
+        WireGuard: {
+            interfaceName: string;
+            /** Format: int32 */
+            listenPort: number;
+            peers: components["schemas"]["WireGuardPeer"][];
+        };
+        WireGuardPeer: {
+            allowedIps: string[];
+            endpoint?: string;
+            /** Format: date-time */
+            lastHandshakeAt?: string;
+            /** Format: int64 */
+            receiveBytes: number;
+            /** Format: int64 */
+            transmitBytes: number;
+        };
     };
     responses: never;
     parameters: never;
@@ -473,6 +728,100 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listCaddyConfigs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Caddy configurations and drift status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaddyConfigs"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    clusterDiagnostics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cluster diagnostics */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClusterDiagnostics"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     getDomain: {
         parameters: {
             query?: never;
@@ -593,6 +942,108 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["MachineImage"][];
+                    };
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    inspectRemoteImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Remote image inspection list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["RemoteImage"][];
+                    };
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    inspectImageUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Image update status per machine */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ImageUpdate"][];
                     };
                 };
             };
@@ -1145,6 +1596,166 @@ export interface operations {
             };
         };
     };
+    inspectContainer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                container: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Container */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceContainer"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    containerAction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                container: string;
+            };
+            cookie?: never;
+        };
+        /** @description Container action */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContainerActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Operation status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    execContainer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                container: string;
+            };
+            cookie?: never;
+        };
+        /** @description Command */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExecContainerRequest"];
+            };
+        };
+        responses: {
+            /** @description Command result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExecContainerResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     serviceLogs: {
         parameters: {
             query?: {
@@ -1411,6 +2022,55 @@ export interface operations {
             };
         };
     };
+    listVolumeAttachments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Volume attachments */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["VolumeAttachment"][];
+                    };
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     health: {
         parameters: {
             query?: never;
@@ -1427,6 +2087,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StatusResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    readiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ready */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessResponse"];
                 };
             };
             /** @description Invalid request */

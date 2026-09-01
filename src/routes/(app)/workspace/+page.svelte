@@ -1,5 +1,6 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
+    import addIcon from "@ktibow/iconset-material-symbols/add";
     import databaseIcon from "@ktibow/iconset-material-symbols/database";
     import expandMoreIcon from "@ktibow/iconset-material-symbols/expand-more";
     import refreshIcon from "@ktibow/iconset-material-symbols/refresh";
@@ -23,8 +24,11 @@
         useQueryStates,
     } from "nuqs-svelte";
 
-    import { listDataSources } from "#lib/api/data-source.remote";
-    import { createWorkspace, listWorkspaces } from "#lib/api/workspace.remote";
+    import { listDataSources } from "#lib/api/data-sources.remote";
+    import {
+        createWorkspace,
+        listWorkspaces,
+    } from "#lib/api/workspaces.remote";
 
     const workspace = listWorkspaces();
     const dataSources = listDataSources();
@@ -48,7 +52,9 @@
         )
     );
     const selectedDataSourceLabel = $derived(
-        selectedDataSource?.url ?? "Select a data source"
+        selectedDataSource?.gitUrl ??
+            selectedDataSource?.uncloudUrl ??
+            "Select a data source"
     );
     const hasSelectedDataSource = $derived(selectedDataSource !== undefined);
 
@@ -100,6 +106,11 @@
     const selectDataSource = (id: string): void => {
         dataSourceId.set(id);
         dataSourceMenuOpen = false;
+    };
+
+    const openCreateDataSource = (): void => {
+        dataSourceMenuOpen = false;
+        goto("/data-sources?createDialogOpen=true");
     };
 </script>
 
@@ -185,7 +196,7 @@
                             {#each dataSources.current ?? [] as source (source.id)}
                                 <ExpressiveMenuItem
                                     leadingIcon={databaseIcon}
-                                    label={source.url ?? "Unnamed data source"}
+                                    label={source.gitUrl ?? source.uncloudUrl}
                                     selected={source.id ===
                                         dataSourceId.current}
                                     onclick={() => selectDataSource(source.id)}
@@ -195,6 +206,11 @@
                             <ExpressiveMenuItem
                                 label="No data sources available"
                                 disabled
+                            />
+                            <ExpressiveMenuItem
+                                leadingIcon={addIcon}
+                                label="Add data source"
+                                onclick={openCreateDataSource}
                             />
                         {/if}
                     </ExpressiveMenu>

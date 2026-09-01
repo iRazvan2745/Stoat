@@ -2,10 +2,10 @@
     // oxlint-disable func-style
     import { Button, Card, Divider, LoadingIndicator } from "m3-svelte";
 
-    import { getVolumes } from "#lib/api/cluster/volumes.remote";
+    import { listVolumes } from "#lib/api/cluster/volumes.remote";
 
     type Volume = NonNullable<
-        ReturnType<typeof getVolumes>["current"]
+        ReturnType<typeof listVolumes>["current"]
     >["items"][number];
 
     interface VolumeMetadata {
@@ -18,7 +18,7 @@
         CreatedAt?: string;
     }
 
-    const volumes = getVolumes();
+    const volumes = listVolumes();
 
     const metadata = (volume: Volume): VolumeMetadata =>
         volume.volume as unknown as VolumeMetadata;
@@ -68,7 +68,7 @@
             <Divider />
 
             <!-- table rows -->
-            {#each volumes.current?.items ?? [] as item, index (item.machineId + (metadata(item).Name ?? ""))}
+            {#each volumes.current?.items ?? [] as item, index (`${item.dataSourceId}:${item.machineId}:${metadata(item).Name ?? ""}`)}
                 <div
                     class="
             border-outline-variant

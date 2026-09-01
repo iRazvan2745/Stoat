@@ -1,10 +1,12 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
+    import domainIcon from "@ktibow/iconset-material-symbols/domain";
     import logoutIcon from "@ktibow/iconset-material-symbols/logout";
     import { ExpressiveMenu, ExpressiveMenuItem } from "m3-svelte";
 
     import { authClient } from "#lib/auth/client";
-    import { getGravatarUrl } from "#lib/gravatar";
+    import OrganizationPicker from "#lib/components/organization-picker.svelte";
+    import { getGravatarUrl } from "#lib/shared/gravatar";
 
     interface User {
         email: string;
@@ -12,14 +14,25 @@
         name: string;
     }
 
+    interface Organization {
+        id: string;
+        logo: string | null;
+        name: string;
+        slug: string;
+    }
+
     const {
-        open,
+        activeOrganizationId,
         initialUser,
         initialGravatarUrl,
+        open,
+        organizations,
     }: {
+        activeOrganizationId?: string | null;
         initialGravatarUrl?: string | null;
         initialUser?: User | null;
         open: boolean;
+        organizations?: Organization[];
     } = $props();
 
     const session = authClient.useSession();
@@ -38,6 +51,10 @@
         }
     };
 
+    const toggleMenu = (): void => {
+        menuOpen = !menuOpen;
+    };
+
     const logout = async (): Promise<void> => {
         menuOpen = false;
         await authClient.signOut();
@@ -46,6 +63,21 @@
 </script>
 
 <svelte:window onclick={closeOnOutsideClick} />
+
+{#snippet organizationSubmenu(open: boolean)}
+    <ExpressiveMenu submenu {open} label="Organizations">
+        {#if organizations}
+            <OrganizationPicker
+                mode="menu"
+                {organizations}
+                activeOrganizationId={activeOrganizationId ?? null}
+                onClose={() => {
+                    menuOpen = false;
+                }}
+            />
+        {/if}
+    </ExpressiveMenu>
+{/snippet}
 
 <div class="absolute inset-x-0 bottom-2 z-20 flex justify-center px-3">
     <div bind:this={root} class="relative {open ? 'w-full' : ''}">
@@ -57,7 +89,7 @@
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             aria-label={user?.name}
-            onclick={() => (menuOpen = !menuOpen)}
+            onclick={toggleMenu}
         >
             {#if user?.image}
                 <img
@@ -105,8 +137,15 @@
         </button>
 
         {#if menuOpen}
-            <div class="absolute bottom-0 left-[calc(100%+4px)]">
+            <div class="account-menu absolute bottom-0 left-[calc(100%+4px)]">
                 <ExpressiveMenu label={user?.name ?? "Account"}>
+                    {#if organizations}
+                        <ExpressiveMenuItem
+                            leadingIcon={domainIcon}
+                            label="Organizations"
+                            submenu={organizationSubmenu}
+                        />
+                    {/if}
                     <ExpressiveMenuItem
                         leadingIcon={logoutIcon}
                         label="Log out"
@@ -117,3 +156,9 @@
         {/if}
     </div>
 </div>
+
+<style>
+    :global(.account-menu > .m3-container) {
+        max-height: min(32rem, calc(100svh - 2rem));
+    }
+</style>

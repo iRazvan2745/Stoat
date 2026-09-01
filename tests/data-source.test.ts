@@ -4,31 +4,31 @@ import path from "node:path";
 
 import { describe, expect, it } from "vite-plus/test";
 
-import { createWorkspaceFolder } from "#lib/server/data-source/paths";
+import { createWorkspaceFolder } from "#lib/server/data-sources/paths";
 
 describe("workspace folders", () => {
-  it("creates nested workspace and service folders", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "stoat-data-source-"));
+    it("creates nested workspace and service folders", async () => {
+        const root = await mkdtemp(path.join(tmpdir(), "stoat-data-source-"));
 
-    try {
-      const folder = await createWorkspaceFolder(root, "my-workspace", "my-service-abc12");
+        try {
+            const folder = await createWorkspaceFolder(root, "my-workspace", "my-service-abc12");
 
-      expect(folder).toBe(path.join(root, "my-workspace", "my-service-abc12"));
-      await expect(access(folder)).resolves.toBeUndefined();
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
+            expect(folder).toBe(path.join(root, "my-workspace", "my-service-abc12"));
+            await expect(access(folder)).resolves.toBeUndefined();
+        } finally {
+            await rm(root, { force: true, recursive: true });
+        }
+    });
 
-  it("rejects folders outside the workspace", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "stoat-data-source-"));
+    it("rejects folders outside the workspace", async () => {
+        const root = await mkdtemp(path.join(tmpdir(), "stoat-data-source-"));
 
-    try {
-      await expect(createWorkspaceFolder(root, "..", "outside")).rejects.toThrow(
-        "inside the workspace",
-      );
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
+        try {
+            await expect(createWorkspaceFolder(root, "..", "outside")).rejects.toThrow(
+                "inside the workspace",
+            );
+        } finally {
+            await rm(root, { force: true, recursive: true });
+        }
+    });
 });

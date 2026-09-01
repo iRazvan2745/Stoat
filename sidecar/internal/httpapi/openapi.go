@@ -116,8 +116,17 @@ func openAPIPaths() map[string]OpenAPIPathItem {
 		"/healthz": {
 			Get: operation("health", "Health check", "health", nil, nil, responses(response("OK", ref("StatusResponse")), false)),
 		},
+		"/readyz": {
+			Get: operation("health", "Uncloud readiness check", "readiness", nil, nil, responses(response("Ready", ref("ReadinessResponse")), false)),
+		},
 		"/api/v1/cluster/domain": {
 			Get: operation("cluster", "Get cluster domain", "getDomain", nil, nil, responses(response("Cluster domain", ref("DomainResponse")), true)),
+		},
+		"/api/v1/cluster/diagnostics": {
+			Get: operation("cluster", "Inspect cluster health", "clusterDiagnostics", nil, nil, responses(response("Cluster diagnostics", ref("ClusterDiagnostics")), true)),
+		},
+		"/api/v1/caddy/configs": {
+			Get: operation("cluster", "List active Caddy configurations", "listCaddyConfigs", nil, nil, responses(response("Caddy configurations and drift status", ref("CaddyConfigs")), true)),
 		},
 		"/api/v1/machines": {
 			Get: operation("machines", "List machines", "listMachines", []OpenAPIParameter{
@@ -149,6 +158,15 @@ func openAPIPaths() map[string]OpenAPIPathItem {
 		"/api/v1/services/{id}/stop": {
 			Post: operation("services", "Stop a service", "stopService", []OpenAPIParameter{pathParameter("id")}, nil, responses(response("Operation status", ref("StatusResponse")), true)),
 		},
+		"/api/v1/services/{id}/containers/{container}": {
+			Get: operation("services", "Inspect a service container", "inspectContainer", []OpenAPIParameter{pathParameter("id"), pathParameter("container")}, nil, responses(response("Container", ref("ServiceContainer")), true)),
+		},
+		"/api/v1/services/{id}/containers/{container}/actions": {
+			Post: operation("services", "Control a service container", "containerAction", []OpenAPIParameter{pathParameter("id"), pathParameter("container")}, requestBody("Container action", "ContainerActionRequest"), responses(response("Operation status", ref("StatusResponse")), true)),
+		},
+		"/api/v1/services/{id}/containers/{container}/exec": {
+			Post: operation("services", "Execute a command in a service container", "execContainer", []OpenAPIParameter{pathParameter("id"), pathParameter("container")}, requestBody("Command", "ExecContainerRequest"), responses(response("Command result", ref("ExecContainerResponse")), true)),
+		},
 		"/api/v1/volumes": {
 			Get: operation("volumes", "List volumes", "listVolumes", []OpenAPIParameter{
 				queryParameter("driver", "Filter by Docker volume driver.", false, OpenAPISchema{Type: "string"}),
@@ -156,6 +174,9 @@ func openAPIPaths() map[string]OpenAPIPathItem {
 				queryParameter("names", "Comma-separated volume names.", false, OpenAPISchema{Type: "string"}),
 			}, nil, responses(response("Volume list", itemResponse("Volume")), true)),
 			Post: operation("volumes", "Create a volume", "createVolume", nil, requestBody("Volume creation request", "CreateVolumeRequest"), createdResponses(response("Created volume", ref("Volume")), true)),
+		},
+		"/api/v1/volumes/attachments": {
+			Get: operation("volumes", "List volume attachments", "listVolumeAttachments", nil, nil, responses(response("Volume attachments", itemResponse("VolumeAttachment")), true)),
 		},
 		"/api/v1/machines/{machine}/volumes/{volume}": {
 			Delete: operation("volumes", "Remove a volume", "removeVolume", []OpenAPIParameter{pathParameter("machine"), pathParameter("volume")}, nil, responses(response("Operation status", ref("StatusResponse")), true)),
@@ -168,6 +189,12 @@ func openAPIPaths() map[string]OpenAPIPathItem {
 		},
 		"/api/v1/images/{id}": {
 			Get: operation("images", "Inspect an image", "inspectImage", []OpenAPIParameter{pathParameter("id")}, nil, responses(response("Image inspection list", itemResponse("MachineImage")), true)),
+		},
+		"/api/v1/images/{id}/remote": {
+			Get: operation("images", "Inspect an image in its remote registry", "inspectRemoteImage", []OpenAPIParameter{pathParameter("id")}, nil, responses(response("Remote image inspection list", itemResponse("RemoteImage")), true)),
+		},
+		"/api/v1/images/{id}/update": {
+			Get: operation("images", "Check an image for updates", "inspectImageUpdate", []OpenAPIParameter{pathParameter("id")}, nil, responses(response("Image update status per machine", itemResponse("ImageUpdate")), true)),
 		},
 		"/api/v1/machines/{id}/logs": {
 			Get: operation("machines", "Stream machine service logs", "machineLogs", append([]OpenAPIParameter{pathParameter("id"), queryParameter("service", "System service name, such as uncloud or docker.", true, OpenAPISchema{Type: "string"})}, logParameters(false)...), nil, streamResponses(true)),
@@ -193,6 +220,71 @@ func openAPISchemas() map[string]OpenAPISchema {
 			Type:       "object",
 			Properties: map[string]OpenAPISchema{"domain": {Type: "string"}},
 			Required:   []string{"domain"},
+		},
+		"ReadinessResponse": {
+			Type:       "object",
+			Properties: map[string]OpenAPISchema{"status": {Type: "string"}, "message": {Type: "string"}},
+			Required:   []string{"status"},
+		},
+		"ClusterDiagnostics": {
+			Type: "object",
+			Properties: map[string]OpenAPISchema{
+				"status":       {Type: "string", Enum: []string{"healthy", "degraded"}},
+				"issues":       {Type: "array", Items: &OpenAPISchema{Type: "string"}},
+				"machines":     {Type: "array", Items: refPtr("DiagnosticMachine")},
+				"links":        {Type: "array", Items: refPtr("ClusterLink")},
+				"versionDrift": {Type: "boolean"},
+			},
+			Required: []string{"status", "issues", "machines", "links", "versionDrift"},
+		},
+		"DiagnosticMachine": {
+			Type: "object",
+			Properties: map[string]OpenAPISchema{
+				"id": {Type: "string"}, "name": {Type: "string"}, "state": {Type: "string"},
+				"daemonVersion": {Type: "string"}, "dockerVersion": {Type: "string"},
+				"storeVersion": {Type: "object"}, "wireGuard": {Ref: "#/components/schemas/WireGuard"},
+				"error": {Type: "string"},
+			},
+			Required: []string{"id", "name", "state"},
+		},
+		"ClusterLink": {
+			Type: "object",
+			Properties: map[string]OpenAPISchema{
+				"from": {Type: "string"}, "to": {Type: "string"},
+				"medianMs":      {Type: "number", Format: "double"},
+				"standardDevMs": {Type: "number", Format: "double"},
+			},
+			Required: []string{"from", "to", "medianMs", "standardDevMs"},
+		},
+		"WireGuard": {
+			Type: "object",
+			Properties: map[string]OpenAPISchema{
+				"interfaceName": {Type: "string"}, "listenPort": {Type: "integer", Format: "int32"},
+				"peers": {Type: "array", Items: refPtr("WireGuardPeer")},
+			},
+			Required: []string{"interfaceName", "listenPort", "peers"},
+		},
+		"WireGuardPeer": {
+			Type: "object",
+			Properties: map[string]OpenAPISchema{
+				"endpoint": {Type: "string"}, "lastHandshakeAt": {Type: "string", Format: "date-time"},
+				"receiveBytes": {Type: "integer", Format: "int64"}, "transmitBytes": {Type: "integer", Format: "int64"},
+				"allowedIps": {Type: "array", Items: &OpenAPISchema{Type: "string"}},
+			},
+			Required: []string{"receiveBytes", "transmitBytes", "allowedIps"},
+		},
+		"CaddyConfig": {
+			Type: "object",
+			Properties: map[string]OpenAPISchema{
+				"machineId": {Type: "string"}, "machineName": {Type: "string"}, "caddyfile": {Type: "string"},
+				"modifiedAt": {Type: "string", Format: "date-time"}, "sha256": {Type: "string"}, "error": {Type: "string"},
+			},
+			Required: []string{"machineId", "machineName"},
+		},
+		"CaddyConfigs": {
+			Type: "object", Properties: map[string]OpenAPISchema{
+				"items": {Type: "array", Items: refPtr("CaddyConfig")}, "drift": {Type: "boolean"},
+			}, Required: []string{"items", "drift"},
 		},
 		"Machine": {
 			Type: "object",
@@ -249,6 +341,23 @@ func openAPISchemas() map[string]OpenAPISchema {
 				"container":   {Type: "object", Description: "Docker inspection and Uncloud service metadata."},
 			},
 			Required: []string{"machineId", "machineName", "container"},
+		},
+		"ContainerActionRequest": {
+			Type: "object", Properties: map[string]OpenAPISchema{
+				"action": {Type: "string", Enum: []string{"start", "stop", "restart", "remove"}},
+			}, Required: []string{"action"},
+		},
+		"ExecContainerRequest": {
+			Type: "object", Properties: map[string]OpenAPISchema{
+				"command": {Type: "array", Items: &OpenAPISchema{Type: "string"}},
+				"stdin":   {Type: "string"}, "tty": {Type: "boolean"},
+			}, Required: []string{"command"},
+		},
+		"ExecContainerResponse": {
+			Type: "object", Properties: map[string]OpenAPISchema{
+				"exitCode": {Type: "integer", Format: "int32"}, "stdout": {Type: "string"}, "stderr": {Type: "string"},
+				"truncated": {Type: "boolean"},
+			}, Required: []string{"exitCode", "stdout", "stderr", "truncated"},
 		},
 		"ServiceSpec": {
 			Type: "object",
@@ -355,18 +464,18 @@ func openAPISchemas() map[string]OpenAPISchema {
 		"DeployComposeEvent": {
 			Type: "object",
 			Properties: map[string]OpenAPISchema{
-				"type":         {Type: "string", Enum: []string{"plan", "progress", "complete", "error"}},
-				"operations":   {Type: "array", Items: refPtr("DeployComposePlanOperation")},
-				"id":           {Type: "string"},
-				"parentId":     {Type: "string"},
-				"phase":        {Type: "string", Enum: []string{"working", "done", "warning", "error", "unknown"}},
-				"statusText":   {Type: "string"},
-				"text":         {Type: "string"},
-				"percent":      {Type: "integer", Format: "int32"},
-				"current":      {Type: "integer", Format: "int64"},
-				"total":        {Type: "integer", Format: "int64"},
-				"status":       {Type: "string"},
-				"error":        {Type: "string"},
+				"type":       {Type: "string", Enum: []string{"plan", "progress", "complete", "error"}},
+				"operations": {Type: "array", Items: refPtr("DeployComposePlanOperation")},
+				"id":         {Type: "string"},
+				"parentId":   {Type: "string"},
+				"phase":      {Type: "string", Enum: []string{"working", "done", "warning", "error", "unknown"}},
+				"statusText": {Type: "string"},
+				"text":       {Type: "string"},
+				"percent":    {Type: "integer", Format: "int32"},
+				"current":    {Type: "integer", Format: "int64"},
+				"total":      {Type: "integer", Format: "int64"},
+				"status":     {Type: "string"},
+				"error":      {Type: "string"},
 			},
 			Required: []string{"type"},
 		},
@@ -390,6 +499,13 @@ func openAPISchemas() map[string]OpenAPISchema {
 			},
 			Required: []string{"machineId", "machineName", "volume"},
 		},
+		"VolumeAttachment": {
+			Type: "object", Properties: map[string]OpenAPISchema{
+				"machineId": {Type: "string"}, "machineName": {Type: "string"}, "volumeName": {Type: "string"},
+				"attached": {Type: "boolean"}, "serviceId": {Type: "string"}, "serviceName": {Type: "string"},
+				"containerId": {Type: "string"}, "containerName": {Type: "string"}, "destination": {Type: "string"},
+			}, Required: []string{"machineId", "machineName", "volumeName", "attached"},
+		},
 		"ImageGroup": {
 			Type: "object",
 			Properties: map[string]OpenAPISchema{
@@ -401,6 +517,19 @@ func openAPISchemas() map[string]OpenAPISchema {
 		"MachineImage": {
 			Type:       "object",
 			Properties: map[string]OpenAPISchema{"metadata": {Type: "object"}, "image": {Type: "object"}},
+		},
+		"RemoteImage": {
+			Type: "object", Properties: map[string]OpenAPISchema{
+				"machineId": {Type: "string"}, "machineName": {Type: "string"},
+				"canonicalReference": {Type: "string"}, "digest": {Type: "string"}, "error": {Type: "string"},
+			},
+		},
+		"ImageUpdate": {
+			Type: "object", Properties: map[string]OpenAPISchema{
+				"machineId": {Type: "string"}, "machineName": {Type: "string"}, "imageId": {Type: "string"},
+				"localDigests": {Type: "array", Items: &OpenAPISchema{Type: "string"}},
+				"remoteDigest": {Type: "string"}, "updateAvailable": {Type: "boolean"}, "error": {Type: "string"},
+			}, Required: []string{"localDigests"},
 		},
 		"LogMetadata": {
 			Type: "object",

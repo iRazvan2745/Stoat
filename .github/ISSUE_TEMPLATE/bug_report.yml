@@ -1,0 +1,41 @@
+name: Bug report
+description: Report a reproducible problem in Stoat
+title: "bug: "
+labels:
+    - bug
+body:
+    - type: markdown
+      attributes:
+          value: |
+              Thanks for taking the time to report a problem.
+    - type: textarea
+      id: description
+      attributes:
+          label: What happened?
+          description: Describe the behavior you observed and what you expected instead.
+      validations:
+          required: true
+    - type: textarea
+      id: reproduce
+      attributes:
+          label: How can we reproduce it?
+          description: Include the smallest set of steps, configuration, or Compose file needed.
+      validations:
+          required: true
+    - type: input
+      id: version
+      attributes:
+          label: Stoat version
+          placeholder: e.g. v0.1.0 or commit SHA
+    - type: textarea
+      id: logs
+      attributes:
+          label: Relevant logs
+          render: text
+    - type: checkboxes
+      id: checks
+      attributes:
+          label: Checks
+          options:
+              - label: I have removed secrets and other sensitive information.
+                required: true

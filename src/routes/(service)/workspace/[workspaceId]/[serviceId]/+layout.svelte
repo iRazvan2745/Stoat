@@ -7,31 +7,33 @@
     import ingressesIcon from "@ktibow/iconset-material-symbols/language";
     import deploymentsIcon from "@ktibow/iconset-material-symbols/rocket-launch-outline";
     import settingsIcon from "@ktibow/iconset-material-symbols/settings-outline";
-    import { FAB, NavigationRail, NavigationRailItem } from "m3-svelte";
+    import { FAB, NavigationRailItem } from "m3-svelte";
 
-    import RailFooter from "#lib/components/rail-footer.svelte";
+    import Sidebar from "#lib/components/sidebar.svelte";
 
     let { children, data, params } = $props();
-    let railOpen = $state(false);
 
     const hrefRoute = $derived(
         `/workspace/${params.workspaceId}/${params.serviceId}/`
     );
 </script>
 
-<div class="flex h-full w-svw min-w-0">
-    <div class="relative z-10 shrink-0">
-        <NavigationRail bind:open={railOpen}>
-            {#snippet fab(open)}
-                <FAB
-                    icon={refreshIcon}
-                    color="secondary-container"
-                    text={open ? "Go back" : undefined}
-                    elevation="lowered"
-                    onclick={() => goto(`/workspace/${params.workspaceId}`)}
-                />
-            {/snippet}
+<div class="flex h-svh w-svw min-w-0">
+    <Sidebar
+        initialGravatarUrl={data.gravatarUrl}
+        initialUser={data.session?.user}
+    >
+        {#snippet fab(open)}
+            <FAB
+                icon={refreshIcon}
+                color="secondary-container"
+                text={open ? "Go back" : undefined}
+                elevation="lowered"
+                onclick={() => goto(`/workspace/${params.workspaceId}`)}
+            />
+        {/snippet}
 
+        {#snippet children()}
             <NavigationRailItem
                 href={hrefRoute}
                 label="Overview"
@@ -68,13 +70,9 @@
                 id="settings-rail-button"
                 icon={settingsIcon}
             />
-        </NavigationRail>
-        <RailFooter
-            open={railOpen}
-            initialGravatarUrl={data.gravatarUrl}
-            initialUser={data.session?.user}
-        />
-    </div>
+        {/snippet}
+    </Sidebar>
+
     <main
         class="bg-surface m:p-6 mt-6 h-[calc(100svh-1.5rem)] min-w-0 flex-1 overflow-y-auto p-4"
         style="border-radius: var(--m3-shape-extra-large) 0 0 var(--m3-shape-extra-large)"

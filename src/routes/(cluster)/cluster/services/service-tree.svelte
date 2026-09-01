@@ -9,7 +9,7 @@
     } = $props();
 </script>
 
-{#each nodes as node, index (node.type === "group" ? node.name : node.service.id)}
+{#each nodes as node, index (node.type === "group" ? node.name : `${node.service.dataSourceId}:${node.service.id}`)}
     {#if node.type === "group"}
         <!-- synthetic group row: no service data behind it -->
         <div

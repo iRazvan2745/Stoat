@@ -9,8 +9,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
+	"net/netip"
 	"strconv"
 	"strings"
+	"time"
 
 	scalargo "github.com/bdpiprava/scalar-go"
 	"github.com/docker/docker/api/types/container"
@@ -24,10 +28,46 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const (
+	maxExecOutputBytes   = 1024 * 1024
+	uncloudMetricsPort   = 51090
+	uncloudMetricsPath   = "/metrics"
+	metricsClientTimeout = 5 * time.Second
+)
+
+type cappedBuffer struct {
+	buffer    bytes.Buffer
+	limit     int
+	truncated bool
+}
+
+func (b *cappedBuffer) Write(data []byte) (int, error) {
+	originalLength := len(data)
+	remaining := b.limit - b.buffer.Len()
+	if len(data) > remaining {
+		b.truncated = true
+	}
+	if remaining > 0 {
+		if len(data) > remaining {
+			data = data[:remaining]
+		}
+		_, _ = b.buffer.Write(data)
+	}
+	return originalLength, nil
+}
+
+func (b *cappedBuffer) String() string { return b.buffer.String() }
+
+func (b *cappedBuffer) Truncated() bool { return b.truncated }
+
 // Backend is the narrow, typed subset of Uncloud's client bindings used by the
 // HTTP API. *client.Client satisfies this interface, while keeping the HTTP
 // handlers easy to test without a running daemon.
 type Backend interface {
+	Ready(context.Context) error
+	ClusterDiagnostics(context.Context) (ClusterDiagnosticsResponse, error)
+	ListCaddyConfigs(context.Context) (CaddyConfigsResponse, error)
+
 	ListMachines(context.Context, *api.MachineFilter) ([]api.MachineMember, error)
 	InspectMachine(context.Context, string) (api.MachineMember, error)
 	RenameMachine(context.Context, string, string) (MachineInfoResponse, error)
@@ -40,13 +80,21 @@ type Backend interface {
 	RemoveService(context.Context, string) error
 	StopService(context.Context, string, container.StopOptions) error
 	StartService(context.Context, string) error
+	InspectContainer(context.Context, string, string) (api.MachineServiceContainer, error)
+	StartContainer(context.Context, string, string) error
+	StopContainer(context.Context, string, string, container.StopOptions) error
+	RemoveContainer(context.Context, string, string, container.RemoveOptions) error
+	ExecContainer(context.Context, string, string, api.ExecOptions) (int, error)
 
 	ListVolumes(context.Context, *api.VolumeFilter) ([]api.MachineVolume, error)
 	CreateVolume(context.Context, string, volume.CreateOptions) (api.MachineVolume, error)
 	RemoveVolume(context.Context, string, string, bool) error
+	ListVolumeAttachments(context.Context) ([]VolumeAttachmentResponse, error)
 
 	ListImages(context.Context, api.ImageFilter) ([]api.MachineImages, error)
 	InspectImage(context.Context, string) ([]api.MachineImage, error)
+	InspectRemoteImage(context.Context, string) ([]RemoteImageResponse, error)
+	InspectImageUpdate(context.Context, string) ([]ImageUpdateResponse, error)
 	GetDomain(context.Context) (string, error)
 
 	DeployCompose(context.Context, DeployComposeRequest) (<-chan DeployComposeEvent, error)
@@ -58,15 +106,23 @@ type Config struct {
 	// AllowedOrigins is a comma-separated list accepted by Fiber's CORS
 	// middleware. Leave it empty to disable CORS middleware.
 	AllowedOrigins string
+	// MachineID identifies the Uncloud machine hosting this sidecar. Global
+	// Uncloud services receive this value through UNCLOUD_MACHINE_ID.
+	MachineID string
+	// MetricsHTTPClient allows the local metrics transport to be replaced in
+	// tests. A client with a five-second timeout is used when it is nil.
+	MetricsHTTPClient *http.Client
 }
 
 // Server is the standalone Fiber HTTP API for Uncloud.
 type Server struct {
-	backend     Backend
-	app         *fiber.App
-	openapiJSON []byte
-	openapiYAML []byte
-	scalarHTML  string
+	backend       Backend
+	app           *fiber.App
+	machineID     string
+	metricsClient *http.Client
+	openapiJSON   []byte
+	openapiYAML   []byte
+	scalarHTML    string
 }
 
 // New creates a Fiber server backed by Uncloud's typed client bindings.
@@ -92,11 +148,18 @@ func New(backend Backend, cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("render Scalar API reference: %w", err)
 	}
 
+	metricsClient := cfg.MetricsHTTPClient
+	if metricsClient == nil {
+		metricsClient = &http.Client{Timeout: metricsClientTimeout}
+	}
+
 	s := &Server{
-		backend:     backend,
-		openapiJSON: spec,
-		openapiYAML: specYAML,
-		scalarHTML:  scalarHTML,
+		backend:       backend,
+		machineID:     strings.TrimSpace(cfg.MachineID),
+		metricsClient: metricsClient,
+		openapiJSON:   spec,
+		openapiYAML:   specYAML,
+		scalarHTML:    scalarHTML,
 	}
 	s.app = fiber.New(fiber.Config{
 		DisableStartupMessage: true,
@@ -121,6 +184,8 @@ func (s *Server) App() *fiber.App {
 
 func (s *Server) registerRoutes() {
 	s.app.Get("/healthz", s.health)
+	s.app.Get("/readyz", s.ready)
+	s.app.Get("/ucinternal/metrics", s.ucInternalMetrics)
 	s.app.Get("/openapi.json", s.openapi)
 	s.app.Get("/openapi.yaml", s.openapiYAMLDocument)
 	s.app.Get("/docs", s.scalar)
@@ -128,6 +193,8 @@ func (s *Server) registerRoutes() {
 
 	apiGroup := s.app.Group("/api/v1")
 	apiGroup.Get("/cluster/domain", s.getDomain)
+	apiGroup.Get("/cluster/diagnostics", s.clusterDiagnostics)
+	apiGroup.Get("/caddy/configs", s.listCaddyConfigs)
 
 	apiGroup.Get("/machines", s.listMachines)
 	apiGroup.Get("/machines/:id", s.inspectMachine)
@@ -140,20 +207,117 @@ func (s *Server) registerRoutes() {
 	apiGroup.Post("/services/deploy/compose", s.deployCompose)
 	apiGroup.Post("/services/:id/start", s.startService)
 	apiGroup.Post("/services/:id/stop", s.stopService)
+	apiGroup.Get("/services/:id/containers/:container", s.inspectContainer)
+	apiGroup.Post("/services/:id/containers/:container/actions", s.containerAction)
+	apiGroup.Post("/services/:id/containers/:container/exec", s.execContainer)
 	apiGroup.Delete("/services/:id", s.removeService)
 
 	apiGroup.Get("/volumes", s.listVolumes)
+	apiGroup.Get("/volumes/attachments", s.listVolumeAttachments)
 	apiGroup.Post("/volumes", s.createVolume)
 	apiGroup.Delete("/machines/:machine/volumes/:volume", s.removeVolume)
 
 	apiGroup.Get("/images", s.listImages)
 	apiGroup.Get("/images/:id", s.inspectImage)
+	apiGroup.Get("/images/:id/remote", s.inspectRemoteImage)
+	apiGroup.Get("/images/:id/update", s.inspectImageUpdate)
 
 	apiGroup.Get("/machines/:id/logs", s.machineLogs)
 }
 
 func (s *Server) health(c *fiber.Ctx) error {
 	return c.JSON(StatusResponse{Status: "ok"})
+}
+
+func (s *Server) ready(c *fiber.Ctx) error {
+	if err := s.backend.Ready(requestContext(c)); err != nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(ReadinessResponse{
+			Status: "unavailable", Message: err.Error(),
+		})
+	}
+	return c.JSON(ReadinessResponse{Status: "ready"})
+}
+
+func (s *Server) ucInternalMetrics(c *fiber.Ctx) error {
+	if s.machineID == "" {
+		return writeError(c, fiber.NewError(
+			fiber.StatusServiceUnavailable,
+			"local Uncloud machine ID is not configured",
+		))
+	}
+
+	machine, err := s.backend.InspectMachine(requestContext(c), s.machineID)
+	if err != nil {
+		return writeError(c, fiber.NewError(
+			fiber.StatusServiceUnavailable,
+			"inspect local Uncloud machine for metrics: "+err.Error(),
+		))
+	}
+
+	machineIP, err := machineMetricsIP(machine)
+	if err != nil {
+		return writeError(c, err)
+	}
+
+	targetURL := "http://" + net.JoinHostPort(machineIP.String(), strconv.Itoa(uncloudMetricsPort)) + uncloudMetricsPath
+	request, err := http.NewRequestWithContext(requestContext(c), http.MethodGet, targetURL, nil)
+	if err != nil {
+		return writeError(c, fmt.Errorf("create local Uncloud metrics request: %w", err))
+	}
+
+	response, err := s.metricsClient.Do(request)
+	if err != nil {
+		return writeError(c, fiber.NewError(
+			fiber.StatusServiceUnavailable,
+			"fetch local Uncloud metrics: "+err.Error(),
+		))
+	}
+
+	contentType := response.Header.Get(fiber.HeaderContentType)
+	if contentType == "" {
+		contentType = fiber.MIMETextPlain + "; charset=utf-8"
+	}
+	c.Status(response.StatusCode)
+	c.Set(fiber.HeaderContentType, contentType)
+	c.Set(fiber.HeaderCacheControl, "no-store")
+	// fasthttp takes ownership of the stream and closes the response body
+	// after it has copied the metrics to the sidecar response.
+	return c.SendStream(response.Body)
+}
+
+func machineMetricsIP(machine api.MachineMember) (netip.Addr, error) {
+	subnet := machine.Network.Subnet
+	if !subnet.IsValid() {
+		return netip.Addr{}, fiber.NewError(
+			fiber.StatusServiceUnavailable,
+			"local Uncloud machine has no valid cluster subnet",
+		)
+	}
+
+	machineIP := subnet.Masked().Addr().Next()
+	if !subnet.Contains(machineIP) {
+		return netip.Addr{}, fiber.NewError(
+			fiber.StatusServiceUnavailable,
+			"local Uncloud machine subnet has no usable machine IP",
+		)
+	}
+	return machineIP, nil
+}
+
+func (s *Server) clusterDiagnostics(c *fiber.Ctx) error {
+	diagnostics, err := s.backend.ClusterDiagnostics(requestContext(c))
+	if err != nil {
+		return writeError(c, err)
+	}
+	return c.JSON(diagnostics)
+}
+
+func (s *Server) listCaddyConfigs(c *fiber.Ctx) error {
+	configs, err := s.backend.ListCaddyConfigs(requestContext(c))
+	if err != nil {
+		return writeError(c, err)
+	}
+	return c.JSON(configs)
 }
 
 func (s *Server) openapi(c *fiber.Ctx) error {
@@ -416,6 +580,91 @@ func (s *Server) stopService(c *fiber.Ctx) error {
 	return c.JSON(StatusResponse{Status: "stopped"})
 }
 
+func (s *Server) inspectContainer(c *fiber.Ctx) error {
+	serviceContainer, err := s.backend.InspectContainer(
+		requestContext(c), c.Params("id"), c.Params("container"),
+	)
+	if err != nil {
+		return writeError(c, err)
+	}
+	return c.JSON(ServiceContainerResponse{
+		MachineID: serviceContainer.MachineID, MachineName: serviceContainer.MachineName,
+		Container: serviceContainer.Container,
+	})
+}
+
+func (s *Server) containerAction(c *fiber.Ctx) error {
+	var request ContainerActionRequest
+	if err := decodeJSON(c, &request); err != nil {
+		return writeError(c, err)
+	}
+	serviceID := c.Params("id")
+	containerID := c.Params("container")
+	ctx := requestContext(c)
+
+	action := strings.ToLower(strings.TrimSpace(request.Action))
+	status := ""
+	switch action {
+	case "start":
+		if err := s.backend.StartContainer(ctx, serviceID, containerID); err != nil {
+			return writeError(c, err)
+		}
+		status = "started"
+	case "stop":
+		if err := s.backend.StopContainer(ctx, serviceID, containerID, container.StopOptions{}); err != nil {
+			return writeError(c, err)
+		}
+		status = "stopped"
+	case "restart":
+		if err := s.backend.StopContainer(ctx, serviceID, containerID, container.StopOptions{}); err != nil {
+			return writeError(c, err)
+		}
+		if err := s.backend.StartContainer(ctx, serviceID, containerID); err != nil {
+			return writeError(c, err)
+		}
+		status = "restarted"
+	case "remove":
+		if err := s.backend.RemoveContainer(ctx, serviceID, containerID, container.RemoveOptions{}); err != nil {
+			return writeError(c, err)
+		}
+		status = "removed"
+	default:
+		return writeError(c, fiber.NewError(fiber.StatusBadRequest, "action must be start, stop, restart, or remove"))
+	}
+
+	return c.JSON(StatusResponse{Status: status})
+}
+
+func (s *Server) execContainer(c *fiber.Ctx) error {
+	var request ExecContainerRequest
+	if err := decodeJSON(c, &request); err != nil {
+		return writeError(c, err)
+	}
+	if len(request.Command) == 0 {
+		return writeError(c, fiber.NewError(fiber.StatusBadRequest, "command must not be empty"))
+	}
+	for _, argument := range request.Command {
+		if strings.ContainsRune(argument, '\x00') {
+			return writeError(c, fiber.NewError(fiber.StatusBadRequest, "command arguments must not contain NUL bytes"))
+		}
+	}
+
+	stdout := &cappedBuffer{limit: maxExecOutputBytes}
+	stderr := &cappedBuffer{limit: maxExecOutputBytes}
+	exitCode, err := s.backend.ExecContainer(requestContext(c), c.Params("id"), c.Params("container"), api.ExecOptions{
+		Command: request.Command, AttachStdin: request.Stdin != "", AttachStdout: true,
+		AttachStderr: !request.TTY, Tty: request.TTY, Stdin: strings.NewReader(request.Stdin),
+		Stdout: stdout, Stderr: stderr,
+	})
+	if err != nil {
+		return writeError(c, err)
+	}
+	return c.JSON(ExecContainerResponse{
+		ExitCode: exitCode, Stdout: stdout.String(), Stderr: stderr.String(),
+		Truncated: stdout.Truncated() || stderr.Truncated(),
+	})
+}
+
 func (s *Server) removeService(c *fiber.Ctx) error {
 	if err := s.backend.RemoveService(requestContext(c), c.Params("id")); err != nil {
 		return writeError(c, err)
@@ -438,6 +687,14 @@ func (s *Server) listVolumes(c *fiber.Ctx) error {
 		items = append(items, volumeResponse(machineVolume))
 	}
 	return c.JSON(ItemResponse[VolumeResponse]{Items: items})
+}
+
+func (s *Server) listVolumeAttachments(c *fiber.Ctx) error {
+	attachments, err := s.backend.ListVolumeAttachments(requestContext(c))
+	if err != nil {
+		return writeError(c, err)
+	}
+	return c.JSON(ItemResponse[VolumeAttachmentResponse]{Items: attachments})
 }
 
 func (s *Server) createVolume(c *fiber.Ctx) error {
@@ -497,6 +754,22 @@ func (s *Server) inspectImage(c *fiber.Ctx) error {
 		items = append(items, machineImageResponse(machineImage))
 	}
 	return c.JSON(ItemResponse[MachineImageResponse]{Items: items})
+}
+
+func (s *Server) inspectRemoteImage(c *fiber.Ctx) error {
+	images, err := s.backend.InspectRemoteImage(requestContext(c), c.Params("id"))
+	if err != nil {
+		return writeError(c, err)
+	}
+	return c.JSON(ItemResponse[RemoteImageResponse]{Items: images})
+}
+
+func (s *Server) inspectImageUpdate(c *fiber.Ctx) error {
+	images, err := s.backend.InspectImageUpdate(requestContext(c), c.Params("id"))
+	if err != nil {
+		return writeError(c, err)
+	}
+	return c.JSON(ItemResponse[ImageUpdateResponse]{Items: images})
 }
 
 func (s *Server) errorHandler(c *fiber.Ctx, err error) error {

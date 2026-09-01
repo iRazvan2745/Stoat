@@ -5,69 +5,64 @@ import { eq } from "drizzle-orm";
 import { db } from "#lib/db";
 import { deployments } from "#lib/db/schema";
 import {
-  hasAccessToThisDataSource,
-  hasAccessToThisService,
-  hasAccessToThisWorkspace,
+    hasAccessToThisDataSource,
+    hasAccessToThisService,
+    hasAccessToThisWorkspace,
 } from "#lib/server/access";
 
-type Session = NonNullable<App.Locals["session"]>;
+type AuthenticatedSession = NonNullable<App.Locals["session"]>;
+type AccessCheck = (userId: string, resourceId: string) => Promise<boolean>;
 
 // Session is resolved once per request in hooks.server.ts; remote functions
 // only need to assert it exists.
-export const requireSession = (): Session => {
-  const { locals } = getRequestEvent();
+export const requireSession = (): AuthenticatedSession => {
+    const { locals } = getRequestEvent();
 
-  if (!locals.session) {
-    error(401, "Unauthorized");
-  }
+    if (!locals.session) {
+        error(401, "Unauthorized");
+    }
 
-  return locals.session;
+    return locals.session;
 };
 
-export const requireDataSourceAccess = async (dataSourceId: string): Promise<Session> => {
-  const session = requireSession();
+const requireResourceAccess = async (
+    resourceId: string,
+    checkAccess: AccessCheck,
+): Promise<AuthenticatedSession> => {
+    const session = requireSession();
 
-  if (!(await hasAccessToThisDataSource(session.user.id, dataSourceId))) {
-    error(403, "Forbidden");
-  }
+    if (!(await checkAccess(session.user.id, resourceId))) {
+        error(403, "Forbidden");
+    }
 
-  return session;
+    return session;
 };
 
-export const requireWorkspaceAccess = async (workspaceId: string): Promise<Session> => {
-  const session = requireSession();
+export const requireDataSourceAccess = (dataSourceId: string): Promise<AuthenticatedSession> =>
+    requireResourceAccess(dataSourceId, hasAccessToThisDataSource);
 
-  if (!(await hasAccessToThisWorkspace(session.user.id, workspaceId))) {
-    error(403, "Forbidden");
-  }
+export const requireWorkspaceAccess = (workspaceId: string): Promise<AuthenticatedSession> =>
+    requireResourceAccess(workspaceId, hasAccessToThisWorkspace);
 
-  return session;
-};
+export const requireServiceAccess = (serviceId: string): Promise<AuthenticatedSession> =>
+    requireResourceAccess(serviceId, hasAccessToThisService);
 
-export const requireServiceAccess = async (serviceId: string): Promise<Session> => {
-  const session = requireSession();
+export const requireDeploymentAccess = async (
+    deploymentId: string,
+): Promise<AuthenticatedSession> => {
+    const session = requireSession();
+    const [deployment] = await db
+        .select({ serviceId: deployments.serviceId })
+        .from(deployments)
+        .where(eq(deployments.id, deploymentId));
 
-  if (!(await hasAccessToThisService(session.user.id, serviceId))) {
-    error(403, "Forbidden");
-  }
+    if (!deployment) {
+        error(404, "Deployment not found");
+    }
 
-  return session;
-};
+    if (!(await hasAccessToThisService(session.user.id, deployment.serviceId))) {
+        error(403, "Forbidden");
+    }
 
-export const requireDeploymentAccess = async (deploymentId: string): Promise<Session> => {
-  const session = requireSession();
-  const [deployment] = await db
-    .select({ serviceId: deployments.serviceId })
-    .from(deployments)
-    .where(eq(deployments.id, deploymentId));
-
-  if (!deployment) {
-    error(404, "Deployment not found");
-  }
-
-  if (!(await hasAccessToThisService(session.user.id, deployment.serviceId))) {
-    error(403, "Forbidden");
-  }
-
-  return session;
+    return session;
 };

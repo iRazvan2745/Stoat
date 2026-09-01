@@ -14,7 +14,11 @@
     import { onDestroy } from "svelte";
     import CodeMirror from "svelte-codemirror-editor";
 
-    import { previewCompose, updateCompose } from "#lib/api/services.remote";
+    import {
+        previewServiceCompose,
+        updateServiceCompose,
+    } from "#lib/api/services.remote";
+    import { codeMirrorSearchExtensions } from "#lib/shared/ui/code-mirror-search";
 
     interface Props {
         initialCompose?: string | null;
@@ -33,7 +37,7 @@
     let saving = $state(false);
     let pendingSave = $state(false);
     let saveInFlight = false;
-    let saveTimeoutId = 0;
+    let saveTimeoutId: ReturnType<typeof setTimeout> | undefined;
     let previewOpen = $state(false);
     let previewLoading = $state(false);
     let previewYaml = $state("");
@@ -133,9 +137,9 @@
         previewYaml = "";
 
         try {
-            const formatted = await previewCompose({
+            const formatted = await previewServiceCompose({
                 compose,
-                id: serviceId,
+                serviceId,
             });
             previewYaml = formatted.yaml;
         } catch (error) {
@@ -164,7 +168,7 @@
         let saved = false;
 
         try {
-            await updateCompose({ compose: draft, id: serviceId });
+            await updateServiceCompose({ compose: draft, serviceId });
             lastSaved = draft;
             saved = true;
         } catch (error) {
@@ -184,7 +188,7 @@
     };
 
     const scheduleSave = (draft: string): void => {
-        window.clearTimeout(saveTimeoutId);
+        clearTimeout(saveTimeoutId);
 
         if (draft === lastSaved) {
             pendingSave = false;
@@ -192,14 +196,14 @@
         }
 
         pendingSave = true;
-        saveTimeoutId = window.setTimeout(() => {
+        saveTimeoutId = setTimeout(() => {
             pendingSave = false;
             void persist();
         }, SAVE_DEBOUNCE_MS);
     };
 
     onDestroy(() => {
-        window.clearTimeout(saveTimeoutId);
+        clearTimeout(saveTimeoutId);
     });
 </script>
 
@@ -241,6 +245,7 @@
                 lang={composeLanguage}
                 syntaxHighlighting={composeSyntaxHighlighting}
                 styles={editorStyles}
+                extensions={codeMirrorSearchExtensions}
                 lineNumbers={false}
                 foldGutter={false}
                 highlight={{

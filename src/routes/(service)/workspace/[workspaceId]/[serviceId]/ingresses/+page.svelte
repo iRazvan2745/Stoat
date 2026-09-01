@@ -9,21 +9,21 @@
     import settingsEthernetIcon from "@ktibow/iconset-material-symbols/settings-ethernet";
     import { Button, Card, Icon, LoadingIndicator, Snackbar } from "m3-svelte";
 
-    import { getService, getServiceIngresses } from "#lib/api/services.remote";
+    import { getService, listServiceIngresses } from "#lib/api/services.remote";
     import {
         Flow,
         FlowNode,
         FlowNodeList,
         FlowParallel,
     } from "#lib/components/flow";
-    import type { ServiceIngress } from "#lib/server/service/service-ingresses";
-    import ServiceIcon from "#lib/service/icon.svelte";
-    import { copyToClipboard } from "#lib/ui/clipboard";
+    import ServiceIcon from "#lib/components/services/service-icon.svelte";
+    import type { ServiceIngress } from "#lib/domain/services/ingresses";
+    import { copyToClipboard } from "#lib/shared/ui/clipboard";
 
     const { params } = $props();
 
     const service = $derived(getService(params.serviceId));
-    const ingressQuery = $derived(getServiceIngresses(params.serviceId));
+    const ingressQuery = $derived(listServiceIngresses(params.serviceId));
 
     const svc = $derived(await service);
 

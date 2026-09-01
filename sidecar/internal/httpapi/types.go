@@ -31,6 +31,114 @@ type DomainResponse struct {
 	Domain string `json:"domain"`
 }
 
+// ReadinessResponse reports whether the sidecar can reach the Uncloud control plane.
+type ReadinessResponse struct {
+	Status  string `json:"status"`
+	Message string `json:"message,omitempty"`
+}
+
+// ClusterDiagnosticsResponse is a read-only health snapshot assembled from every machine.
+type ClusterDiagnosticsResponse struct {
+	Status       string                      `json:"status"`
+	Issues       []string                    `json:"issues"`
+	Machines     []DiagnosticMachineResponse `json:"machines"`
+	Links        []ClusterLinkResponse       `json:"links"`
+	VersionDrift bool                        `json:"versionDrift"`
+}
+
+type DiagnosticMachineResponse struct {
+	ID            string             `json:"id"`
+	Name          string             `json:"name"`
+	State         string             `json:"state"`
+	DaemonVersion string             `json:"daemonVersion,omitempty"`
+	DockerVersion string             `json:"dockerVersion,omitempty"`
+	StoreVersion  map[string]int64   `json:"storeVersion,omitempty"`
+	WireGuard     *WireGuardResponse `json:"wireGuard,omitempty"`
+	Error         string             `json:"error,omitempty"`
+}
+
+type ClusterLinkResponse struct {
+	From          string  `json:"from"`
+	To            string  `json:"to"`
+	MedianMs      float64 `json:"medianMs"`
+	StandardDevMs float64 `json:"standardDevMs"`
+}
+
+type WireGuardResponse struct {
+	InterfaceName string                  `json:"interfaceName"`
+	ListenPort    int32                   `json:"listenPort"`
+	Peers         []WireGuardPeerResponse `json:"peers"`
+}
+
+type WireGuardPeerResponse struct {
+	Endpoint        string    `json:"endpoint,omitempty"`
+	LastHandshakeAt time.Time `json:"lastHandshakeAt,omitempty"`
+	ReceiveBytes    int64     `json:"receiveBytes"`
+	TransmitBytes   int64     `json:"transmitBytes"`
+	AllowedIPs      []string  `json:"allowedIps"`
+}
+
+type CaddyConfigResponse struct {
+	MachineID   string    `json:"machineId"`
+	MachineName string    `json:"machineName"`
+	Caddyfile   string    `json:"caddyfile,omitempty"`
+	ModifiedAt  time.Time `json:"modifiedAt,omitempty"`
+	SHA256      string    `json:"sha256,omitempty"`
+	Error       string    `json:"error,omitempty"`
+}
+
+type CaddyConfigsResponse struct {
+	Items []CaddyConfigResponse `json:"items"`
+	Drift bool                  `json:"drift"`
+}
+
+type RemoteImageResponse struct {
+	MachineID          string `json:"machineId,omitempty"`
+	MachineName        string `json:"machineName,omitempty"`
+	CanonicalReference string `json:"canonicalReference,omitempty"`
+	Digest             string `json:"digest,omitempty"`
+	Error              string `json:"error,omitempty"`
+}
+
+type ImageUpdateResponse struct {
+	MachineID       string   `json:"machineId,omitempty"`
+	MachineName     string   `json:"machineName,omitempty"`
+	ImageID         string   `json:"imageId,omitempty"`
+	LocalDigests    []string `json:"localDigests"`
+	RemoteDigest    string   `json:"remoteDigest,omitempty"`
+	UpdateAvailable *bool    `json:"updateAvailable,omitempty"`
+	Error           string   `json:"error,omitempty"`
+}
+
+type VolumeAttachmentResponse struct {
+	MachineID     string `json:"machineId"`
+	MachineName   string `json:"machineName"`
+	VolumeName    string `json:"volumeName"`
+	Attached      bool   `json:"attached"`
+	ServiceID     string `json:"serviceId,omitempty"`
+	ServiceName   string `json:"serviceName,omitempty"`
+	ContainerID   string `json:"containerId,omitempty"`
+	ContainerName string `json:"containerName,omitempty"`
+	Destination   string `json:"destination,omitempty"`
+}
+
+type ContainerActionRequest struct {
+	Action string `json:"action"`
+}
+
+type ExecContainerRequest struct {
+	Command []string `json:"command"`
+	Stdin   string   `json:"stdin,omitempty"`
+	TTY     bool     `json:"tty,omitempty"`
+}
+
+type ExecContainerResponse struct {
+	ExitCode  int    `json:"exitCode"`
+	Stdout    string `json:"stdout"`
+	Stderr    string `json:"stderr"`
+	Truncated bool   `json:"truncated"`
+}
+
 // RenameMachineRequest is the request body for changing a machine name.
 type RenameMachineRequest struct {
 	Name string `json:"name"`

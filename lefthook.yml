@@ -1,5 +1,10 @@
 pre-commit:
-  commands:
-    check:
-      run: vp staged
-      stage_fixed: true
+    commands:
+        check:
+            run: vp staged
+            stage_fixed: true
+
+commit-msg:
+    commands:
+        commitlint:
+            run: pnpm exec commitlint --edit {1}

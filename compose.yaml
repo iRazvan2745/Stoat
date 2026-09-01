@@ -1,0 +1,59 @@
+services:
+    stoat:
+        image: ghcr.io/irazvan2745/stoat:latest
+        environment:
+            APP_SECRET: "${APP_SECRET:?set APP_SECRET}"
+            APP_URL: "${APP_URL:?set APP_URL}"
+            DATABASE_URL: "postgres://stoat:${POSTGRES_PASSWORD:-stoat}@stoat-db.internal:5432/stoat"
+        x-ports:
+            - "${STOAT_PORT:-3000}:3000"
+        pull_policy: always
+        depends_on:
+            stoat-db:
+                condition: service_healthy
+            sidecar:
+                condition: service_healthy
+        healthcheck:
+            test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/healthz"]
+            interval: 10s
+            timeout: 3s
+            retries: 5
+            start_period: 10s
+        restart: unless-stopped
+        volumes:
+            - stoat_data:/app/data
+
+    stoat-db:
+        image: postgres:18-alpine
+        environment:
+            POSTGRES_DB: stoat
+            POSTGRES_PASSWORD: stoat
+            POSTGRES_USER: stoat
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U stoat -d stoat"]
+            interval: 5s
+            timeout: 3s
+            retries: 5
+        volumes:
+            - stoat_db_data:/var/lib/postgresql
+        restart: unless-stopped
+
+    sidecar:
+        image: ghcr.io/irazvan2745/sidecar:latest
+        deploy:
+            mode: global
+        volumes:
+            # Bind-mount the host's Uncloud socket directory.
+            - /run/uncloud:/run/uncloud:ro
+        pull_policy: always
+        healthcheck:
+            test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:80/readyz"]
+            interval: 10s
+            timeout: 3s
+            retries: 5
+            start_period: 5s
+        restart: unless-stopped
+
+volumes:
+    stoat_data:
+    stoat_db_data:

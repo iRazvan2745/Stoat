@@ -1,22 +1,41 @@
 <script lang="ts">
-    // oxlint-disable func-style
-    import {
-        Button,
-        Card,
-        Divider,
-        LoadingIndicator,
-        pathHeart,
-    } from "m3-svelte";
+    import databaseIcon from "@ktibow/iconset-material-symbols/database";
+    import favoriteIcon from "@ktibow/iconset-material-symbols/favorite";
+    import { Button, Card, Icon, LoadingIndicator } from "m3-svelte";
 
-    import { getMachines } from "#lib/api/cluster/machines.remote";
+    import { listOrganizationMachines } from "#lib/api/cluster/machines.remote";
 
-    const machines = getMachines();
+    const machines = listOrganizationMachines();
+    const machineCount = $derived(machines.current?.items.length ?? 0);
+    const sourceCount = $derived(machines.current?.dataSources.length ?? 0);
+    const connectedSourceCount = $derived(
+        machines.current?.dataSources.filter(
+            (source) => source.status === "connected"
+        ).length ?? 0
+    );
+    const machineGroups = $derived.by(() => {
+        const current = machines.current;
 
-    function stateClasses(state: string) {
+        if (!current) {
+            return [];
+        }
+
+        return current.dataSources.map((source) => ({
+            items: current.items.filter(
+                (item) => item.dataSourceId === source.dataSourceId
+            ),
+            source,
+        }));
+    });
+
+    function stateClasses(state: string): string {
         switch (state.toLowerCase()) {
-            case "running":
+            case "active":
+            case "healthy":
             case "online":
-            case "active": {
+            case "ready":
+            case "running":
+            case "up": {
                 return "bg-primary-container text-on-primary-container";
             }
 
@@ -34,179 +53,200 @@
     }
 </script>
 
-<div class="flex items-center justify-between gap-4 p-5">
+<div class="flex items-center justify-between gap-4 py-5">
     <div>
         <h1 class="text-on-surface text-lg font-medium">Machines</h1>
 
         <p class="text-on-surface-variant mt-0.5 text-sm">
-            {machines.current?.items.length ?? 0}
-            {(machines.current?.items.length ?? 0) === 1
-                ? "machine"
-                : "machines"}
+            {machineCount}
+            {machineCount === 1 ? "machine" : "machines"}
+            <span aria-hidden="true"> · </span>
+            {sourceCount}
+            {sourceCount === 1 ? "data source" : "data sources"}
+            <span aria-hidden="true"> · </span>
+            {connectedSourceCount}/{sourceCount} connected
         </p>
     </div>
 
-    <Button onclick={() => machines.refresh()}>Refresh</Button>
+    <Button variant="tonal" onclick={() => machines.refresh()}>Refresh</Button>
 </div>
+
 <Card variant="outlined" id="machines-card">
     {#if machines.loading}
         <div class="flex min-h-32 items-center justify-center">
             <LoadingIndicator aria-label="Loading machines" />
         </div>
     {:else if machines.error}
-        <div class="text-error p-6 text-sm">
-            {machines.error.message}
+        <div class="text-error p-6 text-sm">{machines.error.message}</div>
+    {:else if sourceCount === 0}
+        <div class="text-on-surface-variant px-5 py-10 text-center text-sm">
+            No data sources are configured for this organization.
         </div>
     {:else}
         <div class="overflow-x-auto">
-            <!-- table header -->
-            <div
-                class="
-          text-on-surface-variant
-          bg-surface-container-high grid
-          min-w-275
-          grid-cols-[minmax(240px,1.4fr)_150px_150px_240px_110px_150px_150px_110px] items-center
-          gap-4 px-5
-          py-3 text-xs
-          font-medium
-        "
+            <table
+                class="w-full min-w-[44rem] table-fixed border-collapse text-left"
             >
-                <span>Machine</span>
-                <span>Public IP</span>
-                <span>Management</span>
-                <span>OS</span>
-                <span>Arch</span>
-                <span>Docker</span>
-                <span>Daemon</span>
-                <span>Status</span>
-            </div>
-
-            <Divider />
-
-            <!-- table rows -->
-            {#each machines.current?.items ?? [] as machine, index (machine.id)}
-                <div
-                    class="
-            border-outline-variant
-            grid min-w-275
-            grid-cols-[minmax(240px,1.4fr)_150px_150px_240px_110px_150px_150px_110px]
-            items-center gap-4
-            border-b px-5 py-3
-            transition-colors
-          "
+                <colgroup>
+                    <col class="w-[38%]" />
+                    <col class="w-[17%]" />
+                    <col class="w-[16%]" />
+                    <col class="w-[29%]" />
+                </colgroup>
+                <thead
+                    class="bg-surface-container-high text-on-surface-variant"
                 >
-                    <!-- machine -->
-                    <div class="flex min-w-0 items-center gap-2">
-                        <div
-                            class={[
-                                "inline-flex items-center rounded-full p-1.5",
-                                "text-xs font-medium capitalize",
-                                stateClasses(machine.state),
-                            ]}
+                    <tr>
+                        <th
+                            class="px-5 py-3 text-xs font-medium whitespace-nowrap"
+                            scope="col"
                         >
-                            <svg
-                                width="20"
-                                height="20"
-                                viewBox="0 0 380 380"
-                                aria-hidden="true"
+                            Machine
+                        </th>
+                        <th
+                            class="px-5 py-3 text-xs font-medium whitespace-nowrap"
+                            scope="col"
+                        >
+                            Public IP
+                        </th>
+                        <th
+                            class="px-5 py-3 text-xs font-medium whitespace-nowrap"
+                            scope="col"
+                        >
+                            Management
+                        </th>
+                        <th
+                            class="px-5 py-3 text-xs font-medium whitespace-nowrap"
+                            scope="col"
+                        >
+                            OS
+                        </th>
+                    </tr>
+                </thead>
+
+                {#each machineGroups as group (group.source.dataSourceId)}
+                    <tbody>
+                        <tr class="bg-surface-container-low">
+                            <th
+                                class="border-outline-variant border-t px-5 py-3"
+                                colspan="4"
+                                scope="rowgroup"
                             >
-                                <path d={pathHeart} fill="currentColor" />
-                            </svg>
-                        </div>
+                                <div class="flex min-w-0 items-start gap-3">
+                                    <span
+                                        class="bg-surface-container text-on-surface-variant mt-0.5 inline-flex shrink-0 items-center rounded-full p-2"
+                                    >
+                                        <Icon icon={databaseIcon} size={18} />
+                                    </span>
 
-                        <div class="min-w-0">
-                            <div
-                                class="text-on-surface truncate text-sm font-medium"
-                            >
-                                {machine.name}
-                            </div>
-
-                            <div
-                                class="text-on-surface-variant truncate text-xs"
-                            >
-                                {machine.hostname ?? machine.id}
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- public IP -->
-                    <div class="text-on-surface truncate font-mono text-sm">
-                        {machine.publicIp ?? "—"}
-                    </div>
-
-                    <!-- management IP -->
-                    <div class="text-on-surface truncate font-mono text-sm">
-                        {machine.network?.managementIp ?? "—"}
-                    </div>
-
-                    <!-- OS -->
-                    <div class="flex min-w-0 items-center gap-2">
-                        {#if machine.osPrettyName
-                            ?.split(" ")[0]
-                            ?.toLowerCase() === "debian"}
-                            <img
-                                src="/debian.svg"
-                                alt="debian"
-                                height="24"
-                                width="24"
-                            />
-                        {/if}
-                        <div class="min-w-0">
-                            <div class="text-on-surface truncate text-sm">
-                                {machine.osPrettyName ?? "—"}
-                            </div>
-
-                            {#if machine.kernelVersion}
-                                <div
-                                    class="text-on-surface-variant truncate text-xs"
-                                >
-                                    {machine.kernelVersion}
+                                    <div class="min-w-0 text-left">
+                                        <div
+                                            class="text-on-surface truncate text-sm font-medium"
+                                        >
+                                            {group.source.label}
+                                        </div>
+                                        <div
+                                            class="text-on-surface-variant truncate font-mono text-xs font-normal"
+                                        >
+                                            {group.source.uncloudUrl}
+                                        </div>
+                                        {#if group.source.error}
+                                            <div
+                                                class="text-error mt-1 text-xs font-normal"
+                                            >
+                                                {group.source.error}
+                                            </div>
+                                        {/if}
+                                    </div>
                                 </div>
-                            {/if}
-                        </div>
-                    </div>
+                            </th>
+                        </tr>
 
-                    <!-- arch -->
-                    <div class="text-on-surface truncate text-sm">
-                        {machine.arch ?? "—"}
-                    </div>
+                        {#each group.items as item (item.machine.id)}
+                            {@const machine = item.machine}
+                            <tr
+                                class="border-outline-variant border-t align-top transition-colors"
+                            >
+                                <td class="px-5 py-4">
+                                    <div class="flex items-start gap-2">
+                                        <div
+                                            class={[
+                                                "inline-flex shrink-0 items-center rounded-full p-1.5",
+                                                stateClasses(machine.state),
+                                            ]}
+                                            role="img"
+                                            aria-label={`Machine status: ${machine.state}`}
+                                        >
+                                            <Icon
+                                                icon={favoriteIcon}
+                                                size={20}
+                                            />
+                                        </div>
+                                        <div class="min-w-0">
+                                            <div
+                                                class="text-on-surface truncate text-sm font-medium"
+                                            >
+                                                {machine.name}
+                                            </div>
+                                            <div
+                                                class="text-on-surface-variant truncate font-mono text-xs"
+                                            >
+                                                {machine.hostname ?? machine.id}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
 
-                    <!-- docker -->
-                    <div class="text-on-surface truncate text-sm">
-                        {machine.dockerVersion ?? "—"}
-                    </div>
+                                <td
+                                    class="px-5 py-4 align-middle font-mono text-sm whitespace-nowrap"
+                                >
+                                    <div
+                                        class="truncate"
+                                        title={machine.publicIp ?? "—"}
+                                    >
+                                        {machine.publicIp ?? "—"}
+                                    </div>
+                                </td>
 
-                    <!-- daemon -->
-                    <div class="text-on-surface truncate text-sm">
-                        {machine.daemonVersion ?? "—"}
-                    </div>
+                                <td
+                                    class="px-5 py-4 align-middle font-mono text-sm whitespace-nowrap"
+                                >
+                                    <div
+                                        class="max-w-40 truncate"
+                                        title={machine.network?.managementIp ??
+                                            "—"}
+                                    >
+                                        {machine.network?.managementIp ?? "—"}
+                                    </div>
+                                </td>
 
-                    <!-- status -->
-                    <div>
-                        <span
-                            class={[
-                                "inline-flex items-center rounded-full px-2.5 py-1",
-                                "text-xs font-medium capitalize",
-                                stateClasses(machine.state),
-                            ]}
-                        >
-                            {machine.state}
-                        </span>
-                    </div>
-                </div>
+                                <td class="px-5 py-4 align-middle">
+                                    <div class="text-on-surface text-sm">
+                                        {machine.osPrettyName ?? "Unknown OS"}
+                                    </div>
+                                    <div
+                                        class="text-on-surface-variant mt-1 max-w-48 truncate text-xs"
+                                        title={machine.kernelVersion ?? "—"}
+                                    >
+                                        Kernel {machine.kernelVersion ?? "—"}
+                                    </div>
+                                </td>
+                            </tr>
+                        {/each}
 
-                {#if index < (machines.current?.items.length ?? 0) - 1}
-                    <Divider />
-                {/if}
-            {/each}
-
-            {#if (machines.current?.items.length ?? 0) === 0}
-                <div
-                    class="text-on-surface-variant px-5 py-10 text-center text-sm"
-                >
-                    No machines found.
-                </div>
-            {/if}
+                        {#if group.items.length === 0}
+                            <tr>
+                                <td
+                                    class="text-on-surface-variant border-outline-variant border-t px-5 py-4 text-sm"
+                                    colspan="4"
+                                >
+                                    No machines returned from this data source.
+                                </td>
+                            </tr>
+                        {/if}
+                    </tbody>
+                {/each}
+            </table>
         </div>
     {/if}
 </Card>
@@ -214,6 +254,6 @@
 <style>
     :global(#machines-card.m3-container) {
         padding: 0;
-        overflow-x: hidden;
+        overflow: hidden;
     }
 </style>

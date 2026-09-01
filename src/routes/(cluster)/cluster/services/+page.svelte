@@ -1,12 +1,12 @@
 <script lang="ts">
     import { Button, Card, Divider, LoadingIndicator } from "m3-svelte";
 
-    import { getServices } from "#lib/api/cluster/services.remote";
+    import { listServices } from "#lib/api/cluster/services.remote";
 
     import { toServiceTree } from "./service-tree";
     import ServiceTree from "./service-tree.svelte";
 
-    const services = getServices();
+    const services = listServices();
 
     const tree = $derived(toServiceTree(services.current?.items ?? []));
 </script>

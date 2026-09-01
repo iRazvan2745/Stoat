@@ -1,9 +1,11 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -24,27 +26,39 @@ import (
 )
 
 type fakeBackend struct {
-	machines []api.MachineMember
-	services []api.Service
-	volumes  []api.MachineVolume
-	images   []api.MachineImages
-	domain   string
+	machines     []api.MachineMember
+	services     []api.Service
+	volumes      []api.MachineVolume
+	images       []api.MachineImages
+	domain       string
+	diagnostics  ClusterDiagnosticsResponse
+	caddyConfigs CaddyConfigsResponse
+	attachments  []VolumeAttachmentResponse
+	remoteImages []RemoteImageResponse
+	imageUpdates []ImageUpdateResponse
 
-	listMachinesErr   error
-	inspectMachineErr error
-	renameMachineErr  error
-	listServicesErr   error
-	inspectServiceErr error
-	runServiceErr     error
-	removeServiceErr  error
-	stopServiceErr    error
-	startServiceErr   error
-	listVolumesErr    error
-	createVolumeErr   error
-	removeVolumeErr   error
-	listImagesErr     error
-	inspectImageErr   error
-	domainErr         error
+	listMachinesErr     error
+	inspectMachineErr   error
+	renameMachineErr    error
+	listServicesErr     error
+	inspectServiceErr   error
+	runServiceErr       error
+	removeServiceErr    error
+	stopServiceErr      error
+	startServiceErr     error
+	listVolumesErr      error
+	createVolumeErr     error
+	removeVolumeErr     error
+	listImagesErr       error
+	inspectImageErr     error
+	domainErr           error
+	readyErr            error
+	containerErr        error
+	execErr             error
+	lastContainerID     string
+	lastContainerAction string
+	containerActions    []string
+	lastExecOptions     api.ExecOptions
 
 	lastMachineFilter *api.MachineFilter
 	lastMachineID     string
@@ -63,6 +77,16 @@ type fakeBackend struct {
 
 	deployComposeErr     error
 	lastDeployComposeReq DeployComposeRequest
+}
+
+func (f *fakeBackend) Ready(context.Context) error { return f.readyErr }
+
+func (f *fakeBackend) ClusterDiagnostics(context.Context) (ClusterDiagnosticsResponse, error) {
+	return f.diagnostics, nil
+}
+
+func (f *fakeBackend) ListCaddyConfigs(context.Context) (CaddyConfigsResponse, error) {
+	return f.caddyConfigs, nil
 }
 
 func (f *fakeBackend) ListMachines(_ context.Context, filter *api.MachineFilter) ([]api.MachineMember, error) {
@@ -154,6 +178,44 @@ func (f *fakeBackend) StartService(_ context.Context, id string) error {
 	return f.startServiceErr
 }
 
+func (f *fakeBackend) InspectContainer(_ context.Context, serviceID, targetID string) (api.MachineServiceContainer, error) {
+	f.lastServiceID = serviceID
+	f.lastContainerID = targetID
+	if f.containerErr != nil {
+		return api.MachineServiceContainer{}, f.containerErr
+	}
+	return api.MachineServiceContainer{MachineID: "machine-1", MachineName: "node-1"}, nil
+}
+
+func (f *fakeBackend) StartContainer(_ context.Context, serviceID, containerID string) error {
+	f.lastServiceID, f.lastContainerID, f.lastContainerAction = serviceID, containerID, "start"
+	f.containerActions = append(f.containerActions, "start")
+	return f.containerErr
+}
+
+func (f *fakeBackend) StopContainer(_ context.Context, serviceID, containerID string, _ container.StopOptions) error {
+	f.lastServiceID, f.lastContainerID, f.lastContainerAction = serviceID, containerID, "stop"
+	f.containerActions = append(f.containerActions, "stop")
+	return f.containerErr
+}
+
+func (f *fakeBackend) RemoveContainer(_ context.Context, serviceID, containerID string, _ container.RemoveOptions) error {
+	f.lastServiceID, f.lastContainerID, f.lastContainerAction = serviceID, containerID, "remove"
+	f.containerActions = append(f.containerActions, "remove")
+	return f.containerErr
+}
+
+func (f *fakeBackend) ExecContainer(_ context.Context, serviceID, containerID string, opts api.ExecOptions) (int, error) {
+	f.lastServiceID, f.lastContainerID, f.lastExecOptions = serviceID, containerID, opts
+	if f.execErr != nil {
+		return -1, f.execErr
+	}
+	input, _ := io.ReadAll(opts.Stdin)
+	_, _ = io.Copy(opts.Stdout, bytes.NewBufferString("out:"+string(input)))
+	_, _ = io.Copy(opts.Stderr, bytes.NewBufferString("warning"))
+	return 0, nil
+}
+
 func (f *fakeBackend) ListVolumes(_ context.Context, filter *api.VolumeFilter) ([]api.MachineVolume, error) {
 	f.lastVolumeFilter = filter
 	return f.volumes, f.listVolumesErr
@@ -177,6 +239,10 @@ func (f *fakeBackend) RemoveVolume(_ context.Context, machine, name string, _ bo
 	return f.removeVolumeErr
 }
 
+func (f *fakeBackend) ListVolumeAttachments(context.Context) ([]VolumeAttachmentResponse, error) {
+	return f.attachments, nil
+}
+
 func (f *fakeBackend) ListImages(_ context.Context, filter api.ImageFilter) ([]api.MachineImages, error) {
 	f.lastImageFilter = filter
 	return f.images, f.listImagesErr
@@ -187,6 +253,14 @@ func (f *fakeBackend) InspectImage(context.Context, string) ([]api.MachineImage,
 		return nil, f.inspectImageErr
 	}
 	return []api.MachineImage{{Image: image.InspectResponse{ID: "sha256:image"}}}, nil
+}
+
+func (f *fakeBackend) InspectRemoteImage(context.Context, string) ([]RemoteImageResponse, error) {
+	return f.remoteImages, nil
+}
+
+func (f *fakeBackend) InspectImageUpdate(context.Context, string) ([]ImageUpdateResponse, error) {
+	return f.imageUpdates, nil
 }
 
 func (f *fakeBackend) GetDomain(context.Context) (string, error) {
@@ -223,6 +297,10 @@ func (f *fakeBackend) DeployCompose(_ context.Context, req DeployComposeRequest)
 }
 
 func newTestServer(t *testing.T) (*Server, *fakeBackend) {
+	return newTestServerWithConfig(t, Config{AllowedOrigins: "http://localhost:3000"})
+}
+
+func newTestServerWithConfig(t *testing.T, cfg Config) (*Server, *fakeBackend) {
 	t.Helper()
 	fake := &fakeBackend{
 		machines: []api.MachineMember{testMachine()},
@@ -235,12 +313,19 @@ func newTestServer(t *testing.T) (*Server, *fakeBackend) {
 		images: []api.MachineImages{{
 			Images: []image.Summary{{ID: "sha256:image", RepoTags: []string{"nginx:latest"}}},
 		}},
-		domain: "example.uncld.dev",
+		domain:       "example.uncld.dev",
+		diagnostics:  ClusterDiagnosticsResponse{Status: "healthy", Issues: []string{}, Machines: []DiagnosticMachineResponse{}, Links: []ClusterLinkResponse{}},
+		caddyConfigs: CaddyConfigsResponse{Items: []CaddyConfigResponse{{MachineID: "machine-1", MachineName: "node-1", SHA256: "abc"}}, Drift: true},
+		attachments:  []VolumeAttachmentResponse{{MachineID: "machine-1", MachineName: "node-1", VolumeName: "data", Attached: true}},
+		remoteImages: []RemoteImageResponse{{MachineName: "node-1", Digest: "sha256:remote"}},
+		imageUpdates: []ImageUpdateResponse{{MachineName: "node-1", RemoteDigest: "sha256:remote", UpdateAvailable: boolPtr(true)}},
 	}
-	server, err := New(fake, Config{AllowedOrigins: "http://localhost:3000"})
+	server, err := New(fake, cfg)
 	require.NoError(t, err)
 	return server, fake
 }
+
+func boolPtr(value bool) *bool { return &value }
 
 func testMachine() api.MachineMember {
 	return api.MachineMember{
@@ -304,6 +389,42 @@ func TestHealthOpenAPIScalarAndCORS(t *testing.T) {
 	assert.Contains(t, docs, "Uncloud API")
 }
 
+func TestInternalMetricsProxy(t *testing.T) {
+	var targetURL string
+	metricsClient := &http.Client{
+		Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+			targetURL = request.URL.String()
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{"text/plain; version=0.0.4"}},
+				Body:       io.NopCloser(strings.NewReader("# HELP stoat_test_metric A test metric.\nstoat_test_metric 1\n")),
+				Request:    request,
+			}, nil
+		}),
+	}
+	server, fake := newTestServerWithConfig(t, Config{
+		MachineID:         "machine-1",
+		MetricsHTTPClient: metricsClient,
+	})
+
+	response := doRequest(t, server, http.MethodGet, "/ucinternal/metrics", nil, "")
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+	assert.Equal(t, "text/plain; version=0.0.4", response.Header.Get("Content-Type"))
+	assert.Equal(t, "no-store", response.Header.Get("Cache-Control"))
+	assert.Equal(t, "# HELP stoat_test_metric A test metric.\nstoat_test_metric 1\n", readBody(t, response))
+	assert.Equal(t, "http://10.210.0.1:51090/metrics", targetURL)
+	assert.Equal(t, "machine-1", fake.lastMachineID)
+}
+
+func TestInternalMetricsRequiresLocalMachineID(t *testing.T) {
+	server, fake := newTestServer(t)
+
+	response := doRequest(t, server, http.MethodGet, "/ucinternal/metrics", nil, "")
+	assert.Equal(t, http.StatusServiceUnavailable, response.StatusCode)
+	assert.Contains(t, decodeResponse[ErrorResponse](t, response).Error, "machine ID")
+	assert.Empty(t, fake.lastMachineID)
+}
+
 func TestAllOpenAPIOperationsAreDocumented(t *testing.T) {
 	data, err := OpenAPIDocumentJSON()
 	require.NoError(t, err)
@@ -313,21 +434,30 @@ func TestAllOpenAPIOperationsAreDocumented(t *testing.T) {
 	require.NoError(t, json.Unmarshal(data, &document))
 
 	expected := map[string][]string{
-		"/healthz":                                    {"get"},
-		"/api/v1/cluster/domain":                      {"get"},
-		"/api/v1/machines":                            {"get"},
-		"/api/v1/machines/{id}":                       {"get", "patch"},
-		"/api/v1/services":                            {"get", "post"},
-		"/api/v1/services/deploy/compose":             {"post"},
-		"/api/v1/services/{id}":                       {"get", "delete"},
-		"/api/v1/services/{id}/logs":                  {"get"},
-		"/api/v1/services/{id}/start":                 {"post"},
-		"/api/v1/services/{id}/stop":                  {"post"},
-		"/api/v1/volumes":                             {"get", "post"},
-		"/api/v1/machines/{machine}/volumes/{volume}": {"delete"},
-		"/api/v1/images":                              {"get"},
-		"/api/v1/images/{id}":                         {"get"},
-		"/api/v1/machines/{id}/logs":                  {"get"},
+		"/healthz":                                             {"get"},
+		"/readyz":                                              {"get"},
+		"/api/v1/cluster/domain":                               {"get"},
+		"/api/v1/cluster/diagnostics":                          {"get"},
+		"/api/v1/caddy/configs":                                {"get"},
+		"/api/v1/machines":                                     {"get"},
+		"/api/v1/machines/{id}":                                {"get", "patch"},
+		"/api/v1/services":                                     {"get", "post"},
+		"/api/v1/services/deploy/compose":                      {"post"},
+		"/api/v1/services/{id}":                                {"get", "delete"},
+		"/api/v1/services/{id}/logs":                           {"get"},
+		"/api/v1/services/{id}/start":                          {"post"},
+		"/api/v1/services/{id}/stop":                           {"post"},
+		"/api/v1/services/{id}/containers/{container}":         {"get"},
+		"/api/v1/services/{id}/containers/{container}/actions": {"post"},
+		"/api/v1/services/{id}/containers/{container}/exec":    {"post"},
+		"/api/v1/volumes":                                      {"get", "post"},
+		"/api/v1/volumes/attachments":                          {"get"},
+		"/api/v1/machines/{machine}/volumes/{volume}":          {"delete"},
+		"/api/v1/images":                                       {"get"},
+		"/api/v1/images/{id}":                                  {"get"},
+		"/api/v1/images/{id}/remote":                           {"get"},
+		"/api/v1/images/{id}/update":                           {"get"},
+		"/api/v1/machines/{id}/logs":                           {"get"},
 	}
 	for path, methods := range expected {
 		operations, ok := document.Paths[path]
@@ -336,6 +466,103 @@ func TestAllOpenAPIOperationsAreDocumented(t *testing.T) {
 			assert.Containsf(t, operations, method, "missing OpenAPI operation %s %s", method, path)
 		}
 	}
+}
+
+func TestDiagnosticAndReadOnlySafetyRoutes(t *testing.T) {
+	server, fake := newTestServer(t)
+
+	response := doRequest(t, server, http.MethodGet, "/readyz", nil, "")
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+	assert.JSONEq(t, `{"status":"ready"}`, readBody(t, response))
+
+	fake.readyErr = errors.New("socket unavailable")
+	response = doRequest(t, server, http.MethodGet, "/readyz", nil, "")
+	assert.Equal(t, http.StatusServiceUnavailable, response.StatusCode)
+	assert.Contains(t, readBody(t, response), "socket unavailable")
+
+	response = doRequest(t, server, http.MethodGet, "/api/v1/cluster/diagnostics", nil, "")
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+	assert.Equal(t, "healthy", decodeResponse[ClusterDiagnosticsResponse](t, response).Status)
+
+	response = doRequest(t, server, http.MethodGet, "/api/v1/caddy/configs", nil, "")
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+	caddyConfigs := decodeResponse[CaddyConfigsResponse](t, response)
+	assert.Equal(t, "abc", caddyConfigs.Items[0].SHA256)
+	assert.True(t, caddyConfigs.Drift)
+
+	response = doRequest(t, server, http.MethodGet, "/api/v1/volumes/attachments", nil, "")
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+	assert.True(t, decodeResponse[ItemResponse[VolumeAttachmentResponse]](t, response).Items[0].Attached)
+
+	response = doRequest(t, server, http.MethodGet, "/api/v1/images/nginx:latest/remote", nil, "")
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+	assert.Equal(t, "sha256:remote", decodeResponse[ItemResponse[RemoteImageResponse]](t, response).Items[0].Digest)
+
+	response = doRequest(t, server, http.MethodGet, "/api/v1/images/nginx:latest/update", nil, "")
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+	update := decodeResponse[ItemResponse[ImageUpdateResponse]](t, response).Items[0]
+	require.NotNil(t, update.UpdateAvailable)
+	assert.True(t, *update.UpdateAvailable)
+}
+
+func TestContainerControlAndExecRoutes(t *testing.T) {
+	server, fake := newTestServer(t)
+
+	response := doRequest(t, server, http.MethodGet, "/api/v1/services/web/containers/abc123", nil, "")
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+	assert.Equal(t, "abc123", fake.lastContainerID)
+
+	for _, test := range []struct {
+		action string
+		status string
+		calls  []string
+	}{
+		{action: "start", status: "started", calls: []string{"start"}},
+		{action: "stop", status: "stopped", calls: []string{"stop"}},
+		{action: "restart", status: "restarted", calls: []string{"stop", "start"}},
+		{action: "remove", status: "removed", calls: []string{"remove"}},
+	} {
+		t.Run(test.action, func(t *testing.T) {
+			fake.containerActions = nil
+			actionResponse := doRequest(t, server, http.MethodPost, "/api/v1/services/web/containers/abc123/actions", ContainerActionRequest{Action: test.action}, "")
+			assert.Equal(t, http.StatusOK, actionResponse.StatusCode)
+			assert.JSONEq(t, `{"status":"`+test.status+`"}`, readBody(t, actionResponse))
+			assert.Equal(t, test.calls, fake.containerActions)
+		})
+	}
+
+	response = doRequest(t, server, http.MethodPost, "/api/v1/services/web/containers/abc123/actions", ContainerActionRequest{Action: "invalid"}, "")
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+
+	response = doRequest(t, server, http.MethodPost, "/api/v1/services/web/containers/abc123/exec", ExecContainerRequest{
+		Command: []string{"sh", "-lc", "cat"}, Stdin: "hello",
+	}, "")
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+	result := decodeResponse[ExecContainerResponse](t, response)
+	assert.Equal(t, "out:hello", result.Stdout)
+	assert.Equal(t, "warning", result.Stderr)
+	assert.False(t, result.Truncated)
+	assert.Equal(t, []string{"sh", "-lc", "cat"}, fake.lastExecOptions.Command)
+
+	response = doRequest(t, server, http.MethodPost, "/api/v1/services/web/containers/abc123/exec", ExecContainerRequest{}, "")
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+
+	response = doRequest(t, server, http.MethodPost, "/api/v1/services/web/containers/abc123/exec", ExecContainerRequest{Command: []string{"bad\x00argument"}}, "")
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+}
+
+func TestCappedBuffer(t *testing.T) {
+	buffer := &cappedBuffer{limit: 4}
+	written, err := buffer.Write([]byte("abc"))
+	require.NoError(t, err)
+	assert.Equal(t, 3, written)
+	assert.False(t, buffer.Truncated())
+
+	written, err = buffer.Write([]byte("def"))
+	require.NoError(t, err)
+	assert.Equal(t, 3, written)
+	assert.Equal(t, "abcd", buffer.String())
+	assert.True(t, buffer.Truncated())
 }
 
 func TestClusterMachineAndServiceRoutes(t *testing.T) {
@@ -565,6 +792,12 @@ func doRequest(t *testing.T, server *Server, method, path string, body any, orig
 	response, err := server.App().Test(request, -1)
 	require.NoError(t, err)
 	return response
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return f(request)
 }
 
 func readBody(t *testing.T, response *http.Response) string {

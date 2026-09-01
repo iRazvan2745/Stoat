@@ -1,42 +1,61 @@
-# sv
+# Stoat
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Stoat is a SvelteKit control plane for managing Uncloud data sources, workspaces, services, deployments, and cluster resources.
 
-## Creating a project
+## Development
 
-If you're seeing this, you've probably already done this step. Congrats!
-
-```sh
-# create a new project
-npx sv create my-app
-```
-
-To recreate this project with the same configuration:
+Requirements: Node.js 24, pnpm 11, Go 1.26 for the sidecar, and Docker for PostgreSQL.
 
 ```sh
-# recreate this project
-pnpm dlx sv@0.17.0 create --template minimal --types ts --add tailwindcss="plugins:none" drizzle="database:sqlite+sqlite:libsql" better-auth="demo:password" sveltekit-adapter="adapter:auto" experimental="versions:kit+features:async,remoteFunctions,explicitEnvironmentVariables,handleRenderingErrors" --install pnpm stoat
+pnpm install
+cp .env.example .env
+docker compose -f compose.dev.yaml up -d
+pnpm run db:push
+pnpm dev
 ```
 
-## Developing
+The development database is published at `localhost:5434`. The default local app URL is `http://localhost:5173`.
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+For the sidecar, run it from `sidecar/`:
 
 ```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+go run ./cmd/sidecar
 ```
 
-## Building
+It serves the Uncloud API on `127.0.0.1:80`. Use `--connect` to select the Uncloud socket or endpoint used by the local data source.
 
-To create a production version of your app:
+## Checks
+
+Run the same checks used by GitHub Actions before opening a pull request:
 
 ```sh
-npm run build
+vp check --no-fmt
+vp test
+pnpm run build
+
+(cd sidecar && gofmt -w . && go test ./... && go vet ./...)
+docker build -f Dockerfile -t stoat:test .
+docker build -f sidecar/Dockerfile -t stoat-sidecar:test sidecar
 ```
 
-You can preview the production build with `npm run preview`.
+## Images and releases
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+GitHub Actions publishes these images to GHCR:
+
+- `ghcr.io/irazvan2745/stoat`
+- `ghcr.io/irazvan2745/sidecar`
+
+Pushing a stable `v*` tag creates a GitHub release and publishes semver tags plus `latest`. The **Canary Release** workflow is started manually from the Actions tab, creates an incrementing `vX.Y.Z-canary.N` tag, and publishes `canary` plus versioned image tags.
+
+Both workflows build directly from this repository. The sidecar does not need Docker `additional_contexts` or an Uncloud checkout because it uses Uncloud's published Go module.
+
+## Production Compose
+
+Copy the example environment and set a strong `APP_SECRET` and the public `APP_URL`, then start the stack:
+
+```sh
+cp .env.example .env
+docker compose up -d
+```
+
+The production stack runs Stoat, PostgreSQL, and the sidecar. It expects the host Uncloud socket directory at `/run/uncloud`; set `UNCLOUD_SOCKET_GID` when the socket is owned by a non-root group. The app and sidecar expose `/healthz` and `/readyz` health checks respectively.

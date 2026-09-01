@@ -1,1 +1,0 @@
-ALTER TABLE "data_source" ALTER COLUMN "path" SET NOT NULL;

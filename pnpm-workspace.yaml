@@ -1,17 +1,18 @@
 allowBuilds:
-  esbuild: true
-  lefthook: true
+    esbuild: true
+    lefthook: true
+    msgpackr-extract: false
 catalog:
-  vite: npm:@voidzero-dev/vite-plus-core@0.2.8
-  vite-plus: 0.2.8
+    vite: npm:@voidzero-dev/vite-plus-core@0.2.8
+    vite-plus: 0.2.8
 overrides:
-  vite: "catalog:"
+    vite: "catalog:"
 patchedDependencies:
-  "@sveltejs/kit@2.70.3": patches/@sveltejs__kit@2.70.3.patch
-  m3-svelte: patches/m3-svelte.patch
-  nuqs-svelte: patches/nuqs-svelte.patch
+    "@sveltejs/kit@2.70.3": patches/@sveltejs__kit@2.70.3.patch
+    m3-svelte: patches/m3-svelte.patch
+    nuqs-svelte: patches/nuqs-svelte.patch
 peerDependencyRules:
-  allowAny:
-    - vite
-  allowedVersions:
-    vite: "*"
+    allowAny:
+        - vite
+    allowedVersions:
+        vite: "*"

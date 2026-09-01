@@ -6,8 +6,8 @@
     import {
         cancelDeployment,
         deleteDeployment,
-        getDeploymentLogs,
-        getDeployments,
+        listDeployments,
+        streamDeploymentLogs,
     } from "#lib/api/deployments.remote";
 
     import { isDeploymentActive } from "./deployment";
@@ -20,14 +20,14 @@
     let { params } = $props();
 
     // svelte-ignore state_referenced_locally
-    const deploymentsQuery = getDeployments(params.serviceId);
+    const deploymentsQuery = listDeployments(params.serviceId);
     const deployments = $derived(deploymentsQuery.current ?? []);
 
     const view = useQueryState("view", parseAsString.withDefault(""));
     const deploymentLogsQuery = $derived.by(() => {
         const deploymentId = view.current;
 
-        return deploymentId ? getDeploymentLogs(deploymentId) : undefined;
+        return deploymentId ? streamDeploymentLogs(deploymentId) : undefined;
     });
 
     const logs = $derived(deploymentLogsQuery?.current ?? []);

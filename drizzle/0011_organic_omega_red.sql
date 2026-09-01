@@ -1,1 +1,0 @@
-ALTER TABLE "deployments" ADD COLUMN "settings" jsonb DEFAULT '{}'::jsonb NOT NULL;

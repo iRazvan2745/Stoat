@@ -43,7 +43,7 @@ func newCommand() *cobra.Command {
 			return run(cmd.Context(), opts)
 		},
 	}
-	cmd.Flags().StringVar(&opts.listen, "listen", "127.0.0.1:8080", "HTTP listen address.")
+	cmd.Flags().StringVar(&opts.listen, "listen", "127.0.0.1:80", "HTTP listen address.")
 	cmd.Flags().StringVar(&opts.configPath, "uncloud-config", defaultConfigPath,
 		"Path to the Uncloud configuration file.")
 	cmd.Flags().StringVarP(&opts.contextName, "context", "c", "", "Cluster context to use.")
@@ -66,7 +66,10 @@ func run(ctx context.Context, opts options) error {
 	}
 	defer func() { _ = clusterClient.Close() }()
 
-	server, err := httpapi.New(httpapi.NewClientBackend(clusterClient), httpapi.Config{AllowedOrigins: opts.allowedOrigins})
+	server, err := httpapi.New(httpapi.NewClientBackend(clusterClient), httpapi.Config{
+		AllowedOrigins: opts.allowedOrigins,
+		MachineID:      os.Getenv("UNCLOUD_MACHINE_ID"),
+	})
 	if err != nil {
 		return fmt.Errorf("create HTTP API: %w", err)
 	}

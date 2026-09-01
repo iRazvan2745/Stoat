@@ -4,69 +4,71 @@ import { db } from "#lib/db";
 import { dataSource, member, services, workspace } from "#lib/db/schema";
 
 export const hasAccessToThisDataSource = async (
-  userId: string,
-  dataSourceId: string,
+    userId: string,
+    dataSourceId: string,
 ): Promise<boolean> => {
-  const [row] = await db
-    .select({ id: dataSource.id })
-    .from(dataSource)
-    .innerJoin(member, eq(member.organizationId, dataSource.organizationId))
-    .where(and(eq(dataSource.id, dataSourceId), eq(member.userId, userId)))
-    .limit(1);
+    const [row] = await db
+        .select({ id: dataSource.id })
+        .from(dataSource)
+        .innerJoin(member, eq(member.organizationId, dataSource.organizationId))
+        .where(and(eq(dataSource.id, dataSourceId), eq(member.userId, userId)))
+        .limit(1);
 
-  return row !== undefined;
+    return row !== undefined;
 };
 
 export const hasAccessToThisWorkspace = async (
-  userId: string,
-  workspaceId: string,
+    userId: string,
+    workspaceId: string,
 ): Promise<boolean> => {
-  const [row] = await db
-    .select({ id: workspace.id })
-    .from(workspace)
-    .innerJoin(member, eq(member.organizationId, workspace.organizationId))
-    .where(and(eq(workspace.id, workspaceId), eq(member.userId, userId)))
-    .limit(1);
+    const [row] = await db
+        .select({ id: workspace.id })
+        .from(workspace)
+        .innerJoin(member, eq(member.organizationId, workspace.organizationId))
+        .where(and(eq(workspace.id, workspaceId), eq(member.userId, userId)))
+        .limit(1);
 
-  return row !== undefined;
+    return row !== undefined;
 };
 
 export const hasAccessToThisService = async (
-  userId: string,
-  serviceId: string,
+    userId: string,
+    serviceId: string,
 ): Promise<boolean> => {
-  const [row] = await db
-    .select({ id: services.id })
-    .from(services)
-    .innerJoin(workspace, eq(workspace.id, services.workspaceId))
-    .innerJoin(member, eq(member.organizationId, workspace.organizationId))
-    .where(and(eq(services.id, serviceId), eq(member.userId, userId)))
-    .limit(1);
+    const [row] = await db
+        .select({ id: services.id })
+        .from(services)
+        .innerJoin(workspace, eq(workspace.id, services.workspaceId))
+        .innerJoin(member, eq(member.organizationId, workspace.organizationId))
+        .where(and(eq(services.id, serviceId), eq(member.userId, userId)))
+        .limit(1);
 
-  return row !== undefined;
+    return row !== undefined;
 };
 
 export const getOrganizationIdForUser = async (
-  userId: string,
-  preferredOrganizationId?: string | null,
+    userId: string,
+    preferredOrganizationId?: string | null,
 ): Promise<string | null> => {
-  if (preferredOrganizationId) {
-    const [membership] = await db
-      .select({ organizationId: member.organizationId })
-      .from(member)
-      .where(and(eq(member.userId, userId), eq(member.organizationId, preferredOrganizationId)))
-      .limit(1);
+    if (preferredOrganizationId) {
+        const [membership] = await db
+            .select({ organizationId: member.organizationId })
+            .from(member)
+            .where(
+                and(eq(member.userId, userId), eq(member.organizationId, preferredOrganizationId)),
+            )
+            .limit(1);
 
-    if (membership) {
-      return membership.organizationId;
+        if (membership) {
+            return membership.organizationId;
+        }
     }
-  }
 
-  const [fallback] = await db
-    .select({ organizationId: member.organizationId })
-    .from(member)
-    .where(eq(member.userId, userId))
-    .limit(1);
+    const [fallback] = await db
+        .select({ organizationId: member.organizationId })
+        .from(member)
+        .where(eq(member.userId, userId))
+        .limit(1);
 
-  return fallback?.organizationId ?? null;
+    return fallback?.organizationId ?? null;
 };
