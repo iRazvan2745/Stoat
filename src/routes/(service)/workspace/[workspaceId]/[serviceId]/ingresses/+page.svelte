@@ -1,15 +1,34 @@
 <script lang="ts">
     import contentCopyIcon from "@ktibow/iconset-material-symbols/content-copy-outline";
+    import addIcon from "@ktibow/iconset-material-symbols/add";
+    import deleteIcon from "@ktibow/iconset-material-symbols/delete-outline";
     import dnsIcon from "@ktibow/iconset-material-symbols/dns";
+    import editIcon from "@ktibow/iconset-material-symbols/edit-outline";
     import languageIcon from "@ktibow/iconset-material-symbols/language";
     import lockIcon from "@ktibow/iconset-material-symbols/lock-outline";
     import openInNewIcon from "@ktibow/iconset-material-symbols/open-in-new";
     import publicIcon from "@ktibow/iconset-material-symbols/public";
     import refreshIcon from "@ktibow/iconset-material-symbols/refresh";
     import settingsEthernetIcon from "@ktibow/iconset-material-symbols/settings-ethernet";
-    import { Button, Card, Icon, LoadingIndicator, Snackbar } from "m3-svelte";
+    import {
+        Button,
+        Card,
+        Dialog,
+        Icon,
+        LoadingIndicator,
+        SelectOutlined,
+        Snackbar,
+        snackbar,
+        TextFieldOutlined,
+    } from "m3-svelte";
 
-    import { getService, listServiceIngresses } from "#lib/api/services.remote";
+    import {
+        createServiceIngress,
+        deleteServiceIngress,
+        getService,
+        listServiceIngresses,
+        updateServiceIngress,
+    } from "#lib/api/services.remote";
     import {
         Flow,
         FlowNode,
@@ -30,6 +49,107 @@
     const info = $derived(ingressQuery.current);
     const routes = $derived(info?.ingresses ?? []);
     const ready = $derived(info !== undefined);
+
+    const protocolOptions = [
+        { text: "HTTPS", value: "https" },
+        { text: "HTTP", value: "http" },
+    ];
+    const composeServiceOptions = $derived(
+        (info?.composeServices ?? []).map((name) => ({ text: name, value: name }))
+    );
+
+    let editorOpen = $state(false);
+    let editingRoute = $state<ServiceIngress>();
+    let deletingRoute = $state<ServiceIngress>();
+    let composeService = $state("");
+    let containerPort = $state("");
+    let hostname = $state("");
+    let protocol = $state<"http" | "https">("https");
+    let submitting = $state(false);
+
+    const parsedPort = $derived(Number(containerPort));
+    const routeIsValid = $derived(
+        composeService !== "" &&
+            Number.isInteger(parsedPort) &&
+            parsedPort >= 1 &&
+            parsedPort <= 65_535 &&
+            !/[\s/:]/u.test(hostname)
+    );
+
+    const openCreateRoute = (): void => {
+        editingRoute = undefined;
+        composeService = info?.composeServices[0] ?? "";
+        containerPort = "80";
+        hostname = "";
+        protocol = "https";
+        editorOpen = true;
+    };
+
+    const openEditRoute = (route: ServiceIngress): void => {
+        editingRoute = route;
+        composeService = route.editableComposeService ?? "";
+        containerPort = String(route.containerPort);
+        hostname = route.editableHostname ?? "";
+        protocol = route.protocol === "http" ? "http" : "https";
+        editorOpen = true;
+    };
+
+    const saveRoute = async (): Promise<void> => {
+        if (!routeIsValid || submitting) {
+            return;
+        }
+
+        submitting = true;
+
+        try {
+            const route = {
+                composeService,
+                containerPort: parsedPort,
+                ...(hostname.trim() === "" ? {} : { hostname: hostname.trim() }),
+                protocol,
+                serviceId: params.serviceId,
+            };
+
+            if (editingRoute?.editableRouteId) {
+                await updateServiceIngress({
+                    ...route,
+                    routeId: editingRoute.editableRouteId,
+                });
+                snackbar("Route updated in Compose");
+            } else {
+                await createServiceIngress(route);
+                snackbar("Route added to Compose");
+            }
+
+            editorOpen = false;
+            await ingressQuery.refresh();
+        } catch (error) {
+            snackbar(error instanceof Error ? error.message : "Unable to save route");
+        } finally {
+            submitting = false;
+        }
+    };
+
+    const removeRoute = async (): Promise<void> => {
+        const routeId = deletingRoute?.editableRouteId;
+
+        if (!routeId || submitting) {
+            return;
+        }
+
+        submitting = true;
+
+        try {
+            await deleteServiceIngress({ routeId, serviceId: params.serviceId });
+            deletingRoute = undefined;
+            snackbar("Route deleted from Compose");
+            await ingressQuery.refresh();
+        } catch (error) {
+            snackbar(error instanceof Error ? error.message : "Unable to delete route");
+        } finally {
+            submitting = false;
+        }
+    };
 
     const routeIcon = (route: ServiceIngress) => {
         if (route.mode === "host") {
@@ -304,14 +424,24 @@
             </p>
         </div>
 
-        <Button
-            variant="tonal"
-            square
-            aria-label="Refresh ingresses"
-            onclick={() => ingressQuery.refresh()}
-        >
-            <Icon icon={refreshIcon} />
-        </Button>
+        <div class="flex items-center gap-2">
+            <Button
+                variant="tonal"
+                square
+                aria-label="Refresh ingresses"
+                onclick={() => ingressQuery.refresh()}
+            >
+                <Icon icon={refreshIcon} />
+            </Button>
+            <Button
+                variant="filled"
+                disabled={!ready || info === null || composeServiceOptions.length === 0}
+                onclick={openCreateRoute}
+            >
+                <Icon icon={addIcon} />
+                Add route
+            </Button>
+        </div>
     </header>
 
     {#if !ready && ingressQuery.loading}
@@ -446,11 +576,110 @@
                                 <Icon icon={openInNewIcon} size={18} />
                             </Button>
                         {/if}
+
+                        {#if route.editableRouteId}
+                            <Button
+                                variant="text"
+                                square
+                                aria-label={`Edit ${routeHeadline(route)}`}
+                                onclick={() => openEditRoute(route)}
+                            >
+                                <Icon icon={editIcon} size={18} />
+                            </Button>
+                            <Button
+                                variant="text"
+                                square
+                                aria-label={`Delete ${routeHeadline(route)}`}
+                                onclick={() => (deletingRoute = route)}
+                            >
+                                <Icon icon={deleteIcon} size={18} />
+                            </Button>
+                        {/if}
                     </li>
                 {/each}
             </ul>
         </Card>
     {/if}
 </div>
+
+<Dialog
+    bind:open={editorOpen}
+    headline={editingRoute ? "Edit route" : "Add route"}
+    onclose={() => (editorOpen = false)}
+>
+    <div class="flex min-w-72 flex-col gap-4">
+        <p class="m3-font-body-medium text-on-surface-variant">
+            This updates the service's <code class="font-mono">x-ports</code>
+            in Compose. Deploy the service when you're ready to apply it.
+        </p>
+        <SelectOutlined
+            label="Compose service"
+            options={composeServiceOptions}
+            width="20rem"
+            bind:value={composeService}
+        />
+        <TextFieldOutlined
+            label="Domain (optional)"
+            placeholder="app.example.com"
+            bind:value={hostname}
+            error={/[\s/:]/u.test(hostname)}
+        />
+        <div class="grid grid-cols-2 gap-3">
+            <TextFieldOutlined
+                label="Container port"
+                type="number"
+                min="1"
+                max="65535"
+                required
+                bind:value={containerPort}
+            />
+            <SelectOutlined
+                label="Protocol"
+                options={protocolOptions}
+                bind:value={protocol}
+            />
+        </div>
+        <p class="m3-font-body-small text-on-surface-variant">
+            Leave the domain blank to use the cluster-assigned service domain.
+        </p>
+    </div>
+
+    {#snippet buttons()}
+        <Button variant="text" disabled={submitting} onclick={() => (editorOpen = false)}>
+            Cancel
+        </Button>
+        <Button disabled={!routeIsValid || submitting} onclick={saveRoute}>
+            {editingRoute ? "Save" : "Add"}
+        </Button>
+    {/snippet}
+</Dialog>
+
+<Dialog
+    open={deletingRoute !== undefined}
+    headline="Delete route"
+    onclose={() => (deletingRoute = undefined)}
+>
+    <div class="flex flex-col gap-2">
+        <p class="text-on-surface">
+            Delete <span class="font-mono">{deletingRoute
+                ? routeHeadline(deletingRoute)
+                : "this route"}</span> from the Compose file?
+        </p>
+        <p class="m3-font-body-small text-on-surface-variant">
+            This does not redeploy the service.
+        </p>
+    </div>
+
+    {#snippet buttons()}
+        <Button
+            variant="text"
+            disabled={submitting}
+            onclick={() => (deletingRoute = undefined)}
+        >
+            Cancel
+        </Button>
+        <Button disabled={submitting} onclick={removeRoute}>Delete</Button>
+    {/snippet}
+</Dialog>
 
 <Snackbar />

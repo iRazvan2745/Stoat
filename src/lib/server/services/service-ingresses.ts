@@ -2,6 +2,10 @@ import type { ServiceIngress, ServiceIngressInfo } from "#lib/domain/services/in
 import { getServiceDataSource } from "#lib/server/data-sources/data-sources";
 import type { CaddyIngress } from "#lib/server/services/compose-caddy";
 import { listComposeCaddyIngresses } from "#lib/server/services/compose-caddy";
+import {
+    listComposeServiceNames,
+    listEditableComposeIngressRoutes,
+} from "#lib/server/services/compose-ingress-routes";
 import { interpolateComposeVariables } from "#lib/server/services/compose-interpolate";
 import type { ComposePort } from "#lib/server/services/compose-ports";
 import { listComposePorts } from "#lib/server/services/compose-ports";
@@ -85,9 +89,12 @@ export async function listServiceIngresses(serviceId: string): Promise<ServiceIn
 
     const environment = await listEnvironmentVariables(serviceId);
     const variables = new Map(environment.map((variable) => [variable.name, variable.value]));
-    const compose = interpolateComposeVariables(svc.value ?? "", (name) => variables.get(name));
+    const resolveVariable = (name: string): string | undefined => variables.get(name);
+    const rawCompose = svc.value ?? "";
+    const compose = interpolateComposeVariables(rawCompose, resolveVariable);
 
     const ports = listComposePorts(compose);
+    const editableRoutes = listEditableComposeIngressRoutes(rawCompose);
     const prefix = serviceComposePrefix(svc);
     const deployedName = (name: string): string => (prefix ? `${prefix}-${name}` : name);
 
@@ -127,7 +134,33 @@ export async function listServiceIngresses(serviceId: string): Promise<ServiceIn
         ),
     ];
 
+    for (const editableRoute of editableRoutes) {
+        const deployedService = deployedName(editableRoute.composeService);
+        const ingress = ingresses.find(
+            (candidate) =>
+                candidate.editableRouteId === undefined &&
+                candidate.composeService === deployedService &&
+                candidate.containerPort === editableRoute.containerPort &&
+                candidate.host ===
+                    ((editableRoute.hostname
+                        ? interpolateComposeVariables(editableRoute.hostname, resolveVariable)
+                        : undefined) ??
+                        (clusterDomain ? `${deployedService}.${clusterDomain}` : undefined)) &&
+                candidate.protocol === editableRoute.protocol,
+        );
+
+        if (ingress) {
+            ingress.editableComposeService = editableRoute.composeService;
+            ingress.editableRouteId = editableRoute.id;
+
+            if (editableRoute.hostname !== undefined) {
+                ingress.editableHostname = editableRoute.hostname;
+            }
+        }
+    }
+
     return {
+        composeServices: listComposeServiceNames(rawCompose),
         ingresses,
         serviceName: svc.name ?? svc.slug ?? svc.id,
         ...(clusterDomain === undefined ? {} : { clusterDomain }),

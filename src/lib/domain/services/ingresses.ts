@@ -13,10 +13,17 @@ export interface ServiceIngress {
     publishedPort?: number;
     /** Clickable URL for HTTP(S) ingresses. */
     url?: string;
+    /** Opaque reference used to edit an x-ports entry in the Compose file. */
+    editableRouteId?: string;
+    /** Compose service name before any deployment prefix is applied. */
+    editableComposeService?: string;
+    /** Hostname written in Compose; absent means the cluster assigns one. */
+    editableHostname?: string;
 }
 
 export interface ServiceIngressInfo {
     clusterDomain?: string;
+    composeServices: string[];
     ingresses: ServiceIngress[];
     serviceName: string;
 }

@@ -16,15 +16,18 @@ import {
 import { listServiceIngresses as listServiceIngressRecords } from "#lib/server/services/service-ingresses";
 import { streamServiceContainerLogs as streamServiceContainerLogsFromServer } from "#lib/server/services/service-logs";
 import {
+    createServiceIngress as createServiceIngressRecord,
     createService as createServiceRecord,
     createServiceFromTemplate as createServiceFromTemplateRecord,
     copyService as copyServiceRecord,
+    deleteServiceIngress as deleteServiceIngressRecord,
     deleteService as deleteServiceRecord,
     getService as getServiceRecord,
     listServicesInWorkspace as listServicesInWorkspaceRecords,
     moveService as moveServiceRecord,
     previewServiceCompose as previewServiceComposeRecord,
     updateServiceCompose as updateServiceComposeRecord,
+    updateServiceIngress as updateServiceIngressRecord,
     updateServiceIdentity as updateServiceIdentityRecord,
     updateServiceSettings as updateServiceSettingsRecord,
 } from "#lib/server/services/services";
@@ -56,6 +59,30 @@ const CreateServiceFromTemplateInput = v.object({
 
 const UpdateServiceComposeInput = v.object({
     compose: v.string(),
+    serviceId: ServiceIdInput,
+});
+
+const IngressRouteFieldsInput = {
+    composeService: v.pipe(v.string(), v.trim(), v.minLength(1)),
+    containerPort: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(65_535)),
+    hostname: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(253))),
+    protocol: v.picklist(["http", "https", "tcp", "udp"]),
+    publishedPort: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(65_535))),
+};
+
+const CreateServiceIngressInput = v.object({
+    ...IngressRouteFieldsInput,
+    serviceId: ServiceIdInput,
+});
+
+const UpdateServiceIngressInput = v.object({
+    ...IngressRouteFieldsInput,
+    routeId: v.pipe(v.string(), v.minLength(1)),
+    serviceId: ServiceIdInput,
+});
+
+const DeleteServiceIngressInput = v.object({
+    routeId: v.pipe(v.string(), v.minLength(1)),
     serviceId: ServiceIdInput,
 });
 
@@ -214,6 +241,52 @@ const refreshServiceQueries = async (): Promise<void> => {
 };
 
 // Commands
+export const createServiceIngress = command(
+    CreateServiceIngressInput,
+    withRemoteLogging(
+        "services.createServiceIngress",
+        "command",
+        async ({ serviceId, ...route }: v.InferOutput<typeof CreateServiceIngressInput>) => {
+            await requireServiceAccess(serviceId);
+            const updated = await createServiceIngressRecord(serviceId, route);
+            await refreshServiceQueries();
+            return updated;
+        },
+    ),
+);
+
+export const updateServiceIngress = command(
+    UpdateServiceIngressInput,
+    withRemoteLogging(
+        "services.updateServiceIngress",
+        "command",
+        async ({
+            routeId,
+            serviceId,
+            ...route
+        }: v.InferOutput<typeof UpdateServiceIngressInput>) => {
+            await requireServiceAccess(serviceId);
+            const updated = await updateServiceIngressRecord(serviceId, routeId, route);
+            await refreshServiceQueries();
+            return updated;
+        },
+    ),
+);
+
+export const deleteServiceIngress = command(
+    DeleteServiceIngressInput,
+    withRemoteLogging(
+        "services.deleteServiceIngress",
+        "command",
+        async ({ routeId, serviceId }: v.InferOutput<typeof DeleteServiceIngressInput>) => {
+            await requireServiceAccess(serviceId);
+            const updated = await deleteServiceIngressRecord(serviceId, routeId);
+            await refreshServiceQueries();
+            return updated;
+        },
+    ),
+);
+
 export const createService = command(
     CreateServiceInput,
     withRemoteLogging(

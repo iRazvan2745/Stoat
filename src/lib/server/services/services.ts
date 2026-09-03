@@ -19,6 +19,12 @@ import { expandTemplateSecrets, expandTemplateVariables } from "#lib/domain/temp
 import { createWorkspaceFolder, workspacePath } from "#lib/server/data-sources/paths";
 import { formatComposeFile } from "#lib/server/deployments/deployment-compose";
 import {
+    addComposeIngressRoute,
+    deleteComposeIngressRoute,
+    type ComposeIngressRouteInput,
+    updateComposeIngressRoute,
+} from "#lib/server/services/compose-ingress-routes";
+import {
     deleteEnvironmentVariablesForService,
     replaceEnvironmentVariables,
 } from "#lib/server/services/service-environment";
@@ -244,6 +250,42 @@ export async function moveService(serviceId: string, targetWorkspaceId: string) 
 export async function updateServiceCompose(id: string, compose: string) {
     return await db.update(services).set({ value: compose }).where(eq(services.id, id)).returning();
 }
+
+const updateIngressCompose = async (serviceId: string, update: (compose: string) => string) => {
+    const svc = await getService(serviceId);
+
+    if (!svc) {
+        throw new Error("Service not found");
+    }
+
+    const compose = update(svc.value ?? "");
+    const [updated] = await db
+        .update(services)
+        .set({ value: compose })
+        .where(eq(services.id, serviceId))
+        .returning();
+
+    if (!updated) {
+        throw new Error("Unable to update service ingress");
+    }
+
+    return updated;
+};
+
+export const createServiceIngress = async (serviceId: string, route: ComposeIngressRouteInput) =>
+    await updateIngressCompose(serviceId, (compose) => addComposeIngressRoute(compose, route));
+
+export const updateServiceIngress = async (
+    serviceId: string,
+    routeId: string,
+    route: ComposeIngressRouteInput,
+) =>
+    await updateIngressCompose(serviceId, (compose) =>
+        updateComposeIngressRoute(compose, routeId, route),
+    );
+
+export const deleteServiceIngress = async (serviceId: string, routeId: string) =>
+    await updateIngressCompose(serviceId, (compose) => deleteComposeIngressRoute(compose, routeId));
 
 export async function deleteService(id: string) {
     const [svc] = await db.select().from(services).where(eq(services.id, id));
