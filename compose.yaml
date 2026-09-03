@@ -5,6 +5,8 @@ services:
             APP_SECRET: "${APP_SECRET:?set APP_SECRET}"
             APP_URL: "${APP_URL:?set APP_URL}"
             DATABASE_URL: "postgres://stoat:${POSTGRES_PASSWORD:-stoat}@stoat-db.internal:5432/stoat"
+        x-pre_deploy:
+            command: ["/usr/local/bin/node", "/app/node_modules/drizzle-kit/bin.cjs", "migrate"]
         x-ports:
             - "3000/https"
         pull_policy: always

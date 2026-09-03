@@ -43,6 +43,8 @@ RUN apk add --no-cache ca-certificates git \
 COPY --from=build --chown=stoat:stoat /app/build ./build
 COPY --from=build --chown=stoat:stoat /app/package.json ./package.json
 COPY --from=build --chown=stoat:stoat /app/node_modules ./node_modules
+COPY --from=build --chown=stoat:stoat /app/drizzle.config.ts ./drizzle.config.ts
+COPY --from=build --chown=stoat:stoat /app/drizzle ./drizzle
 
 USER stoat
 
