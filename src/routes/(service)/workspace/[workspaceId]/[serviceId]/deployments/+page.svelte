@@ -48,19 +48,25 @@
             : false
     );
 
-    let cancelDialogDeploymentId = $state<string | null>(null);
-    let deleteDialogDeploymentId = $state<string | null>(null);
+    const cancelDialogDeploymentId = useQueryState(
+        "cancel",
+        parseAsString.withDefault("")
+    );
+    const deleteDialogDeploymentId = useQueryState(
+        "delete",
+        parseAsString.withDefault("")
+    );
     let cancelling = $state(false);
     let deleting = $state(false);
 
     const cancelDialogDeployment = $derived(
         deployments.find(
-            (deployment) => deployment.id === cancelDialogDeploymentId
+            (deployment) => deployment.id === cancelDialogDeploymentId.current
         )
     );
     const deleteDialogDeployment = $derived(
         deployments.find(
-            (deployment) => deployment.id === deleteDialogDeploymentId
+            (deployment) => deployment.id === deleteDialogDeploymentId.current
         )
     );
 
@@ -104,24 +110,26 @@
 
     function openCancelDialog(deploymentId: string): void {
         closeActionsMenu();
-        cancelDialogDeploymentId = deploymentId;
+        void cancelDialogDeploymentId.set(deploymentId);
     }
 
     function openDeleteDialog(deploymentId: string): void {
         closeActionsMenu();
-        deleteDialogDeploymentId = deploymentId;
+        void deleteDialogDeploymentId.set(deploymentId);
     }
 
     const forceCancel = async (): Promise<void> => {
-        if (!cancelDialogDeploymentId || cancelling) {
+        const deploymentId = cancelDialogDeploymentId.current;
+
+        if (!deploymentId || cancelling) {
             return;
         }
 
         cancelling = true;
 
         try {
-            await cancelDeployment(cancelDialogDeploymentId);
-            cancelDialogDeploymentId = null;
+            await cancelDeployment(deploymentId);
+            void cancelDialogDeploymentId.set("");
             snackbar("Deployment cancelled");
         } catch (error) {
             snackbar(
@@ -135,20 +143,22 @@
     };
 
     const removeDeployment = async (): Promise<void> => {
-        if (!deleteDialogDeploymentId || deleting) {
+        const deploymentId = deleteDialogDeploymentId.current;
+
+        if (!deploymentId || deleting) {
             return;
         }
 
         deleting = true;
 
         try {
-            await deleteDeployment(deleteDialogDeploymentId);
+            await deleteDeployment(deploymentId);
 
-            if (view.current === deleteDialogDeploymentId) {
+            if (view.current === deploymentId) {
                 closeLogs();
             }
 
-            deleteDialogDeploymentId = null;
+            void deleteDialogDeploymentId.set("");
             snackbar("Deployment deleted");
         } catch (error) {
             snackbar(
@@ -219,17 +229,17 @@
 <DeploymentCancelDialog
     {cancelling}
     deployment={cancelDialogDeployment}
-    onCancel={() => (cancelDialogDeploymentId = null)}
+    onCancel={() => cancelDialogDeploymentId.set("")}
     onConfirm={forceCancel}
-    open={cancelDialogDeploymentId !== null}
+    open={cancelDialogDeploymentId.current !== ""}
 />
 
 <DeploymentDeleteDialog
     {deleting}
     deployment={deleteDialogDeployment}
-    onCancel={() => (deleteDialogDeploymentId = null)}
+    onCancel={() => deleteDialogDeploymentId.set("")}
     onConfirm={removeDeployment}
-    open={deleteDialogDeploymentId !== null}
+    open={deleteDialogDeploymentId.current !== ""}
 />
 
 <Snackbar />

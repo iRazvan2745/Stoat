@@ -85,6 +85,7 @@ type Backend interface {
 	StopContainer(context.Context, string, string, container.StopOptions) error
 	RemoveContainer(context.Context, string, string, container.RemoveOptions) error
 	ExecContainer(context.Context, string, string, api.ExecOptions) (int, error)
+	ExecMachine(context.Context, string, api.ExecOptions) (int, error)
 
 	ListVolumes(context.Context, *api.VolumeFilter) ([]api.MachineVolume, error)
 	CreateVolume(context.Context, string, volume.CreateOptions) (api.MachineVolume, error)
@@ -199,6 +200,8 @@ func (s *Server) registerRoutes() {
 	apiGroup.Get("/machines", s.listMachines)
 	apiGroup.Get("/machines/:id", s.inspectMachine)
 	apiGroup.Patch("/machines/:id", s.renameMachine)
+	apiGroup.Post("/machines/:id/exec", s.execMachine)
+	apiGroup.Post("/machines/:id/exec/stream", s.streamMachineExec)
 
 	apiGroup.Get("/services", s.listServices)
 	apiGroup.Get("/services/:id", s.inspectService)

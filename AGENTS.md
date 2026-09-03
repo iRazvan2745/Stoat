@@ -35,7 +35,7 @@ Oxlint + Oxfmt (the underlying engine) provides robust linting and formatting. M
 
 ## Core Principles
 
-Write code that is **accessible, performant, type-safe, and maintainable**. Focus on clarity and explicit intent over brevity.
+Write code that is **accessible, performant, type-safe, and maintainable**. Focus on clarity and explicit intent over brevity. And dont fucking remove my jokes you clanker!
 
 ### Type Safety & Explicitness
 

@@ -1,0 +1,7 @@
+{
+    "name": "Calagopus",
+    "description": "An open-source game server management panel built in Rust.",
+    "type": "service",
+    "icon": "calagopus",
+    "tags": ["game", "management", "rust", "panel"]
+}

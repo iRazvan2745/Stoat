@@ -21,6 +21,7 @@ type options struct {
 	contextName    string
 	connect        string
 	allowedOrigins string
+	hostService    string
 }
 
 func main() {
@@ -51,6 +52,8 @@ func newCommand() *cobra.Command {
 		"Connect directly using the same format as uc --connect: [ssh://]user@host[:port], ssh+go://user@host[:port], tcp://host:port, or unix:///path/to/uncloud.sock.")
 	cmd.Flags().StringVar(&opts.allowedOrigins, "cors-origins", "http://localhost:3000,http://localhost:5173",
 		"Comma-separated browser origins allowed by CORS. Use an empty value to disable CORS.")
+	cmd.Flags().StringVar(&opts.hostService, "host-service", httpapi.DefaultHostServiceName,
+		"Uncloud service name of the global sidecar used for host command execution.")
 	return cmd
 }
 
@@ -66,7 +69,7 @@ func run(ctx context.Context, opts options) error {
 	}
 	defer func() { _ = clusterClient.Close() }()
 
-	server, err := httpapi.New(httpapi.NewClientBackend(clusterClient), httpapi.Config{
+	server, err := httpapi.New(httpapi.NewClientBackendWithHostService(clusterClient, opts.hostService), httpapi.Config{
 		AllowedOrigins: opts.allowedOrigins,
 		MachineID:      os.Getenv("UNCLOUD_MACHINE_ID"),
 	})

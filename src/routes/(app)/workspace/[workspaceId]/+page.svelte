@@ -56,7 +56,10 @@
 
     let actionsMenuOpen = $state(false);
     let addServiceMenuOpen = $state(false);
-    let deleteWorkspaceDialogOpen = $state(false);
+    const deleteWorkspaceDialogOpen = useQueryState(
+        "deleteWorkspaceDialogOpen",
+        parseAsBoolean.withDefault(false),
+    );
     let deletingWorkspace = $state(false);
 
     const create = async (): Promise<void> => {
@@ -199,7 +202,7 @@
                         label="Delete workspace"
                         onclick={() => {
                             actionsMenuOpen = false;
-                            deleteWorkspaceDialogOpen = true;
+                            void deleteWorkspaceDialogOpen.set(true);
                         }}
                     />
                 </ExpressiveMenu>
@@ -281,7 +284,11 @@
     {/snippet}
 </Dialog>
 
-<Dialog bind:open={deleteWorkspaceDialogOpen} headline="Delete workspace">
+<Dialog
+    bind:open={deleteWorkspaceDialogOpen.current}
+    headline="Delete workspace"
+    onclose={() => deleteWorkspaceDialogOpen.set(false)}
+>
     <div class="flex flex-col gap-2">
         <p class="text-on-surface">
             Are you sure you want to delete this workspace?
@@ -295,7 +302,7 @@
     {#snippet buttons()}
         <Button
             variant="text"
-            onclick={() => (deleteWorkspaceDialogOpen = false)}>Cancel</Button
+            onclick={() => deleteWorkspaceDialogOpen.set(false)}>Cancel</Button
         >
 
         <Button disabled={deletingWorkspace} onclick={removeWorkspace}

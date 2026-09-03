@@ -9,14 +9,21 @@
     import { LoadingIndicator } from "m3-svelte";
     import CodeMirror from "svelte-codemirror-editor";
 
+    import { maskEnvironmentValues } from "#lib/shared/ui/code-mirror-environment-values";
     import { codeMirrorSearchExtensions } from "#lib/shared/ui/code-mirror-search";
 
     interface Props {
+        showValues?: boolean;
         value?: string;
     }
 
-    let { value = $bindable("") }: Props = $props();
+    let { showValues = false, value = $bindable("") }: Props = $props();
     let editorLoading = $state(true);
+
+    const editorExtensions = $derived([
+        ...codeMirrorSearchExtensions,
+        maskEnvironmentValues(showValues),
+    ]);
 
     const dotenvLanguage = new LanguageSupport(
         StreamLanguage.define<{ expectValue: boolean }>({
@@ -82,6 +89,11 @@
         ".cm-cursor, .cm-dropCursor": {
             borderLeftColor: "var(--m3c-primary)",
         },
+        ".cm-env-masked-value": {
+            color: "var(--m3c-on-surface-variant)",
+            cursor: "text",
+            userSelect: "none",
+        },
         ".cm-gutters": {
             backgroundColor: "var(--m3c-surface-container-low)",
             borderRight: "1px solid var(--m3c-outline-variant)",
@@ -130,11 +142,11 @@
         lang={dotenvLanguage}
         syntaxHighlighting={envSyntaxHighlighting}
         styles={editorStyles}
-        extensions={codeMirrorSearchExtensions}
+        extensions={editorExtensions}
         foldGutter={false}
         closeBrackets={false}
         autocompletion={false}
-        placeholder={"DATABASE_URL=postgres://localhost:5432/app"}
+        placeholder={"Add your stuff"}
         onready={handleEditorReady}
     />
 

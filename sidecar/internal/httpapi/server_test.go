@@ -55,10 +55,14 @@ type fakeBackend struct {
 	readyErr            error
 	containerErr        error
 	execErr             error
+	machineExecErr      error
+	machineExecExitCode int
 	lastContainerID     string
 	lastContainerAction string
 	containerActions    []string
 	lastExecOptions     api.ExecOptions
+	lastMachineExecID   string
+	lastMachineExecOpts api.ExecOptions
 
 	lastMachineFilter *api.MachineFilter
 	lastMachineID     string
@@ -214,6 +218,20 @@ func (f *fakeBackend) ExecContainer(_ context.Context, serviceID, containerID st
 	_, _ = io.Copy(opts.Stdout, bytes.NewBufferString("out:"+string(input)))
 	_, _ = io.Copy(opts.Stderr, bytes.NewBufferString("warning"))
 	return 0, nil
+}
+
+func (f *fakeBackend) ExecMachine(_ context.Context, machineID string, opts api.ExecOptions) (int, error) {
+	f.lastMachineExecID, f.lastMachineExecOpts = machineID, opts
+	if f.machineExecErr != nil {
+		return -1, f.machineExecErr
+	}
+	var input []byte
+	if opts.Stdin != nil {
+		input, _ = io.ReadAll(opts.Stdin)
+	}
+	_, _ = io.Copy(opts.Stdout, bytes.NewBufferString("out:"+string(input)))
+	_, _ = io.Copy(opts.Stderr, bytes.NewBufferString("warning"))
+	return f.machineExecExitCode, nil
 }
 
 func (f *fakeBackend) ListVolumes(_ context.Context, filter *api.VolumeFilter) ([]api.MachineVolume, error) {
@@ -441,6 +459,8 @@ func TestAllOpenAPIOperationsAreDocumented(t *testing.T) {
 		"/api/v1/caddy/configs":                                {"get"},
 		"/api/v1/machines":                                     {"get"},
 		"/api/v1/machines/{id}":                                {"get", "patch"},
+		"/api/v1/machines/{id}/exec":                           {"post"},
+		"/api/v1/machines/{id}/exec/stream":                    {"post"},
 		"/api/v1/services":                                     {"get", "post"},
 		"/api/v1/services/deploy/compose":                      {"post"},
 		"/api/v1/services/{id}":                                {"get", "delete"},
@@ -549,6 +569,43 @@ func TestContainerControlAndExecRoutes(t *testing.T) {
 
 	response = doRequest(t, server, http.MethodPost, "/api/v1/services/web/containers/abc123/exec", ExecContainerRequest{Command: []string{"bad\x00argument"}}, "")
 	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+
+	response = doRequest(t, server, http.MethodPost, "/api/v1/machines/node-1/exec", MachineExecRequest{}, "")
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+
+	response = doRequest(t, server, http.MethodPost, "/api/v1/machines/node-1/exec/stream", MachineExecRequest{Command: []string{"bad\x00argument"}}, "")
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+}
+
+func TestMachineExecRoutes(t *testing.T) {
+	server, fake := newTestServer(t)
+
+	response := doRequest(t, server, http.MethodPost, "/api/v1/machines/node-1/exec", MachineExecRequest{
+		Command: []string{"printf", "hello"}, Stdin: "input",
+	}, "")
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+	result := decodeResponse[MachineExecResponse](t, response)
+	assert.Equal(t, "machine-1", result.MachineID)
+	assert.Equal(t, "node-1", result.MachineName)
+	assert.Equal(t, 0, result.ExitCode)
+	assert.Equal(t, "out:input", result.Stdout)
+	assert.Equal(t, "warning", result.Stderr)
+	assert.False(t, result.Truncated)
+	assert.Equal(t, "machine-1", fake.lastMachineExecID)
+	assert.Equal(t, []string{"printf", "hello"}, fake.lastMachineExecOpts.Command)
+
+	response = doRequest(t, server, http.MethodPost, "/api/v1/machines/machine-1/exec/stream", MachineExecRequest{
+		Command: []string{"uname", "-a"},
+	}, "")
+	assert.Equal(t, http.StatusOK, response.StatusCode)
+	assert.Equal(t, "text/event-stream", response.Header.Get("Content-Type"))
+	body := readBody(t, response)
+	assert.Contains(t, body, "event: stdout")
+	assert.Contains(t, body, `"data":"out:"`)
+	assert.Contains(t, body, "event: stderr")
+	assert.Contains(t, body, `"data":"warning"`)
+	assert.Contains(t, body, "event: complete")
+	assert.Contains(t, body, `"exitCode":0`)
 }
 
 func TestCappedBuffer(t *testing.T) {

@@ -16,6 +16,7 @@
         TextFieldOutlined,
         snackbar,
     } from "m3-svelte";
+    import { parseAsBoolean, useQueryState } from "nuqs-svelte";
     import { onDestroy } from "svelte";
 
     import { getLatestSuccessfulDeployment } from "#lib/api/deployments.remote";
@@ -72,8 +73,14 @@
     let prefixSaveTimeoutId = 0;
     let identitySaveTimeoutId = 0;
     let iconMenuOpen = $state(false);
-    let uploadDialogOpen = $state(false);
-    let urlDialogOpen = $state(false);
+    const uploadDialogOpen = useQueryState(
+        "uploadIconDialogOpen",
+        parseAsBoolean.withDefault(false),
+    );
+    const urlDialogOpen = useQueryState(
+        "iconUrlDialogOpen",
+        parseAsBoolean.withDefault(false),
+    );
     let iconUrlDraft = $state("");
     let uploadDraft = $state<string | null>(null);
     let uploadInput = $state<HTMLInputElement | undefined>();
@@ -204,22 +211,22 @@
     const openUploadDialog = (): void => {
         closeIconMenu();
         uploadDraft = null;
-        uploadDialogOpen = true;
+        void uploadDialogOpen.set(true);
     };
 
     const closeUploadDialog = (): void => {
-        uploadDialogOpen = false;
+        void uploadDialogOpen.set(false);
         uploadDraft = null;
     };
 
     const openUrlDialog = (): void => {
         closeIconMenu();
         iconUrlDraft = icon && !icon.startsWith("data:") ? icon : "";
-        urlDialogOpen = true;
+        void urlDialogOpen.set(true);
     };
 
     const closeUrlDialog = (): void => {
-        urlDialogOpen = false;
+        void urlDialogOpen.set(false);
         iconUrlDraft = "";
     };
 
@@ -419,7 +426,7 @@
 {/if}
 
 <Dialog
-    bind:open={uploadDialogOpen}
+    bind:open={uploadDialogOpen.current}
     headline="Upload icon"
     onclose={closeUploadDialog}
 >
@@ -462,7 +469,11 @@
     {/snippet}
 </Dialog>
 
-<Dialog bind:open={urlDialogOpen} headline="Icon URL" onclose={closeUrlDialog}>
+<Dialog
+    bind:open={urlDialogOpen.current}
+    headline="Icon URL"
+    onclose={closeUrlDialog}
+>
     <div class="flex flex-col gap-4 [&_.m3-container]:w-full">
         <TextFieldOutlined
             bind:value={iconUrlDraft}

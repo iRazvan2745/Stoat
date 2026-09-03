@@ -2,6 +2,7 @@
     import contentCopyIcon from "@ktibow/iconset-material-symbols/content-copy-outline";
     import refreshIcon from "@ktibow/iconset-material-symbols/refresh";
     import { Button, Card, Icon, LoadingIndicator, Snackbar } from "m3-svelte";
+    import { parseAsString, useQueryState } from "nuqs-svelte";
     import CodeMirror from "svelte-codemirror-editor";
 
     import { listOrganizationCaddyConfigs } from "#lib/api/cluster/caddy.remote";
@@ -13,7 +14,10 @@
     const result = $derived(caddy.current);
     const configs = $derived(result?.items ?? []);
 
-    let selectedConfigKey = $state<string | null>(null);
+    const selectedConfigKey = useQueryState(
+        "config",
+        parseAsString.withDefault(""),
+    );
 
     const configKey = (item: OrganizationCaddyConfig): string =>
         `${item.dataSourceId}:${item.config.machineId}`;
@@ -21,7 +25,7 @@
     const selectedConfig = $derived.by(
         (): OrganizationCaddyConfig | undefined => {
             const selected = configs.find(
-                (item) => configKey(item) === selectedConfigKey
+                (item) => configKey(item) === selectedConfigKey.current
             );
 
             return selected ?? configs[0];
@@ -36,7 +40,7 @@
         )?.label ?? dataSourceId;
 
     const selectConfig = (item: OrganizationCaddyConfig): void => {
-        selectedConfigKey = configKey(item);
+        void selectedConfigKey.set(configKey(item));
     };
 
     const copySelectedConfig = async (): Promise<void> => {

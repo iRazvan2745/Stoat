@@ -1,4 +1,6 @@
 // oxlint-disable func-style
+import { stripAnsi } from "#lib/domain/logs/ansi";
+
 export interface DeploymentLogRecord {
     createdAt: Date;
     id: number;
@@ -76,20 +78,22 @@ function classifyHighlight(text: string): LogHighlightKind {
 }
 
 export function highlightLogMessage(message: string): HighlightedLogSegment[] {
-    if (!message) {
+    const cleanMessage = stripAnsi(message);
+
+    if (!cleanMessage) {
         return [{ kind: "default", text: " " }];
     }
 
     const segments: HighlightedLogSegment[] = [];
     let lastIndex = 0;
 
-    for (const match of message.matchAll(LOG_HIGHLIGHT_PATTERN)) {
+    for (const match of cleanMessage.matchAll(LOG_HIGHLIGHT_PATTERN)) {
         const index = match.index ?? 0;
 
         if (index > lastIndex) {
             segments.push({
                 kind: "default",
-                text: message.slice(lastIndex, index),
+                text: cleanMessage.slice(lastIndex, index),
             });
         }
 
@@ -103,11 +107,11 @@ export function highlightLogMessage(message: string): HighlightedLogSegment[] {
         lastIndex = index + text.length;
     }
 
-    if (lastIndex < message.length) {
-        segments.push({ kind: "default", text: message.slice(lastIndex) });
+    if (lastIndex < cleanMessage.length) {
+        segments.push({ kind: "default", text: cleanMessage.slice(lastIndex) });
     }
 
-    return segments.length > 0 ? segments : [{ kind: "default", text: message }];
+    return segments.length > 0 ? segments : [{ kind: "default", text: cleanMessage }];
 }
 
 const DEBUG_LOG_PATTERNS: readonly RegExp[] = [
@@ -192,7 +196,7 @@ export function isDebugDeploymentLog(
         return true;
     }
 
-    return DEBUG_LOG_PATTERNS.some((pattern) => pattern.test(log.message));
+    return DEBUG_LOG_PATTERNS.some((pattern) => pattern.test(stripAnsi(log.message)));
 }
 
 function formatPlanAction(action: string): string {
@@ -233,16 +237,18 @@ function formatOldPlanOperation(operation: string): string {
 }
 
 export function formatDeploymentLogMessage(message: string): string {
-    if (message === "Deploy complete: deployed") {
+    const cleanMessage = stripAnsi(message);
+
+    if (cleanMessage === "Deploy complete: deployed") {
         return "Deployment finished";
     }
 
-    if (message.startsWith("Deploy complete: ")) {
-        return `Deployment finished: ${message.slice("Deploy complete: ".length)}`;
+    if (cleanMessage.startsWith("Deploy complete: ")) {
+        return `Deployment finished: ${cleanMessage.slice("Deploy complete: ".length)}`;
     }
 
-    if (message.startsWith(PLAN_PREFIX)) {
-        const details = message.slice(PLAN_PREFIX.length);
+    if (cleanMessage.startsWith(PLAN_PREFIX)) {
+        const details = cleanMessage.slice(PLAN_PREFIX.length);
         const operations = details.includes("=")
             ? details.split(" | ").map(formatOldPlanOperation)
             : details.split(" | ");
@@ -250,7 +256,7 @@ export function formatDeploymentLogMessage(message: string): string {
         return operations.join("\n");
     }
 
-    return message;
+    return cleanMessage;
 }
 
 export function formatDeployPlanMessage(
@@ -296,7 +302,7 @@ export function getDeploymentLogSection(
         return "error";
     }
 
-    const { message } = log;
+    const message = stripAnsi(log.message);
 
     if (
         /^Deployment queued|^Deployment started|^Parsed compose|^Preparing deployment|^Wrote compose/u.test(
@@ -556,7 +562,7 @@ function aggregateImagePercent(layers: Map<string, LayerProgress> | undefined): 
 }
 
 export function parseDeploymentProgress(message: string): ParsedDeploymentProgress | null {
-    const line = message.split("\n")[0] ?? "";
+    const line = stripAnsi(message).split("\n")[0] ?? "";
     const progressMatch = PROGRESS_LINE_PATTERN.exec(line);
 
     if (!progressMatch?.groups) {

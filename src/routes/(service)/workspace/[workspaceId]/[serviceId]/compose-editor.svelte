@@ -19,6 +19,7 @@
         updateServiceCompose,
     } from "#lib/api/services.remote";
     import { codeMirrorSearchExtensions } from "#lib/shared/ui/code-mirror-search";
+    import { parseAsBoolean, useQueryState } from "nuqs-svelte";
 
     interface Props {
         initialCompose?: string | null;
@@ -38,7 +39,10 @@
     let pendingSave = $state(false);
     let saveInFlight = false;
     let saveTimeoutId: ReturnType<typeof setTimeout> | undefined;
-    let previewOpen = $state(false);
+    let previewOpen = useQueryState(
+        "previewOpen",
+        parseAsBoolean.withDefault(false),
+    );
     let previewLoading = $state(false);
     let previewYaml = $state("");
     let previewError = $state<string | null>(null);
@@ -127,11 +131,11 @@
     };
 
     const closePreview = (): void => {
-        previewOpen = false;
+        previewOpen.set(false);
     };
 
     const openPreview = async (): Promise<void> => {
-        previewOpen = true;
+        previewOpen.set(true);
         previewLoading = true;
         previewError = null;
         previewYaml = "";
@@ -175,7 +179,7 @@
             snackbar(
                 error instanceof Error
                     ? error.message
-                    : "Unable to save compose"
+                    : "Unable to save compose",
             );
         } finally {
             saveInFlight = false;
@@ -270,8 +274,8 @@
     <Dialog
         headline="Compose preview"
         id="compose-preview-dialog"
-        bind:open={previewOpen}
-        onclose={closePreview}
+        bind:open={previewOpen.current}
+        onclose={() => previewOpen.set(false)}
     >
         {#if previewLoading}
             <div class="preview-status">

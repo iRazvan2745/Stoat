@@ -10,6 +10,7 @@
         Icon,
         LoadingIndicator,
         Snackbar,
+        Switch,
         TextFieldOutlined,
         snackbar,
     } from "m3-svelte";
@@ -54,6 +55,7 @@
     let variables = $state<DraftVariable[]>(draftsFrom(savedVariables));
     let envFile = $state(serializeEnvFile(savedVariables));
     let saving = $state(false);
+    let showEnvironmentValues = $state(false);
 
     const applySaved = (rows: EnvironmentVariable[]): void => {
         variables = draftsFrom(rows);
@@ -266,11 +268,25 @@
         </Card>
     {:else}
         <Card variant="elevated">
-            <div class="text-on-surface-variant mb-2 flex items-center gap-2">
-                <Icon icon={codeIcon} size={18} />
-                <p class="m3-font-body-small">.env file</p>
+            <div
+                class="text-on-surface-variant mb-2 flex flex-wrap items-center justify-between gap-3"
+            >
+                <div class="flex items-center gap-2">
+                    <Icon icon={codeIcon} size={18} />
+                    <p class="m3-font-body-small">.env file</p>
+                </div>
+                <label class="text-on-surface flex items-center gap-2">
+                    <span class="m3-font-label-large">Show values</span>
+                    <Switch
+                        bind:checked={showEnvironmentValues}
+                        aria-label="Show environment values"
+                    />
+                </label>
             </div>
-            <EnvironmentEditor bind:value={envFile} />
+            <EnvironmentEditor
+                bind:value={envFile}
+                showValues={showEnvironmentValues}
+            />
         </Card>
     {/if}
 </div>

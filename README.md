@@ -58,4 +58,4 @@ cp .env.example .env
 docker compose up -d
 ```
 
-The production stack runs Stoat, PostgreSQL, and the sidecar. It expects the host Uncloud socket directory at `/run/uncloud`; set `UNCLOUD_SOCKET_GID` when the socket is owned by a non-root group. The app and sidecar expose `/healthz` and `/readyz` health checks respectively.
+The production stack runs Stoat, PostgreSQL, and the sidecar. It expects the host Uncloud socket directory at `/run/uncloud`. The sidecar runs as a privileged global service with the host PID namespace so it can execute commands on selected machines; keep its API on a trusted network. The app and sidecar expose `/healthz` and `/readyz` health checks respectively.

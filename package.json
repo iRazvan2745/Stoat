@@ -10,7 +10,7 @@
         "#lib/*": "./src/lib/*"
     },
     "scripts": {
-        "dev": "vp dev",
+        "dev": "portless stoat vp dev",
         "build": "vp build",
         "preview": "vp preview",
         "prepare": "vp config && svelte-kit sync || echo ''",

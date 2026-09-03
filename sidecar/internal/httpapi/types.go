@@ -139,6 +139,31 @@ type ExecContainerResponse struct {
 	Truncated bool   `json:"truncated"`
 }
 
+// MachineExecRequest describes a command to run on a machine's host operating system.
+type MachineExecRequest struct {
+	Command []string `json:"command"`
+	Stdin   string   `json:"stdin,omitempty"`
+}
+
+// MachineExecResponse contains the completed result of a host command.
+type MachineExecResponse struct {
+	MachineID   string `json:"machineId"`
+	MachineName string `json:"machineName"`
+	ExitCode    int    `json:"exitCode"`
+	Stdout      string `json:"stdout"`
+	Stderr      string `json:"stderr"`
+	Truncated   bool   `json:"truncated"`
+}
+
+// MachineExecEvent is emitted by the streaming host command endpoint.
+// Type is one of stdout, stderr, complete, or error.
+type MachineExecEvent struct {
+	Type     string `json:"type"`
+	Data     string `json:"data,omitempty"`
+	ExitCode *int   `json:"exitCode,omitempty"`
+	Error    string `json:"error,omitempty"`
+}
+
 // RenameMachineRequest is the request body for changing a machine name.
 type RenameMachineRequest struct {
 	Name string `json:"name"`

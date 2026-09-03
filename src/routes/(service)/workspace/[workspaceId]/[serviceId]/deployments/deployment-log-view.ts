@@ -5,6 +5,7 @@ import {
     insertLogSectionHeaders,
     isDebugDeploymentLog,
 } from "#lib/domain/deployments/logs";
+import { stripAnsi } from "#lib/domain/logs/ansi";
 
 export type LogFilter = "all" | "stderr" | "stdout";
 
@@ -28,7 +29,7 @@ const CHANGE_SUMMARY_PATTERN =
     /^Changes: (?<changes>\d+), insertions: (?<insertions>\d+), deletions: (?<deletions>\d+)$/u;
 
 export function getChangeSummary(message: string): ChangeSummary | null {
-    const groups = CHANGE_SUMMARY_PATTERN.exec(message)?.groups;
+    const groups = CHANGE_SUMMARY_PATTERN.exec(stripAnsi(message))?.groups;
 
     if (!groups?.changes || !groups.insertions || !groups.deletions) {
         return null;

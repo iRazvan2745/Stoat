@@ -16,16 +16,32 @@ import (
 	"github.com/psviderski/uncloud/pkg/client"
 	"github.com/psviderski/uncloud/pkg/client/compose"
 	"github.com/psviderski/uncloud/pkg/client/deploy"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type clientBackend struct {
 	*client.Client
+	hostServiceName string
 }
 
-// NewClientBackend adapts *client.Client to the HTTP API Backend interface.
+const DefaultHostServiceName = "sidecar"
+
+// NewClientBackend adapts *client.Client to the HTTP API Backend interface
+// using the default global sidecar service name.
 func NewClientBackend(cli *client.Client) Backend {
-	return &clientBackend{Client: cli}
+	return NewClientBackendWithHostService(cli, DefaultHostServiceName)
+}
+
+// NewClientBackendWithHostService adapts *client.Client and configures the
+// service used for machine host command execution.
+func NewClientBackendWithHostService(cli *client.Client, hostServiceName string) Backend {
+	hostServiceName = strings.TrimSpace(hostServiceName)
+	if hostServiceName == "" {
+		hostServiceName = DefaultHostServiceName
+	}
+	return &clientBackend{Client: cli, hostServiceName: hostServiceName}
 }
 
 func (b *clientBackend) Ready(ctx context.Context) error {
@@ -364,6 +380,56 @@ func (b *clientBackend) RenameMachine(ctx context.Context, id, name string) (Mac
 		return MachineInfoResponse{}, errors.New("Uncloud returned an empty machine response")
 	}
 	return MachineInfoResponse{ID: machine.Id, Name: machine.Name}, nil
+}
+
+func (b *clientBackend) ExecMachine(ctx context.Context, machineID string, opts api.ExecOptions) (int, error) {
+	service, err := b.Client.InspectService(ctx, b.hostServiceName)
+	if err != nil {
+		return -1, status.Errorf(
+			codes.Unavailable,
+			"inspect host-exec sidecar service %q: %v",
+			b.hostServiceName,
+			err,
+		)
+	}
+
+	target, err := findHostExecContainer(service, machineID)
+	if err != nil {
+		return -1, err
+	}
+
+	opts.Command = hostExecCommand(opts.Command)
+	exitCode, err := b.Client.ExecContainer(ctx, b.hostServiceName, target.Container.ID, opts)
+	if err != nil {
+		return exitCode, fmt.Errorf("execute host command on machine %q: %w", machineID, err)
+	}
+	return exitCode, nil
+}
+
+func findHostExecContainer(service api.Service, machineID string) (api.MachineServiceContainer, error) {
+	for _, candidate := range service.Containers {
+		if candidate.MachineID != machineID {
+			continue
+		}
+		if candidate.Container.State != nil && candidate.Container.State.Running {
+			return candidate, nil
+		}
+	}
+
+	return api.MachineServiceContainer{}, status.Errorf(
+		codes.Unavailable,
+		"host-exec sidecar service %q has no running container on machine %q",
+		service.Name,
+		machineID,
+	)
+}
+
+func hostExecCommand(command []string) []string {
+	const namespaceArgumentCount = 9
+
+	wrapped := make([]string, 0, namespaceArgumentCount+len(command))
+	wrapped = append(wrapped, "nsenter", "-t", "1", "-m", "-u", "-i", "-n", "-p", "--")
+	return append(wrapped, command...)
 }
 
 // DeployCompose deploys services from a Compose file, replicating the behaviour

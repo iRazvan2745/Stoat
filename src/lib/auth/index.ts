@@ -12,6 +12,14 @@ import * as schema from "#lib/db/schema";
 // Registration is closed by default; set ALLOW_SIGNUP=true to open it.
 export const isSignupAllowed = (): boolean => ALLOW_SIGNUP;
 
+const appUrl = new URL(APP_URL);
+const authProtocol: "http" | "https" = appUrl.protocol === "http:" ? "http" : "https";
+const authBaseURL = {
+    allowedHosts: [appUrl.host, "localhost:*", "127.0.0.1:*", "[::1]:*"],
+    fallback: APP_URL,
+    protocol: authProtocol,
+};
+
 const slugify = (value: string): string =>
     value
         .toLowerCase()
@@ -22,7 +30,7 @@ const slugify = (value: string): string =>
         .slice(0, 32);
 
 export const auth = betterAuth({
-    baseURL: APP_URL,
+    baseURL: authBaseURL,
     database: drizzleAdapter(db, { provider: "pg", schema }),
     databaseHooks: {
         user: {

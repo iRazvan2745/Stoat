@@ -1,0 +1,57 @@
+services:
+    calagopus-web:
+        image: ghcr.io/calagopus/panel:heavy-aio
+        restart: unless-stopped
+        volumes:
+            - calagopus-data:/var/lib/calagopus
+            - calagopus-logs:/var/log/calagopus
+            - calagopus-binaries:/app/binaries
+            - calagopus-translations:/app/translations
+            - calagopus-extensions:/app/extensions
+            - calagopus-extension-migrations:/app/repo/database/extension-migrations
+            - /opt/calagopus/wings-config.yml:/wings-config.yml
+            - /var/run/docker.sock:/var/run/docker.sock
+            - /var/lib/docker/containers:/var/lib/docker/containers
+            - /etc/pterodactyl:/etc/pterodactyl
+            - /var/lib/pterodactyl:/var/lib/pterodactyl
+            - /var/log/pterodactyl:/var/log/pterodactyl
+            - /tmp/pterodactyl:/tmp/pterodactyl
+        x-ports:
+            - 8000:8000@host
+            - 2022:2022@host # for sftpg
+        extra_hosts:
+            - host.docker.internal:host-gateway
+        depends_on:
+            - calagopus-cache
+            - calagopus-db
+
+    calagopus-cache:
+        image: redis:8.0-alpine
+        restart: unless-stopped
+        x-machines: hazel
+        volumes:
+            - calagopus-redis-data:/data
+        healthcheck:
+            test:
+                - CMD
+                - redis-cli
+                - ping
+            interval: 10s
+            timeout: 3s
+            retries: 5
+
+    calagopus-db:
+        image: ghcr.io/calagopus/pgautoupgrade:18-alpine
+        restart: unless-stopped
+        volumes:
+            - calagopus-postgres-data:/data
+
+volumes:
+    calagopus-data: null
+    calagopus-logs: null
+    calagopus-binaries: null
+    calagopus-translations: null
+    calagopus-extensions: null
+    calagopus-extension-migrations: null
+    calagopus-postgres-data: null
+    calagopus-redis-data: null

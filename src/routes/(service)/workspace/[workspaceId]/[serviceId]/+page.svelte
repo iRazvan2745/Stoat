@@ -15,6 +15,7 @@
         Snackbar,
         snackbar,
     } from "m3-svelte";
+    import { parseAsBoolean, useQueryState } from "nuqs-svelte";
     import type { Attachment } from "svelte/attachments";
 
     import {
@@ -39,7 +40,10 @@
 
     const svc = await service;
     let actionsMenuOpen = $state(false);
-    let deleteDialogOpen = $state(false);
+    const deleteDialogOpen = useQueryState(
+        "deleteDialogOpen",
+        parseAsBoolean.withDefault(false),
+    );
     let deleting = $state(false);
     let deploying = $state(false);
 
@@ -319,7 +323,7 @@
                                 label="Delete service"
                                 onclick={() => {
                                     actionsMenuOpen = false;
-                                    deleteDialogOpen = true;
+                                    void deleteDialogOpen.set(true);
                                 }}
                             />
                         </ExpressiveMenu>
@@ -456,7 +460,11 @@
     </div>
 {/if}
 
-<Dialog bind:open={deleteDialogOpen} headline="Delete service">
+<Dialog
+    bind:open={deleteDialogOpen.current}
+    headline="Delete service"
+    onclose={() => deleteDialogOpen.set(false)}
+>
     <div class="flex flex-col gap-2">
         <p class="m3-font-body-large text-on-surface">
             Are you sure you want to delete this service?
@@ -471,7 +479,7 @@
         <Button
             variant="text"
             disabled={deleting}
-            onclick={() => (deleteDialogOpen = false)}
+            onclick={() => deleteDialogOpen.set(false)}
         >
             Cancel
         </Button>

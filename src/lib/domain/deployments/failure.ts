@@ -1,4 +1,6 @@
 // oxlint-disable func-style
+import { stripAnsi } from "#lib/domain/logs/ansi";
+
 export interface DeploymentFailureCheck {
     id: string;
     matches: (message: string) => boolean;
@@ -58,11 +60,13 @@ export function detectDeploymentFailure(
     logs: Iterable<DeploymentFailureLog>,
 ): DetectedDeploymentFailure | null {
     for (const log of logs) {
+        const message = stripAnsi(log.message);
+
         for (const check of DEPLOYMENT_FAILURE_CHECKS) {
-            if (check.matches(log.message)) {
+            if (check.matches(message)) {
                 return {
                     checkId: check.id,
-                    message: log.message,
+                    message,
                     summary: check.summary,
                 };
             }

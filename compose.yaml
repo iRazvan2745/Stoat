@@ -39,12 +39,20 @@ services:
         restart: unless-stopped
 
     sidecar:
-        image: ghcr.io/irazvan2745/sidecar:latest
+        image: ghcr.io/irazvan2745/sidecar:canary
+        # Uncloud does not propagate Compose group_add. The sidecar needs
+        # root-equivalent access to the host's Uncloud control socket.
+        user: root
+        # Host command execution uses the host PID and mount namespaces.
+        privileged: true
+        pid: host
         deploy:
             mode: global
         volumes:
             # Bind-mount the host's Uncloud socket directory.
             - /run/uncloud:/run/uncloud:ro
+            # Required for host namespace access from the sidecar.
+            - /:/host
         pull_policy: always
         healthcheck:
             test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:80/readyz"]

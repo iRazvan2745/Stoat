@@ -158,6 +158,40 @@ export interface paths {
         patch: operations["renameMachine"];
         trace?: never;
     };
+    "/api/v1/machines/{id}/exec": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Execute a host command */
+        post: operations["execMachine"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/machines/{id}/exec/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stream a host command */
+        post: operations["streamMachineExec"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/machines/{id}/logs": {
         parameters: {
             query?: never;
@@ -595,6 +629,27 @@ export interface components {
             osPrettyName?: string;
             publicIp?: string;
             state: string;
+        };
+        MachineExecEvent: {
+            data?: string;
+            error?: string;
+            /** Format: int32 */
+            exitCode?: number;
+            /** @enum {string} */
+            type: "stdout" | "stderr" | "complete" | "error";
+        };
+        MachineExecRequest: {
+            command: string[];
+            stdin?: string;
+        };
+        MachineExecResponse: {
+            /** Format: int32 */
+            exitCode: number;
+            machineId: string;
+            machineName: string;
+            stderr: string;
+            stdout: string;
+            truncated: boolean;
         };
         MachineImage: {
             image?: Record<string, never>;
@@ -1202,6 +1257,114 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MachineInfoResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    execMachine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Host command */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MachineExecRequest"];
+            };
+        };
+        responses: {
+            /** @description Completed command */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MachineExecResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    streamMachineExec: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Host command */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MachineExecRequest"];
+            };
+        };
+        responses: {
+            /** @description Server-Sent host command events */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": components["schemas"]["MachineExecEvent"];
                 };
             };
             /** @description Invalid request */

@@ -138,6 +138,12 @@ func openAPIPaths() map[string]OpenAPIPathItem {
 			Get:   operation("machines", "Inspect a machine", "inspectMachine", []OpenAPIParameter{pathParameter("id")}, nil, responses(response("Machine", ref("Machine")), true)),
 			Patch: operation("machines", "Rename a machine", "renameMachine", []OpenAPIParameter{pathParameter("id")}, requestBody("Machine name", "RenameMachineRequest"), responses(response("Updated machine", ref("MachineInfoResponse")), true)),
 		},
+		"/api/v1/machines/{id}/exec": {
+			Post: operation("machines", "Execute a host command", "execMachine", []OpenAPIParameter{pathParameter("id")}, requestBody("Host command", "MachineExecRequest"), responses(response("Completed command", ref("MachineExecResponse")), true)),
+		},
+		"/api/v1/machines/{id}/exec/stream": {
+			Post: operation("machines", "Stream a host command", "streamMachineExec", []OpenAPIParameter{pathParameter("id")}, requestBody("Host command", "MachineExecRequest"), machineExecStreamResponses(true)),
+		},
 		"/api/v1/services": {
 			Get:  operation("services", "List services", "listServices", nil, nil, responses(response("Service list", itemResponse("Service")), true)),
 			Post: operation("services", "Deploy a service", "runService", nil, requestBody("Service specification", "ServiceSpec"), createdResponses(response("Created service", ref("RunServiceResponse")), true)),
@@ -321,6 +327,36 @@ func openAPISchemas() map[string]OpenAPISchema {
 			Type:       "object",
 			Properties: map[string]OpenAPISchema{"id": {Type: "string"}, "name": {Type: "string"}},
 			Required:   []string{"id", "name"},
+		},
+		"MachineExecRequest": {
+			Type: "object",
+			Properties: map[string]OpenAPISchema{
+				"command": {Type: "array", Items: &OpenAPISchema{Type: "string"}},
+				"stdin":   {Type: "string"},
+			},
+			Required: []string{"command"},
+		},
+		"MachineExecResponse": {
+			Type: "object",
+			Properties: map[string]OpenAPISchema{
+				"machineId":   {Type: "string"},
+				"machineName": {Type: "string"},
+				"exitCode":    {Type: "integer", Format: "int32"},
+				"stdout":      {Type: "string"},
+				"stderr":      {Type: "string"},
+				"truncated":   {Type: "boolean"},
+			},
+			Required: []string{"machineId", "machineName", "exitCode", "stdout", "stderr", "truncated"},
+		},
+		"MachineExecEvent": {
+			Type: "object",
+			Properties: map[string]OpenAPISchema{
+				"type":     {Type: "string", Enum: []string{"stdout", "stderr", "complete", "error"}},
+				"data":     {Type: "string"},
+				"exitCode": {Type: "integer", Format: "int32"},
+				"error":    {Type: "string"},
+			},
+			Required: []string{"type"},
 		},
 		"Service": {
 			Type: "object",
@@ -688,10 +724,26 @@ func deployStreamResponses(notFound bool) map[string]OpenAPIResponse {
 }
 
 func streamResponse(description string) OpenAPIResponse {
+	return streamResponseSchema(description, "LogEvent")
+}
+
+func machineExecStreamResponses(notFound bool) map[string]OpenAPIResponse {
+	result := map[string]OpenAPIResponse{
+		"200": streamResponseSchema("Server-Sent host command events", "MachineExecEvent"),
+		"400": response("Invalid request", ref("ErrorResponse")),
+		"500": response("Internal server error", ref("ErrorResponse")),
+	}
+	if notFound {
+		result["404"] = response("Resource not found", ref("ErrorResponse"))
+	}
+	return result
+}
+
+func streamResponseSchema(description, schemaName string) OpenAPIResponse {
 	return OpenAPIResponse{
 		Description: description,
 		Content: map[string]OpenAPIMediaType{
-			"text/event-stream": {Schema: ref("LogEvent")},
+			"text/event-stream": {Schema: ref(schemaName)},
 		},
 	}
 }
