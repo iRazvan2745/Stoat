@@ -60,23 +60,33 @@
         target: string;
     }
 
-    interface FlowBranch {
+    interface FlowHost {
         https: boolean;
-        host: string;
+        id: string;
+        label: string;
+    }
+
+    interface FlowBranch {
+        hosts: FlowHost[];
         id: string;
         kind: "domain" | "port";
         paths: FlowPath[];
     }
 
     const branches = $derived.by((): FlowBranch[] => {
-        const domains = new Map<string, FlowBranch>();
+        const domains = new Map<string, Omit<FlowBranch, "id">>();
         const result: FlowBranch[] = [];
 
         for (const [index, route] of routes.entries()) {
             if (route.mode === "host") {
                 result.push({
-                    host: `:${route.publishedPort ?? route.containerPort}`,
-                    https: false,
+                    hosts: [
+                        {
+                            https: false,
+                            id: `port-${index}-host`,
+                            label: `:${route.publishedPort ?? route.containerPort}`,
+                        },
+                    ],
                     id: `port-${index}`,
                     kind: "port",
                     paths: [
@@ -96,22 +106,57 @@
 
             if (!branch) {
                 branch = {
-                    host,
-                    https: route.protocol === "https",
-                    id: `domain-${domains.size}`,
+                    hosts: [
+                        {
+                            https: route.protocol === "https",
+                            id: `domain-${domains.size}-host`,
+                            label: host,
+                        },
+                    ],
                     kind: "domain",
                     paths: [],
                 };
                 domains.set(host, branch);
-                result.push(branch);
             }
 
             branch.paths.push({
-                id: `${branch.id}-path-${branch.paths.length}`,
+                id: `domain-${domains.size - 1}-path-${branch.paths.length}`,
                 label: route.path ?? "/",
                 port: route.containerPort,
                 target: route.composeService,
             });
+        }
+
+        const sharedDomainBranches = new Map<string, FlowBranch>();
+
+        for (const domain of domains.values()) {
+            const signature = JSON.stringify(
+                domain.paths
+                    .map(({ label, port, target }) => [label, port, target])
+                    .toSorted((left, right) =>
+                        JSON.stringify(left).localeCompare(
+                            JSON.stringify(right)
+                        )
+                    )
+            );
+            const sharedBranch = sharedDomainBranches.get(signature);
+
+            if (sharedBranch) {
+                sharedBranch.hosts.push(...domain.hosts);
+                continue;
+            }
+
+            const id = `domain-group-${sharedDomainBranches.size}`;
+            const groupedBranch: FlowBranch = {
+                ...domain,
+                id,
+                paths: domain.paths.map((path, index) => ({
+                    ...path,
+                    id: `${id}-path-${index}`,
+                })),
+            };
+            sharedDomainBranches.set(signature, groupedBranch);
+            result.push(groupedBranch);
         }
 
         return result;
@@ -181,6 +226,7 @@
     <FlowNodeList>
         {#if branch.kind === "port"}
             {@const path = branch.paths[0]}
+            {@const host = branch.hosts[0]}
             <FlowNode
                 id={branch.id}
                 edgeLabel={path ? `:${path.port}` : undefined}
@@ -189,24 +235,45 @@
                     <span class="text-on-surface-variant flex">
                         <Icon icon={settingsEthernetIcon} size={18} />
                     </span>
-                    <span class="font-mono">{branch.host}</span>
+                    <span class="font-mono">{host?.label}</span>
                 </span>
             </FlowNode>
             {#if path}
                 {@render targetNode(`${branch.id}-target`, path.target)}
             {/if}
         {:else}
-            <FlowNode id={branch.id}>
-                <span class="flex items-center gap-2">
-                    <span class="text-on-surface-variant flex">
-                        <Icon
-                            icon={branch.https ? lockIcon : publicIcon}
-                            size={18}
-                        />
+            {#if branch.hosts.length > 1}
+                <FlowParallel contentClass="flex flex-col gap-5">
+                    {#each branch.hosts as host (host.id)}
+                        <FlowNode id={host.id}>
+                            <span class="flex items-center gap-2">
+                                <span class="text-on-surface-variant flex">
+                                    <Icon
+                                        icon={host.https
+                                            ? lockIcon
+                                            : publicIcon}
+                                        size={18}
+                                    />
+                                </span>
+                                <span class="font-mono">{host.label}</span>
+                            </span>
+                        </FlowNode>
+                    {/each}
+                </FlowParallel>
+            {:else if branch.hosts[0]}
+                {@const host = branch.hosts[0]}
+                <FlowNode id={host.id}>
+                    <span class="flex items-center gap-2">
+                        <span class="text-on-surface-variant flex">
+                            <Icon
+                                icon={host.https ? lockIcon : publicIcon}
+                                size={18}
+                            />
+                        </span>
+                        <span class="font-mono">{host.label}</span>
                     </span>
-                    <span class="font-mono">{branch.host}</span>
-                </span>
-            </FlowNode>
+                </FlowNode>
+            {/if}
 
             {#if branch.paths.length > 1}
                 <FlowParallel

@@ -43,6 +43,8 @@
         shouldPrefixServices,
     } from "#lib/domain/services/settings";
 
+    import ServiceTransferSettings from "./service-transfer-settings.svelte";
+
     const SAVE_DEBOUNCE_MS = 400;
 
     const { params } = $props();
@@ -75,11 +77,11 @@
     let iconMenuOpen = $state(false);
     const uploadDialogOpen = useQueryState(
         "uploadIconDialogOpen",
-        parseAsBoolean.withDefault(false),
+        parseAsBoolean.withDefault(false)
     );
     const urlDialogOpen = useQueryState(
         "iconUrlDialogOpen",
-        parseAsBoolean.withDefault(false),
+        parseAsBoolean.withDefault(false)
     );
     let iconUrlDraft = $state("");
     let uploadDraft = $state<string | null>(null);
@@ -292,7 +294,7 @@
         <header class="flex min-w-0 flex-col gap-1">
             <h1 class="m3-font-headline-small text-on-surface">Settings</h1>
             <p class="m3-font-body-medium text-on-surface-variant">
-                Name, icon, and options that apply on the next deploy.
+                Manage service configuration and workspace placement.
             </p>
         </header>
 
@@ -422,6 +424,11 @@
                 {/if}
             </section>
         </div>
+
+        <ServiceTransferSettings
+            serviceId={svc.id}
+            workspaceId={params.workspaceId}
+        />
     </div>
 {/if}
 

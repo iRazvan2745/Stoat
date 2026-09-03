@@ -62,7 +62,8 @@
             const red = Math.floor(cubeIndex / 36);
             const green = Math.floor((cubeIndex % 36) / 6);
             const blue = cubeIndex % 6;
-            const channel = (value: number): number => (value === 0 ? 0 : 55 + value * 40);
+            const channel = (value: number): number =>
+                value === 0 ? 0 : 55 + value * 40;
 
             return `rgb(${channel(red)} ${channel(green)} ${channel(blue)})`;
         }

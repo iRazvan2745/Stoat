@@ -58,7 +58,7 @@
     let addServiceMenuOpen = $state(false);
     const deleteWorkspaceDialogOpen = useQueryState(
         "deleteWorkspaceDialogOpen",
-        parseAsBoolean.withDefault(false),
+        parseAsBoolean.withDefault(false)
     );
     let deletingWorkspace = $state(false);
 

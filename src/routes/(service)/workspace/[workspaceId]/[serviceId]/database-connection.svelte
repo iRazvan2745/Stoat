@@ -74,15 +74,15 @@
             {@render copyUrl(
                 "Internal URL",
                 maskPostgresUrl(connection.internal.url, revealPassword),
-                connection.internal.url,
+                connection.internal.url
             )}
             {#if connection.external}
                 {@render copyUrl(
                     "External URL",
                     maskPostgresUrl(connection.external.url, revealPassword),
-                    connection.external.url,
+                    connection.external.url
                 )}
-            <!-- {:else}
+                <!-- {:else}
                 <Button variant="text">Enable External connection</Button> -->
             {/if}
         </ul>

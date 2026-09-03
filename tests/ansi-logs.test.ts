@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { parseAnsiLogLines, stripAnsi } from "#lib/domain/logs/ansi";
 
-const ESC = "\u001b";
+const ESC = "\u001B";
 
 describe("parseAnsiLogLines", () => {
     it("renders SGR colors and styles as structured segments", () => {

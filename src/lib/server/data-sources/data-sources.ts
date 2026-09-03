@@ -228,15 +228,25 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
         };
     }
 
-    const existingServices = await db
-        .select()
+    const linkedServices = await db
+        .select({
+            service: services,
+            workspaceId: workspace.id,
+            workspaceSlug: workspace.slug,
+        })
         .from(services)
-        .where(eq(services.workspaceId, targetWorkspace.id));
+        .innerJoin(workspace, eq(workspace.id, services.workspaceId))
+        .where(eq(workspace.dataSourceId, source.id));
     const generatedComposePaths = new Set(
-        existingServices.flatMap((service) => [
-            `${targetWorkspace.slug}/${service.slug}/compose.yaml`,
-            `${targetWorkspace.id}/${service.slug}/compose.yaml`,
+        linkedServices.flatMap(({ service, workspaceId, workspaceSlug }) => [
+            `${workspaceSlug}/${service.slug ?? service.id}/compose.yaml`,
+            `${workspaceId}/${service.slug ?? service.id}/compose.yaml`,
         ]),
+    );
+    const importedSourcePaths = new Set(
+        linkedServices.flatMap(({ service }) =>
+            service.settings?.sourcePath ? [service.settings.sourcePath] : [],
+        ),
     );
 
     let existing = 0;
@@ -247,11 +257,7 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
             continue;
         }
 
-        const alreadyImported = existingServices.some(
-            (service) => service.settings?.sourcePath === file.relativePath,
-        );
-
-        if (alreadyImported) {
+        if (importedSourcePaths.has(file.relativePath)) {
             existing += 1;
             continue;
         }
@@ -269,7 +275,10 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
             .insert(services)
             .values({
                 name: serviceName,
-                settings: { sourcePath: file.relativePath },
+                settings: {
+                    shouldPrefix: false,
+                    sourcePath: file.relativePath,
+                },
                 slug,
                 type: "compose",
                 value: file.compose,
@@ -282,7 +291,7 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
         }
 
         await createWorkspaceFolder(repoPath, targetWorkspace.slug, createdService.slug ?? slug);
-        existingServices.push(createdService);
+        importedSourcePaths.add(file.relativePath);
         imported += 1;
     }
 

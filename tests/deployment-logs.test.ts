@@ -89,7 +89,7 @@ describe("formatDeploymentLogMessage", () => {
     });
 
     it("removes ANSI styling before formatting deployment messages", () => {
-        expect(formatDeploymentLogMessage("\u001b[32mDeploy complete: deployed\u001b[0m")).toBe(
+        expect(formatDeploymentLogMessage("\u001B[32mDeploy complete: deployed\u001B[0m")).toBe(
             "Deployment finished",
         );
     });

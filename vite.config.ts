@@ -4,6 +4,18 @@ import tailwindcss from "@tailwindcss/vite";
 import { functionsMixins } from "vite-plugin-functions-mixins";
 import { defineConfig, lazyPlugins } from "vite-plus";
 
+const functionsMixinsPre = {
+    ...functionsMixins({ deps: ["m3-svelte"] }),
+    enforce: "pre" as const,
+    name: "vite-plugin-functions-mixins:pre",
+};
+
+const functionsMixinsPost = {
+    ...functionsMixins({ deps: ["m3-svelte"] }),
+    enforce: "post" as const,
+    name: "vite-plugin-functions-mixins:post",
+};
+
 export default defineConfig({
     fmt: { ignorePatterns: ["**/schema.d.ts"] },
     lint: {
@@ -31,6 +43,7 @@ export default defineConfig({
         ],
     },
     plugins: lazyPlugins(() => [
+        functionsMixinsPre,
         tailwindcss(),
         sveltekit({
             // Stoat runs as a Node.js server in production.
@@ -50,12 +63,7 @@ export default defineConfig({
                 remoteFunctions: true,
             },
         }),
-        functionsMixins({ deps: ["m3-svelte"] }),
-        {
-            // Keep Lightning CSS from parsing m3-svelte's custom mixin syntax.
-            config: () => ({ build: { cssMinify: false } }),
-            name: "stoat-m3-css",
-        },
+        functionsMixinsPost,
     ]),
     server: {
         watch: {

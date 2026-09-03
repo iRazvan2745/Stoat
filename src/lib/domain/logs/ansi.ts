@@ -45,8 +45,8 @@ type EscapeSequence =
     | { end: number; kind: "csi"; parameters: string; final: string }
     | { end: number; kind: "control" };
 
-const ESCAPE = "\u001b";
-const CSI = "\u009b";
+const ESCAPE = "\u001B";
+const CSI = "\u009B";
 const BELL = "\u0007";
 
 const STANDARD_COLORS: readonly AnsiNamedColor[] = [
@@ -174,7 +174,10 @@ function readExtendedColor(
 
         if (colorIndex !== undefined && Number.isInteger(colorIndex)) {
             return {
-                color: { index: Math.max(0, Math.min(255, colorIndex)), kind: "indexed" },
+                color: {
+                    index: Math.max(0, Math.min(255, colorIndex)),
+                    kind: "indexed",
+                },
                 consumed: 2,
             };
         }

@@ -18,9 +18,11 @@ import { streamServiceContainerLogs as streamServiceContainerLogsFromServer } fr
 import {
     createService as createServiceRecord,
     createServiceFromTemplate as createServiceFromTemplateRecord,
+    copyService as copyServiceRecord,
     deleteService as deleteServiceRecord,
     getService as getServiceRecord,
     listServicesInWorkspace as listServicesInWorkspaceRecords,
+    moveService as moveServiceRecord,
     previewServiceCompose as previewServiceComposeRecord,
     updateServiceCompose as updateServiceComposeRecord,
     updateServiceIdentity as updateServiceIdentityRecord,
@@ -55,6 +57,11 @@ const CreateServiceFromTemplateInput = v.object({
 const UpdateServiceComposeInput = v.object({
     compose: v.string(),
     serviceId: ServiceIdInput,
+});
+
+const TransferServiceInput = v.object({
+    serviceId: ServiceIdInput,
+    targetWorkspaceId: WorkspaceIdInput,
 });
 
 const UpdateServiceEnvironmentInput = v.pipe(
@@ -227,6 +234,36 @@ export const createServiceFromTemplate = command(
         async (input: v.InferOutput<typeof CreateServiceFromTemplateInput>) => {
             await requireWorkspaceAccess(input.workspaceId);
             return await createServiceFromTemplateRecord(input);
+        },
+    ),
+);
+
+export const copyService = command(
+    TransferServiceInput,
+    withRemoteLogging(
+        "services.copyService",
+        "command",
+        async ({ serviceId, targetWorkspaceId }: v.InferOutput<typeof TransferServiceInput>) => {
+            await requireServiceAccess(serviceId);
+            await requireWorkspaceAccess(targetWorkspaceId);
+            const copied = await copyServiceRecord(serviceId, targetWorkspaceId);
+            await refreshServiceQueries();
+            return copied;
+        },
+    ),
+);
+
+export const moveService = command(
+    TransferServiceInput,
+    withRemoteLogging(
+        "services.moveService",
+        "command",
+        async ({ serviceId, targetWorkspaceId }: v.InferOutput<typeof TransferServiceInput>) => {
+            await requireServiceAccess(serviceId);
+            await requireWorkspaceAccess(targetWorkspaceId);
+            const moved = await moveServiceRecord(serviceId, targetWorkspaceId);
+            await refreshServiceQueries();
+            return moved;
         },
     ),
 );

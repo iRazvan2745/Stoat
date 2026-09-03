@@ -40,7 +40,7 @@ describe("withKeyedLock", () => {
         await Promise.resolve();
         expect(otherStarted).toBe(true);
 
-        gate.resolve(undefined);
+        gate.resolve();
         await Promise.all([held, other]);
     });
 });

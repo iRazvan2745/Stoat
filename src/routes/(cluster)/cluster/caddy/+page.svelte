@@ -16,7 +16,7 @@
 
     const selectedConfigKey = useQueryState(
         "config",
-        parseAsString.withDefault(""),
+        parseAsString.withDefault("")
     );
 
     const configKey = (item: OrganizationCaddyConfig): string =>

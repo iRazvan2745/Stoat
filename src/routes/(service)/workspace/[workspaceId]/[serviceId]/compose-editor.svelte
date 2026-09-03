@@ -11,6 +11,7 @@
         LoadingIndicator,
         snackbar,
     } from "m3-svelte";
+    import { parseAsBoolean, useQueryState } from "nuqs-svelte";
     import { onDestroy } from "svelte";
     import CodeMirror from "svelte-codemirror-editor";
 
@@ -19,7 +20,6 @@
         updateServiceCompose,
     } from "#lib/api/services.remote";
     import { codeMirrorSearchExtensions } from "#lib/shared/ui/code-mirror-search";
-    import { parseAsBoolean, useQueryState } from "nuqs-svelte";
 
     interface Props {
         initialCompose?: string | null;
@@ -41,7 +41,7 @@
     let saveTimeoutId: ReturnType<typeof setTimeout> | undefined;
     let previewOpen = useQueryState(
         "previewOpen",
-        parseAsBoolean.withDefault(false),
+        parseAsBoolean.withDefault(false)
     );
     let previewLoading = $state(false);
     let previewYaml = $state("");
@@ -179,7 +179,7 @@
             snackbar(
                 error instanceof Error
                     ? error.message
-                    : "Unable to save compose",
+                    : "Unable to save compose"
             );
         } finally {
             saveInFlight = false;

@@ -6,12 +6,12 @@
 
     import { streamServiceContainerLogs } from "#lib/api/services.remote";
     import AnsiLogLine from "#lib/components/logs/ansi-log-line.svelte";
+    import { parseAnsiLogLines } from "#lib/domain/logs/ansi";
     import type { ContainerLogRecord } from "#lib/domain/services/container-logs";
     import {
         filterContainerLogs,
         matchContainerId,
     } from "#lib/domain/services/container-logs";
-    import { parseAnsiLogLines } from "#lib/domain/logs/ansi";
     import { attachFollowScroll } from "#lib/shared/ui/follow-scroll";
 
     const { params } = $props();
@@ -27,7 +27,7 @@
 
     const selectedIds = useQueryState(
         "containers",
-        parseAsArrayOf(parseAsString).withDefault([] as string[]),
+        parseAsArrayOf(parseAsString).withDefault([] as string[])
     );
     let followLatest = $state(true);
     let logContainer: HTMLDivElement | undefined = $state();
@@ -35,8 +35,8 @@
 
     const activeSelectedIds = $derived(
         selectedIds.current.filter((id) =>
-            containers.some((container) => container.id === id),
-        ),
+            containers.some((container) => container.id === id)
+        )
     );
     const showingAll = $derived(activeSelectedIds.length === 0);
     const visibleLogs = $derived(filterContainerLogs(logs, activeSelectedIds));
@@ -87,7 +87,7 @@
     };
 
     const scrollToBottom = (
-        container: HTMLElement | undefined = logContainer,
+        container: HTMLElement | undefined = logContainer
     ): void => {
         if (!container) {
             return;

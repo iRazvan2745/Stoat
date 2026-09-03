@@ -42,7 +42,7 @@
     let actionsMenuOpen = $state(false);
     const deleteDialogOpen = useQueryState(
         "deleteDialogOpen",
-        parseAsBoolean.withDefault(false),
+        parseAsBoolean.withDefault(false)
     );
     let deleting = $state(false);
     let deploying = $state(false);
