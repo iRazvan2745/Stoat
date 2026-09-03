@@ -6,7 +6,7 @@ services:
             APP_URL: "${APP_URL:?set APP_URL}"
             DATABASE_URL: "postgres://stoat:${POSTGRES_PASSWORD:-stoat}@stoat-db.internal:5432/stoat"
         x-ports:
-            - "${STOAT_PORT:-3000}:3000"
+            - "3000/https"
         pull_policy: always
         env_file:
             - .env
