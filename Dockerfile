@@ -20,8 +20,6 @@ FROM dependencies AS build
 
 COPY . .
 
-# SvelteKit validates explicit private variables while compiling. These values
-# only exist for this command; production values are injected at runtime.
 RUN APP_SECRET=build-only-secret \
     APP_URL=http://localhost:3000 \
     DATABASE_URL=postgres://stoat:stoat@db:5432/stoat \
