@@ -36,7 +36,10 @@
         FlowParallel,
     } from "#lib/components/flow";
     import ServiceIcon from "#lib/components/services/service-icon.svelte";
-    import type { ServiceIngress } from "#lib/domain/services/ingresses";
+    import type {
+        ServiceIngress,
+        ServiceIngressProtocol,
+    } from "#lib/domain/services/ingresses";
     import { copyToClipboard } from "#lib/shared/ui/clipboard";
 
     const { params } = $props();
@@ -53,6 +56,8 @@
     const protocolOptions = [
         { text: "HTTPS", value: "https" },
         { text: "HTTP", value: "http" },
+        { text: "TCP", value: "tcp" },
+        { text: "UDP", value: "udp" },
     ];
     const composeServiceOptions = $derived(
         (info?.composeServices ?? []).map((name) => ({ text: name, value: name }))
@@ -64,15 +69,25 @@
     let composeService = $state("");
     let containerPort = $state("");
     let hostname = $state("");
-    let protocol = $state<"http" | "https">("https");
+    let protocol = $state<ServiceIngressProtocol>("https");
+    let publishedPort = $state("");
     let submitting = $state(false);
 
     const parsedPort = $derived(Number(containerPort));
+    const parsedPublishedPort = $derived(Number(publishedPort));
+    const isTransportProtocol = $derived(protocol === "tcp" || protocol === "udp");
+    const publishedPortIsValid = $derived(
+        !isTransportProtocol ||
+            (Number.isInteger(parsedPublishedPort) &&
+                parsedPublishedPort >= 1 &&
+                parsedPublishedPort <= 65_535)
+    );
     const routeIsValid = $derived(
         composeService !== "" &&
             Number.isInteger(parsedPort) &&
             parsedPort >= 1 &&
             parsedPort <= 65_535 &&
+            publishedPortIsValid &&
             !/[\s/:]/u.test(hostname)
     );
 
@@ -82,6 +97,7 @@
         containerPort = "80";
         hostname = "";
         protocol = "https";
+        publishedPort = "";
         editorOpen = true;
     };
 
@@ -90,7 +106,8 @@
         composeService = route.editableComposeService ?? "";
         containerPort = String(route.containerPort);
         hostname = route.editableHostname ?? "";
-        protocol = route.protocol === "http" ? "http" : "https";
+        protocol = route.protocol;
+        publishedPort = String(route.editablePublishedPort ?? route.publishedPort ?? "");
         editorOpen = true;
     };
 
@@ -107,6 +124,12 @@
                 containerPort: parsedPort,
                 ...(hostname.trim() === "" ? {} : { hostname: hostname.trim() }),
                 protocol,
+                ...(publishedPort !== "" &&
+                (isTransportProtocol ||
+                    (editingRoute?.protocol === protocol &&
+                        editingRoute.editablePublishedPort !== undefined))
+                    ? { publishedPort: parsedPublishedPort }
+                    : {}),
                 serviceId: params.serviceId,
             };
 
@@ -639,8 +662,23 @@
                 bind:value={protocol}
             />
         </div>
+        {#if isTransportProtocol}
+            <TextFieldOutlined
+                label="Published port"
+                type="number"
+                min="1"
+                max="65535"
+                required
+                bind:value={publishedPort}
+            />
+        {/if}
         <p class="m3-font-body-small text-on-surface-variant">
-            Leave the domain blank to use the cluster-assigned service domain.
+            {#if isTransportProtocol}
+                Leave the domain blank to listen on the cluster's public host.
+            {:else}
+                Leave the domain blank to use the cluster-assigned service
+                domain.
+            {/if}
         </p>
     </div>
 

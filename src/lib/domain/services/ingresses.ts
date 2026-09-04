@@ -19,6 +19,8 @@ export interface ServiceIngress {
     editableComposeService?: string;
     /** Hostname written in Compose; absent means the cluster assigns one. */
     editableHostname?: string;
+    /** Published port written in Compose, including uncommon HTTP(S) mappings. */
+    editablePublishedPort?: number;
 }
 
 export interface ServiceIngressInfo {

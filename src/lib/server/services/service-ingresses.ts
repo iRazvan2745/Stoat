@@ -136,16 +136,25 @@ export async function listServiceIngresses(serviceId: string): Promise<ServiceIn
 
     for (const editableRoute of editableRoutes) {
         const deployedService = deployedName(editableRoute.composeService);
+        const configuredHost = editableRoute.hostname
+            ? interpolateComposeVariables(editableRoute.hostname, resolveVariable)
+            : undefined;
+        const resolvedHost =
+            configuredHost ??
+            (editableRoute.protocol === "http" || editableRoute.protocol === "https"
+                ? clusterDomain
+                    ? `${deployedService}.${clusterDomain}`
+                    : undefined
+                : publicHost);
         const ingress = ingresses.find(
             (candidate) =>
                 candidate.editableRouteId === undefined &&
                 candidate.composeService === deployedService &&
                 candidate.containerPort === editableRoute.containerPort &&
-                candidate.host ===
-                    ((editableRoute.hostname
-                        ? interpolateComposeVariables(editableRoute.hostname, resolveVariable)
-                        : undefined) ??
-                        (clusterDomain ? `${deployedService}.${clusterDomain}` : undefined)) &&
+                candidate.host === resolvedHost &&
+                (editableRoute.protocol === "http" || editableRoute.protocol === "https"
+                    ? true
+                    : candidate.publishedPort === editableRoute.publishedPort) &&
                 candidate.protocol === editableRoute.protocol,
         );
 
@@ -155,6 +164,10 @@ export async function listServiceIngresses(serviceId: string): Promise<ServiceIn
 
             if (editableRoute.hostname !== undefined) {
                 ingress.editableHostname = editableRoute.hostname;
+            }
+
+            if (editableRoute.publishedPort !== undefined) {
+                ingress.editablePublishedPort = editableRoute.publishedPort;
             }
         }
     }

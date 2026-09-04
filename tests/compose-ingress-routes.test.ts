@@ -19,7 +19,7 @@ const COMPOSE = `services:
 `;
 
 describe("compose ingress routes", () => {
-    it("lists editable HTTP routes and ignores published host ports", () => {
+    it("lists editable HTTP and transport routes", () => {
         expect(listEditableComposeIngressRoutes(COMPOSE)).toEqual([
             {
                 composeService: "web",
@@ -33,6 +33,13 @@ describe("compose ingress routes", () => {
                 hostname: "api.example.com",
                 id: '["x-ports","web",1,"api.example.com:3001/http"]',
                 protocol: "http",
+            },
+            {
+                composeService: "web",
+                containerPort: 3002,
+                id: '["x-ports","web",2,"25001:3002/tcp"]',
+                protocol: "tcp",
+                publishedPort: 25_001,
             },
         ]);
     });
@@ -60,6 +67,26 @@ describe("compose ingress routes", () => {
 
         expect(updated).toContain("- 25001:3000/tcp");
         expect(updated).toContain("- 3000/https");
+    });
+
+    it("requires and writes a published port for TCP and UDP routes", () => {
+        expect(() =>
+            addComposeIngressRoute(COMPOSE, {
+                composeService: "worker",
+                containerPort: 53,
+                protocol: "udp",
+            }),
+        ).toThrow("Published port is required");
+
+        const updated = addComposeIngressRoute(COMPOSE, {
+            composeService: "worker",
+            containerPort: 53,
+            hostname: "dns.example.com",
+            protocol: "udp",
+            publishedPort: 5353,
+        });
+
+        expect(updated).toContain("dns.example.com:5353:53/udp");
     });
 
     it("updates and moves a route without touching unrelated ports", () => {
