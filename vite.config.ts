@@ -73,4 +73,7 @@ export default defineConfig({
     staged: {
         "*": "vp check --fix",
     },
+    test: {
+        include: ["tests/**/*.test.ts", "src/**/*.test.ts"],
+    },
 });

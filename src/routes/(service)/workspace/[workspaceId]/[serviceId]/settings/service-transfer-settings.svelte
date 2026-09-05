@@ -11,7 +11,12 @@
         snackbar,
     } from "m3-svelte";
 
-    import { copyService, moveService } from "#lib/api/services.remote";
+    import {
+        copyService,
+        getService,
+        listServicesInWorkspace,
+        moveService,
+    } from "#lib/api/services.remote";
     import { listWorkspaces } from "#lib/api/workspaces.remote";
 
     const { serviceId, workspaceId } = $props<{
@@ -55,7 +60,7 @@
             await copyService({
                 serviceId,
                 targetWorkspaceId: selectedCopyWorkspaceId,
-            });
+            }).updates(listServicesInWorkspace);
             copyDialogOpen = false;
             const target = copyTargets.find(
                 (workspace) => workspace.id === selectedCopyWorkspaceId
@@ -83,7 +88,7 @@
             await moveService({
                 serviceId,
                 targetWorkspaceId: selectedMoveWorkspaceId,
-            });
+            }).updates(getService, listServicesInWorkspace);
             await goto(`/workspace/${selectedMoveWorkspaceId}/${serviceId}`);
             snackbar("Service moved");
         } catch (error) {

@@ -10,14 +10,22 @@ import { withRemoteLiveLogging, withRemoteLogging } from "#lib/api/remote-loggin
 import { db } from "#lib/db";
 import { deploymentLogs, deployments } from "#lib/db/schema";
 import {
-    reconcileFailedDeployments,
     cancelDeployment as runCancelDeployment,
     deleteDeployment as runDeleteDeployment,
 } from "#lib/server/deployments/deployments";
+import {
+    createDeploymentLogBatch,
+    DEPLOYMENT_LOG_BATCH_SIZE,
+} from "#lib/server/deployments/log-stream";
 
 const DEPLOYMENT_POLL_INTERVAL = 1000;
+const NonNegativeInteger = v.pipe(v.number(), v.integer(), v.minValue(0));
 const ServiceIdInput = v.string();
 const DeploymentIdInput = v.string();
+const DeploymentLogBatchInput = v.object({
+    afterId: NonNegativeInteger,
+    deploymentId: v.string(),
+});
 
 const streamDeployments = async function* streamDeployments(serviceId: string) {
     await requireServiceAccess(serviceId);
@@ -25,8 +33,6 @@ const streamDeployments = async function* streamDeployments(serviceId: string) {
     let previousSnapshot: string | undefined;
 
     while (true) {
-        await reconcileFailedDeployments(serviceId);
-
         const currentDeployments = await db
             .select()
             .from(deployments)
@@ -43,32 +49,27 @@ const streamDeployments = async function* streamDeployments(serviceId: string) {
     }
 };
 
-const readDeploymentLogs = async function* readDeploymentLogs(deploymentId: string) {
+const fetchDeploymentLogBatch = async ({
+    afterId,
+    deploymentId,
+}: v.InferOutput<typeof DeploymentLogBatchInput>) => {
     await requireDeploymentAccess(deploymentId);
 
-    const logs: (typeof deploymentLogs.$inferSelect)[] = [];
-    let lastId = 0;
-    let emitted = false;
+    // Read terminal state before logs. Completion and its final log are written
+    // in one transaction, so a terminal read always sees a drainable history.
+    const [deployment] = await db
+        .select({ finishedAt: deployments.finishedAt })
+        .from(deployments)
+        .where(eq(deployments.id, deploymentId));
+    const terminal = !deployment || deployment.finishedAt !== null;
+    const logs = await db
+        .select()
+        .from(deploymentLogs)
+        .where(and(eq(deploymentLogs.deploymentId, deploymentId), gt(deploymentLogs.id, afterId)))
+        .orderBy(asc(deploymentLogs.id))
+        .limit(DEPLOYMENT_LOG_BATCH_SIZE);
 
-    while (true) {
-        // Only fetch rows we haven't seen yet instead of re-reading the whole log.
-        const newLogs = await db
-            .select()
-            .from(deploymentLogs)
-            .where(
-                and(eq(deploymentLogs.deploymentId, deploymentId), gt(deploymentLogs.id, lastId)),
-            )
-            .orderBy(asc(deploymentLogs.id));
-
-        if (newLogs.length > 0 || !emitted) {
-            logs.push(...newLogs);
-            lastId = logs.at(-1)?.id ?? lastId;
-            emitted = true;
-            yield [...logs];
-        }
-
-        await wait(DEPLOYMENT_POLL_INTERVAL);
-    }
+    return createDeploymentLogBatch(logs, afterId, terminal);
 };
 
 // Queries
@@ -95,18 +96,18 @@ export const getLatestSuccessfulDeployment = query(
     ),
 );
 
+export const getDeploymentLogBatch = query(
+    DeploymentLogBatchInput,
+    withRemoteLogging("deployments.getDeploymentLogBatch", "query", fetchDeploymentLogBatch, {
+        inputKey: "deploymentId",
+    }),
+);
+
 // Live queries
 export const listDeployments = query.live(
     ServiceIdInput,
     withRemoteLiveLogging("deployments.listDeployments", streamDeployments, {
         inputKey: "serviceId",
-    }),
-);
-
-export const streamDeploymentLogs = query.live(
-    DeploymentIdInput,
-    withRemoteLiveLogging("deployments.streamDeploymentLogs", readDeploymentLogs, {
-        inputKey: "deploymentId",
     }),
 );
 

@@ -6,9 +6,10 @@
     import {
         cancelDeployment,
         deleteDeployment,
+        getDeploymentLogBatch,
         listDeployments,
-        streamDeploymentLogs,
     } from "#lib/api/deployments.remote";
+    import type { DeploymentLogRecord } from "#lib/domain/deployments/logs";
 
     import { isDeploymentActive } from "./deployment";
     import DeploymentActionsMenu from "./deployment-actions-menu.svelte";
@@ -24,13 +25,75 @@
     const deployments = $derived(deploymentsQuery.current ?? []);
 
     const view = useQueryState("view", parseAsString.withDefault(""));
-    const deploymentLogsQuery = $derived.by(() => {
-        const deploymentId = view.current;
+    let logs = $state<DeploymentLogRecord[]>([]);
+    let logsLoading = $state(false);
+    let logsError = $state<{ message: string }>();
 
-        return deploymentId ? streamDeploymentLogs(deploymentId) : undefined;
+    const waitForNextLogBatch = (): Promise<void> =>
+        new Promise((resolve) => {
+            setTimeout(resolve, 1000);
+        });
+
+    $effect(() => {
+        const deploymentId = view.current;
+        logs = [];
+        logsError = undefined;
+        logsLoading = Boolean(deploymentId);
+        if (!deploymentId) {return;}
+        let disposed = false;
+        let afterId = 0;
+        const consume = async (): Promise<void> => {
+            try {
+                while (!disposed) {
+                    // Each request carries the cursor it owns. Refresh the
+                    // ordinary query because an unchanged cursor is a valid
+                    // poll and must still reach the server.
+                    // oxlint-disable-next-line no-await-in-loop
+                    const batchQuery = getDeploymentLogBatch({
+                        afterId,
+                        deploymentId,
+                    });
+                    // oxlint-disable-next-line no-await-in-loop
+                    await batchQuery.refresh();
+                    // oxlint-disable-next-line no-await-in-loop
+                    const batch = await batchQuery;
+                    if (disposed) {break;}
+
+                    for (const log of batch.logs) {
+                        if (log.id > afterId) {
+                            logs.push(log);
+                        }
+                    }
+                    afterId = Math.max(afterId, batch.nextCursor);
+                    logsLoading = false;
+
+                    if (batch.done) {break;}
+
+                    // A full batch may have more history ready immediately;
+                    // otherwise wait for the next deployment log update.
+                    if (!batch.hasMore) {
+                        // oxlint-disable-next-line no-await-in-loop
+                        await waitForNextLogBatch();
+                    }
+                }
+            } catch (error) {
+                if (!disposed)
+                    {logsError = {
+                        message:
+                            error instanceof Error
+                                ? error.message
+                                : "Unable to load deployment logs",
+                    };}
+            } finally {
+                if (!disposed) {logsLoading = false;}
+            }
+        };
+        void consume();
+        return () => {
+            disposed = true;
+        };
     });
 
-    const logs = $derived(deploymentLogsQuery?.current ?? []);
     const selectedDeployment = $derived(
         deployments.find((deployment) => deployment.id === view.current)
     );
@@ -198,7 +261,7 @@
             {actionsMenuOpenFor}
             loading={deploymentsQuery.loading}
             {logs}
-            logsLoadingFor={deploymentLogsQuery?.loading ? view.current : null}
+            logsLoadingFor={logsLoading ? view.current : null}
             onOpenLogs={openLogs}
             onToggleActions={toggleActionsMenu}
             selectedDeploymentId={view.current}
@@ -217,8 +280,8 @@
     {cancelling}
     {deleting}
     deployment={selectedDeployment}
-    error={deploymentLogsQuery?.error}
-    loading={deploymentLogsQuery?.loading === true}
+    error={logsError}
+    loading={logsLoading}
     {logs}
     onCancel={openCancelDialog}
     onclose={closeLogs}

@@ -6,6 +6,7 @@
     import houseOutlineIcon from "@ktibow/iconset-material-symbols/house-outline";
     import { NavigationRailItem } from "m3-svelte";
 
+    import PageShell from "#lib/components/page-shell.svelte";
     import Sidebar from "#lib/components/sidebar.svelte";
 
     let { children, data } = $props();
@@ -49,9 +50,7 @@
         {/snippet}
     </Sidebar>
 
-    <main
-        class="bg-surface m:p-8 mt-6 h-[calc(100svh-1.5rem)] min-h-0 min-w-0 flex-1 overflow-y-auto rounded-md p-4"
-    >
+    <PageShell>
         {@render children()}
-    </main>
+    </PageShell>
 </div>

@@ -8,7 +8,6 @@
     import widgetsIcon from "@ktibow/iconset-material-symbols/widgets-outline";
     import {
         Button,
-        Card,
         Dialog,
         ExpressiveMenu,
         ExpressiveMenuItem,
@@ -29,7 +28,7 @@
         getWorkspace,
         listWorkspaces,
     } from "#lib/api/workspaces.remote";
-    import ServiceIcon from "#lib/components/services/service-icon.svelte";
+    import ServiceGroups from "#lib/components/services/service-groups.svelte";
 
     import type { PageProps } from "./$types";
     import TemplatesDialog from "./templates-dialog.svelte";
@@ -223,45 +222,10 @@
             No services yet. Add a compose file or start from a template.
         </div>
     {:else}
-        <div class="grid grid-cols-3 gap-2 py-2">
-            {#each services.current ?? [] as service (service.id)}
-                <Card
-                    variant="elevated"
-                    id="service-card"
-                    onclick={() =>
-                        goto(`/workspace/${params.workspaceId}/${service.id}`)}
-                >
-                    <div class="flex items-center gap-4">
-                        <div
-                            class="bg-surface-container-high text-on-surface grid size-12 shrink-0
-                                place-items-center rounded-lg"
-                        >
-                            <ServiceIcon
-                                icon={service.icon}
-                                type={service.type}
-                                size={28}
-                                alt=""
-                            />
-                        </div>
-                        <div class="min-w-0">
-                            <p
-                                class="text-on-surface truncate text-sm font-medium"
-                            >
-                                {service.name ?? "Untitled"}
-                            </p>
-
-                            <p
-                                class="text-on-surface-variant truncate font-mono text-xs"
-                            >
-                                {service.slug ?? "—"}
-                            </p>
-                        </div>
-                    </div>
-
-                    <!-- <pre class="service-compose">{service.value ?? "—"}</pre> -->
-                </Card>
-            {/each}
-        </div>
+        <ServiceGroups
+            services={services.current ?? []}
+            workspaceId={params.workspaceId}
+        />
     {/if}
 </div>
 
@@ -323,13 +287,5 @@
     :global(#services-card.m3-container) {
         padding: 0;
         overflow-x: hidden;
-    }
-
-    :global(#service-card.m3-container.elevated) {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 0.5rem;
-        padding: 0.75rem;
-        border-radius: var(--m3-shape-medium);
     }
 </style>

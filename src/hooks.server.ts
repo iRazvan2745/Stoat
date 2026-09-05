@@ -122,6 +122,9 @@ export const init: ServerInit = async () => {
         return;
     }
 
+    const { ensureGitSyncWorker } = await import("#lib/server/git-sources/worker");
+    ensureGitSyncWorker();
+
     // Start the deployment worker at boot so jobs queued before a restart are
     // picked up without waiting for someone to trigger a new deployment.
     const { ensureDeploymentWorker } = await import("#lib/server/deployments/deployments");

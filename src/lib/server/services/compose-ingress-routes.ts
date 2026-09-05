@@ -1,4 +1,5 @@
-import YAML, { isMap, isScalar, isSeq, type YAMLMap, YAMLSeq } from "yaml";
+import YAML, { isMap, isScalar, isSeq, YAMLSeq } from "yaml";
+import type { YAMLMap } from "yaml";
 
 import type { ServiceIngressProtocol } from "#lib/domain/services/ingresses";
 import { parseComposePortSpec } from "#lib/server/services/compose-ports";
@@ -123,7 +124,7 @@ const routeSpec = (route: ComposeIngressRouteInput): string => {
         throw new Error("Published port is required for TCP and UDP routes");
     }
 
-    const publishedPort = route.publishedPort;
+    const { publishedPort } = route;
     const portSpec =
         publishedPort === undefined
             ? String(route.containerPort)

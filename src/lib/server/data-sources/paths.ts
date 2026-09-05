@@ -28,3 +28,7 @@ export const createWorkspaceFolder = async (
 
     return folderPath;
 };
+
+/** One checkout per Git Source, shared by all of its workspaces. */
+export const gitSourcePath = (gitSourceId: string): string =>
+    path.resolve(getDataDir(), "git-sources", gitSourceId);

@@ -1,7 +1,7 @@
 // oxlint-disable func-style no-await-in-loop
 import { DATABASE_URL } from "$app/env/private";
 import { PgClient } from "@effect/sql-pg";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { Effect, Layer, ManagedRuntime, Redacted, Schema } from "effect";
 import { Job, JobStore, Worker } from "effect-mq";
 import { DrizzleJobStore } from "effect-mq/drizzle-postgres";
@@ -20,10 +20,11 @@ import {
     effectMqQueues,
     effectMqSchedules,
 } from "#lib/db/schema";
-import { detectDeploymentFailure } from "#lib/domain/deployments/failure";
-import { parseServiceSettings } from "#lib/domain/services/settings";
+import { deploymentRecoveryReason } from "#lib/domain/deployments/recovery";
 import { prepareDeployment } from "#lib/server/deployments/deployment-prepare";
-import { getService } from "#lib/server/services/services";
+
+import { captureDeploymentSnapshot } from "./deployment-snapshot";
+import type { DeploymentSnapshot } from "./deployment-snapshot";
 
 const StartDeploymentInput = v.object({
     service_id: v.string(),
@@ -31,7 +32,6 @@ const StartDeploymentInput = v.object({
 
 const DEPLOYMENT_QUEUE = "deployments";
 
-const STALE_DEPLOYMENT_TIMEOUT_MS = 10 * 60 * 1000;
 const RECONCILE_MIN_INTERVAL_MS = 10_000;
 
 const errorDetails = (caught: unknown): Record<string, string> => {
@@ -47,16 +47,20 @@ const errorDetails = (caught: unknown): Record<string, string> => {
 };
 
 interface DeploymentJob {
+    snapshot?: DeploymentSnapshot;
     deployment_id: string;
     service_id: string;
 }
 
 class DeploymentQueueJob extends Job.make("deployment", {
-    dedupe: ({ service_id }) => service_id,
+    dedupe: ({ service_id, git_commit }) =>
+        git_commit ? `${service_id}:${git_commit}` : service_id,
     defaults: { attempts: 1 },
     payload: {
+        git_commit: Schema.optionalKey(Schema.String),
         deployment_id: Schema.String,
         service_id: Schema.String,
+        snapshot: Schema.optionalKey(Schema.Unknown),
     },
     queue: DEPLOYMENT_QUEUE,
 }) {}
@@ -79,10 +83,10 @@ async function isDeploymentTerminal(deploymentId: string): Promise<boolean> {
     return Boolean(deployment?.finishedAt);
 }
 
-async function processDeployment({
-    deployment_id: deploymentId,
-    service_id: serviceId,
-}: DeploymentJob): Promise<void> {
+async function processDeployment(
+    { deployment_id: deploymentId, service_id: serviceId, snapshot }: DeploymentJob,
+    workerSignal?: AbortSignal,
+): Promise<void> {
     const existing = await getDeploymentRecord(deploymentId);
 
     if (!existing || existing.outcome === "cancelled" || existing.finishedAt) {
@@ -112,27 +116,54 @@ async function processDeployment({
         deploymentId,
         serviceId,
     });
-    const svc = await getService(serviceId);
-    await db.transaction(async (tx) => {
-        await tx
+    // Legacy jobs cannot preserve the user's original input; require a new deployment.
+    if (!snapshot) {
+        await markDeploymentFailed(
+            deploymentId,
+            "Deployment predates configuration snapshots; enqueue a new deployment",
+        );
+        return;
+    }
+    const svc = snapshot.service;
+    const started = await db.transaction(async (tx) => {
+        const updated = await tx
             .update(deployments)
             .set({
-                settings: parseServiceSettings(svc?.settings),
                 startedAt: new Date(),
             })
-            .where(eq(deployments.id, deploymentId));
+            .where(and(eq(deployments.id, deploymentId), isNull(deployments.finishedAt)))
+            .returning({ id: deployments.id });
+        if (updated.length === 0) {
+            return false;
+        }
+
         await tx.insert(deploymentLogs).values({
             deploymentId,
             message: startedMessage,
             stream: "debug",
         });
+        return true;
     });
+    if (!started) {
+        evlog.info({
+            action: "deployment.skipped",
+            deploymentId,
+            reason: "finished_before_worker_started",
+            serviceId,
+        });
+        return;
+    }
 
     const controller = new AbortController();
+    const abort = () => controller.abort();
+    workerSignal?.addEventListener("abort", abort, { once: true });
+    if (workerSignal?.aborted) {
+        controller.abort();
+    }
     activeDeployments.set(deploymentId, controller);
 
     try {
-        await prepareDeployment(serviceId, deploymentId, controller.signal);
+        await prepareDeployment(snapshot, deploymentId, controller.signal);
 
         if (await isDeploymentTerminal(deploymentId)) {
             evlog.info({
@@ -145,15 +176,18 @@ async function processDeployment({
 
         const finishedMessage = `Deployment completed for service ${svc?.slug}`;
         await db.transaction(async (tx) => {
-            await tx
+            const updated = await tx
                 .update(deployments)
                 .set({ finishedAt: new Date(), outcome: "success" })
-                .where(eq(deployments.id, deploymentId));
-            await tx.insert(deploymentLogs).values({
-                deploymentId,
-                message: finishedMessage,
-                stream: "debug",
-            });
+                .where(and(eq(deployments.id, deploymentId), isNull(deployments.finishedAt)))
+                .returning({ id: deployments.id });
+            if (updated.length > 0) {
+                await tx.insert(deploymentLogs).values({
+                    deploymentId,
+                    message: finishedMessage,
+                    stream: "debug",
+                });
+            }
         });
         evlog.info({
             action: "deployment.completed",
@@ -180,17 +214,21 @@ async function processDeployment({
             serviceId,
         });
         await db.transaction(async (tx) => {
-            await tx
+            const updated = await tx
                 .update(deployments)
                 .set({ finishedAt: new Date(), outcome: "failed" })
-                .where(eq(deployments.id, deploymentId));
-            await tx.insert(deploymentLogs).values({
-                deploymentId,
-                message,
-                stream: "stderr",
-            });
+                .where(and(eq(deployments.id, deploymentId), isNull(deployments.finishedAt)))
+                .returning({ id: deployments.id });
+            if (updated.length > 0) {
+                await tx.insert(deploymentLogs).values({
+                    deploymentId,
+                    message,
+                    stream: "stderr",
+                });
+            }
         });
     } finally {
+        workerSignal?.removeEventListener("abort", abort);
         activeDeployments.delete(deploymentId);
     }
 }
@@ -206,15 +244,21 @@ const JobStoreLive = DrizzleJobStore.layer({
 }).pipe(Layer.provide(PgClient.layer({ url: Redacted.make(DATABASE_URL) })));
 
 const DeploymentQueueLive = DeploymentQueueJob.toLayer(
-    (payload) => Effect.promise(() => processDeployment(payload)),
+    (payload) => Effect.promise((signal) => processDeployment(payload as DeploymentJob, signal)),
     { concurrency: 1 },
 ).pipe(Layer.provideMerge(Worker.layer()), Layer.provideMerge(JobStoreLive));
 
 const deploymentQueueRuntime = ManagedRuntime.make(DeploymentQueueLive);
 
+export async function shutdownDeploymentWorker(): Promise<void> {
+    workerDisposed = true;
+    clearTimeout(reconciliationTimer);
+    await deploymentQueueRuntime.dispose();
+}
+
 const { hot } = import.meta as { hot?: { dispose: (fn: () => void) => void } };
 hot?.dispose(() => {
-    void deploymentQueueRuntime.dispose();
+    void shutdownDeploymentWorker();
 });
 
 let queueReady: Promise<void> | undefined;
@@ -223,6 +267,7 @@ async function initializeQueue(): Promise<void> {
     evlog.info({ action: "deployment_worker.starting" });
     await deploymentQueueRuntime.context();
     evlog.info({ action: "deployment_worker.started" });
+    void reconcileWorkerDeployments();
 }
 
 export async function ensureDeploymentWorker(): Promise<void> {
@@ -243,10 +288,15 @@ export async function ensureDeploymentWorker(): Promise<void> {
     }
 }
 
-export async function startDeployment({ service_id }: v.InferOutput<typeof StartDeploymentInput>) {
+export async function enqueueDeployment(
+    snapshot: DeploymentSnapshot,
+    options: { deploymentId?: string } = {},
+) {
     await ensureDeploymentWorker();
-
-    const deploymentId = crypto.randomUUID();
+    const service_id = snapshot.service.id;
+    const deploymentId = options.deploymentId ?? crypto.randomUUID();
+    const existing = await getDeploymentRecord(deploymentId);
+    if (existing?.finishedAt) return { deploymentId, jobId: existing.jobId ?? deploymentId };
 
     const deployment = await db.transaction(async (tx) => {
         const [createdDeployment] = await tx
@@ -254,18 +304,24 @@ export async function startDeployment({ service_id }: v.InferOutput<typeof Start
             .values({
                 id: deploymentId,
                 jobId: deploymentId,
+                gitCommit: snapshot.gitCommit,
                 queuedAt: new Date(),
                 serviceId: service_id,
+                settings: snapshot.service.settings,
             })
+            .onConflictDoNothing()
             .returning({ id: deployments.id });
 
+        if (!createdDeployment && existing) return { id: existing.id };
         if (!createdDeployment) {
             throw new Error("Unable to create deployment");
         }
 
         await tx.insert(deploymentLogs).values({
             deploymentId: createdDeployment.id,
-            message: `Deployment queued for service ${service_id}`,
+            message: snapshot.gitCommit
+                ? `Deployment queued for Git commit ${snapshot.gitCommit}`
+                : `Deployment queued for service ${service_id}`,
             stream: "debug",
         });
 
@@ -281,7 +337,12 @@ export async function startDeployment({ service_id }: v.InferOutput<typeof Start
     try {
         const jobId = await deploymentQueueRuntime.runPromise(
             DeploymentQueueJob.enqueue(
-                { deployment_id: deployment.id, service_id },
+                {
+                    deployment_id: deployment.id,
+                    git_commit: snapshot.gitCommit,
+                    service_id,
+                    snapshot,
+                },
                 { jobId: deployment.id },
             ),
         );
@@ -305,6 +366,13 @@ export async function startDeployment({ service_id }: v.InferOutput<typeof Start
     }
 }
 
+export async function startDeployment({ service_id }: v.InferOutput<typeof StartDeploymentInput>) {
+    const snapshot = await captureDeploymentSnapshot(service_id);
+    if (!snapshot.git.url) return await enqueueDeployment(snapshot);
+    const { publishServiceDeployment } = await import("#lib/server/git-sources/sync");
+    return await publishServiceDeployment(snapshot);
+}
+
 export async function deployService(id: string) {
     return await startDeployment({ service_id: id });
 }
@@ -325,15 +393,18 @@ export async function cancelDeployment(deploymentId: string): Promise<void> {
     }
 
     await db.transaction(async (tx) => {
-        await tx
+        const updated = await tx
             .update(deployments)
             .set({ finishedAt: new Date(), outcome: "cancelled" })
-            .where(eq(deployments.id, deploymentId));
-        await tx.insert(deploymentLogs).values({
-            deploymentId,
-            message: "Deployment force cancelled",
-            stream: "stderr",
-        });
+            .where(and(eq(deployments.id, deploymentId), isNull(deployments.finishedAt)))
+            .returning({ id: deployments.id });
+        if (updated.length > 0) {
+            await tx.insert(deploymentLogs).values({
+                deploymentId,
+                message: "Deployment force cancelled",
+                stream: "stderr",
+            });
+        }
     });
 
     // Abort in-flight work (git push / deploy stream) after the record is
@@ -374,19 +445,21 @@ export async function deleteDeployment(deploymentId: string): Promise<void> {
 }
 
 async function markDeploymentFailed(deploymentId: string, reason?: string): Promise<void> {
-    const updated = await db
-        .update(deployments)
-        .set({ finishedAt: new Date(), outcome: "failed" })
-        .where(and(eq(deployments.id, deploymentId), isNull(deployments.finishedAt)))
-        .returning({ id: deployments.id });
+    await db.transaction(async (tx) => {
+        const updated = await tx
+            .update(deployments)
+            .set({ finishedAt: new Date(), outcome: "failed" })
+            .where(and(eq(deployments.id, deploymentId), isNull(deployments.finishedAt)))
+            .returning({ id: deployments.id });
 
-    if (updated.length > 0 && reason) {
-        await db.insert(deploymentLogs).values({
-            deploymentId,
-            message: reason,
-            stream: "stderr",
-        });
-    }
+        if (updated.length > 0 && reason) {
+            await tx.insert(deploymentLogs).values({
+                deploymentId,
+                message: reason,
+                stream: "stderr",
+            });
+        }
+    });
 }
 
 const reconcileLastRunAt = new Map<string, number>();
@@ -405,64 +478,47 @@ export async function reconcileFailedDeployments(serviceId: string): Promise<voi
         .select({
             createdAt: deployments.createdAt,
             id: deployments.id,
-            queuedAt: deployments.queuedAt,
-            startedAt: deployments.startedAt,
+            queueState: effectMqJobs.state,
         })
         .from(deployments)
+        .leftJoin(effectMqJobs, eq(effectMqJobs.id, deployments.jobId))
         .where(and(eq(deployments.serviceId, serviceId), isNull(deployments.finishedAt)));
 
-    if (unfinished.length === 0) {
-        return;
-    }
-
-    const logs = await db
-        .select({
-            createdAt: deploymentLogs.createdAt,
-            deploymentId: deploymentLogs.deploymentId,
-            message: deploymentLogs.message,
-        })
-        .from(deploymentLogs)
-        .where(
-            inArray(
-                deploymentLogs.deploymentId,
-                unfinished.map((deployment) => deployment.id),
-            ),
-        );
-
-    const logsByDeployment = new Map<string, { createdAt: Date; message: string }[]>();
-
-    for (const log of logs) {
-        const current = logsByDeployment.get(log.deploymentId) ?? [];
-        current.push({ createdAt: log.createdAt, message: log.message });
-        logsByDeployment.set(log.deploymentId, current);
-    }
-
     for (const deployment of unfinished) {
-        const deploymentLogEntries = logsByDeployment.get(deployment.id) ?? [];
-        const failure = detectDeploymentFailure(deploymentLogEntries);
-
-        if (failure) {
-            await markDeploymentFailed(deployment.id);
-            continue;
-        }
-
-        // Recover deployments orphaned by a crash or restart: no terminal state
-        // and no activity (new logs) for longer than the stale timeout.
-        let lastActivity = Math.max(
-            deployment.createdAt.getTime(),
-            deployment.queuedAt?.getTime() ?? 0,
-            deployment.startedAt?.getTime() ?? 0,
+        const reason = deploymentRecoveryReason(
+            deployment.queueState ?? undefined,
+            deployment.createdAt,
+            now,
         );
-
-        for (const log of deploymentLogEntries) {
-            lastActivity = Math.max(lastActivity, log.createdAt.getTime());
+        if (reason) {
+            await markDeploymentFailed(deployment.id, reason);
         }
+    }
+}
 
-        if (now - lastActivity > STALE_DEPLOYMENT_TIMEOUT_MS) {
-            await markDeploymentFailed(
-                deployment.id,
-                "Deployment marked as failed after 10 minutes without activity",
-            );
+let reconciliationTimer: ReturnType<typeof setTimeout> | undefined;
+let workerDisposed = false;
+
+async function reconcileWorkerDeployments(): Promise<void> {
+    try {
+        const unfinishedServices = await db
+            .selectDistinct({ serviceId: deployments.serviceId })
+            .from(deployments)
+            .where(isNull(deployments.finishedAt));
+        for (const { serviceId } of unfinishedServices) {
+            await reconcileFailedDeployments(serviceId);
+        }
+    } catch (error) {
+        evlog.warn({
+            action: "deployment.reconciliation_failed",
+            error: errorDetails(error),
+        });
+    } finally {
+        if (!workerDisposed) {
+            reconciliationTimer = setTimeout(() => {
+                void reconcileWorkerDeployments();
+            }, RECONCILE_MIN_INTERVAL_MS);
+            reconciliationTimer.unref();
         }
     }
 }

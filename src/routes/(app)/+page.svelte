@@ -14,6 +14,7 @@
 
     import { listOrganizationMachines } from "#lib/api/cluster/machines.remote";
     import { getOverview } from "#lib/api/overview.remote";
+    import { presentWorkspaceDataSource } from "#lib/shared/ui/data-source-display";
 
     const overview = getOverview();
     const machines = listOrganizationMachines();
@@ -116,20 +117,22 @@
             dateStyle: "medium",
             timeStyle: "short",
         }).format(value);
+
+    const focusRing =
+        "focus-visible:outline-primary focus-visible:outline-3 focus-visible:-outline-offset-3";
+    const iconCircle =
+        "inline-flex shrink-0 items-center justify-center rounded-full";
+    const listRow = `flex min-h-[4.25rem] items-center gap-3 border-b border-outline-variant px-4 py-3 text-inherit no-underline transition-colors last:border-b-0 hover:bg-surface-container-low`;
+    const emptyRow = "flex min-h-32 items-center gap-3 p-5";
+    const sectionHeading = "min-h-16 px-1 pt-1 pb-3";
+    const summaryMetric = `flex min-w-0 items-center gap-3 border-l border-outline-variant p-4 text-inherit no-underline transition-colors hover:bg-surface-container max-[74rem]:first:border-l-0 max-[56rem]:nth-[3]:border-l-0 max-[56rem]:nth-[n+3]:border-t max-[40rem]:border-t max-[40rem]:border-l-0 ${focusRing}`;
 </script>
 
-<div class="overview-page">
+<div class="mx-auto max-w-384 pt-2 pb-8">
     <header class="flex flex-wrap items-start justify-between gap-4">
-        <div>
-            <h1
-                class="text-on-surface mt-1 text-3xl font-medium tracking-tight"
-            >
-                Overview
-            </h1>
-            <p class="text-on-surface-variant mt-2 max-w-2xl text-sm">
-                Your services, deployments, and cluster health at a glance.
-            </p>
-        </div>
+        <h1 class="text-on-surface mt-1 text-3xl font-medium tracking-tight">
+            Overview
+        </h1>
 
         <Button
             variant="tonal"
@@ -172,7 +175,7 @@
         {#if summary.dataSourceCount === 0}
             <section class="mt-6" aria-labelledby="getting-started-title">
                 <Card variant="filled" id="getting-started-card">
-                    <div class="getting-started-copy">
+                    <div class="flex items-center gap-4">
                         <span
                             class="bg-primary-container text-on-primary-container rounded-full p-3"
                         >
@@ -204,81 +207,153 @@
             </section>
         {/if}
 
-        <section class="summary-grid mt-6" aria-label="Organization summary">
-            <a href="/workspace" class="summary-card">
-                <Card variant="filled">
-                    <span class="summary-icon primary">
-                        <Icon icon={workspacesIcon} size={24} />
-                    </span>
-                    <span class="summary-value"
-                        >{summary.workspaces.length}</span
-                    >
-                    <span class="summary-label">
-                        {plural(summary.workspaces.length, "Workspace")}
-                    </span>
-                </Card>
-            </a>
-
-            <a href="/workspace" class="summary-card">
-                <Card variant="filled">
-                    <span class="summary-icon secondary">
-                        <Icon icon={deployedCodeIcon} size={24} />
-                    </span>
-                    <span class="summary-value">{summary.serviceCount}</span>
-                    <span class="summary-label">
-                        {plural(summary.serviceCount, "Service")}
-                    </span>
-                </Card>
-            </a>
-
-            <a href="/machines" class="summary-card">
-                <Card variant="filled">
-                    <span class="summary-icon tertiary">
-                        <Icon icon={computerIcon} size={24} />
-                    </span>
-                    {#if machines.loading && !machines.current}
-                        <LoadingIndicator aria-label="Loading machine count" />
-                    {:else}
-                        <span class="summary-value">
-                            {onlineMachineCount}/{machineItems.length}
-                        </span>
-                    {/if}
-                    <span class="summary-label">Machines online</span>
-                </Card>
-            </a>
-
-            <a href="#attention" class="summary-card">
-                <Card variant="filled">
+        <section class="mt-6" aria-label="Organization summary">
+            <Card variant="filled" id="summary-card">
+                <a
+                    href="#attention"
+                    class={[
+                        "grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3.5 p-5 text-inherit no-underline transition-[filter] duration-150 hover:brightness-[1.035]",
+                        attentionCount > 0
+                            ? "bg-error-container-subtle text-on-error-container"
+                            : "bg-primary-container-subtle",
+                        focusRing,
+                    ]}
+                >
                     <span
-                        class:attention={attentionCount > 0}
-                        class="summary-icon neutral"
+                        class={[
+                            iconCircle,
+                            "size-11",
+                            attentionCount > 0
+                                ? "bg-error-container text-on-error-container"
+                                : "bg-primary-container text-on-primary-container",
+                        ]}
                     >
                         <Icon
                             icon={attentionCount > 0
                                 ? warningIcon
                                 : checkCircleIcon}
-                            size={24}
+                            size={28}
                         />
                     </span>
-                    <span class="summary-value">{attentionCount}</span>
-                    <span class="summary-label">Needs attention</span>
-                </Card>
-            </a>
+                    <strong class="truncate text-base font-[550]">
+                        {attentionCount > 0
+                            ? `${attentionCount} ${plural(attentionCount, "item")} ${attentionCount === 1 ? "needs" : "need"} attention`
+                            : "Everything looks good"}
+                    </strong>
+                    <Icon icon={arrowForwardIcon} size={20} />
+                </a>
+
+                <div
+                    class="max-[74rem]:border-outline-variant grid grid-cols-4 max-[74rem]:border-t max-[56rem]:grid-cols-2 max-[40rem]:grid-cols-1"
+                >
+                    <a href="/workspace" class={summaryMetric}>
+                        <span
+                            class="{iconCircle} bg-primary-container text-on-primary-container size-10"
+                        >
+                            <Icon icon={workspacesIcon} size={20} />
+                        </span>
+                        <span class="flex min-w-0 flex-col">
+                            <strong
+                                class="text-[1.375rem] leading-[1.1] font-[550]"
+                                >{summary.workspaces.length}</strong
+                            >
+                            <span
+                                class="text-on-surface-variant mt-1 truncate text-[13px]"
+                                >{plural(
+                                    summary.workspaces.length,
+                                    "Workspace"
+                                )}</span
+                            >
+                        </span>
+                    </a>
+
+                    <a href="/workspace" class={summaryMetric}>
+                        <span
+                            class="{iconCircle} bg-secondary-container text-on-secondary-container size-10"
+                        >
+                            <Icon icon={deployedCodeIcon} size={20} />
+                        </span>
+                        <span class="flex min-w-0 flex-col">
+                            <strong
+                                class="text-[1.375rem] leading-[1.1] font-[550]"
+                                >{summary.serviceCount}</strong
+                            >
+                            <span
+                                class="text-on-surface-variant mt-1 truncate text-[13px]"
+                                >{plural(summary.serviceCount, "Service")}</span
+                            >
+                        </span>
+                    </a>
+
+                    <a href="/data-sources" class={summaryMetric}>
+                        <span
+                            class="{iconCircle} bg-tertiary-container text-on-tertiary-container size-10"
+                        >
+                            <Icon icon={databaseIcon} size={20} />
+                        </span>
+                        <span class="flex min-w-0 flex-col">
+                            <strong
+                                class="text-[1.375rem] leading-[1.1] font-[550]"
+                                >{summary.dataSourceCount}</strong
+                            >
+                            <span
+                                class="text-on-surface-variant mt-1 truncate text-[13px]"
+                                >{plural(
+                                    summary.dataSourceCount,
+                                    "Data source"
+                                )}</span
+                            >
+                        </span>
+                    </a>
+
+                    <a href="/machines" class={summaryMetric}>
+                        <span
+                            class="{iconCircle} bg-surface-container-high text-on-surface-variant size-10"
+                        >
+                            <Icon icon={computerIcon} size={20} />
+                        </span>
+                        <span class="flex min-w-0 flex-col">
+                            {#if machines.loading && !machines.current}
+                                <LoadingIndicator
+                                    aria-label="Loading machine count"
+                                />
+                            {:else}
+                                <strong
+                                    class="text-[1.375rem] leading-[1.1] font-[550]"
+                                    >{onlineMachineCount}/{machineItems.length}</strong
+                                >
+                            {/if}
+                            <span
+                                class="text-on-surface-variant mt-1 truncate text-[13px]"
+                                >Machines online</span
+                            >
+                        </span>
+                    </a>
+                </div>
+            </Card>
         </section>
 
-        <div class="dashboard-grid mt-6">
+        <div
+            class="mt-6 grid grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] gap-4 max-[56rem]:grid-cols-1"
+        >
             <section id="attention" aria-labelledby="attention-title">
-                <div class="section-heading">
+                <div class={sectionHeading}>
                     <div>
-                        <h2 id="attention-title">Needs attention</h2>
-                        <p>Problems worth checking now</p>
+                        <h2 id="attention-title" class="text-lg font-medium">
+                            Needs attention
+                        </h2>
+                        <p class="text-on-surface-variant mt-0.5 text-[13px]">
+                            Problems worth checking now
+                        </p>
                     </div>
                 </div>
 
                 <Card variant="outlined" id="attention-card">
                     {#if machines.error}
-                        <a href="/machines" class="attention-row">
-                            <span class="status-icon error">
+                        <a href="/machines" class={listRow}>
+                            <span
+                                class="{iconCircle} bg-error-container text-on-error-container size-9"
+                            >
                                 <Icon icon={errorIcon} size={20} />
                             </span>
                             <span class="min-w-0 flex-1">
@@ -286,7 +361,7 @@
                                     >Cluster health unavailable</span
                                 >
                                 <span
-                                    class="text-on-surface-variant block truncate text-xs"
+                                    class="text-on-surface-variant block truncate text-[13px]"
                                 >
                                     {machines.error.message}
                                 </span>
@@ -294,8 +369,10 @@
                             <Icon icon={arrowForwardIcon} size={18} />
                         </a>
                     {:else if attentionCount === 0}
-                        <div class="empty-row">
-                            <span class="status-icon success">
+                        <div class={emptyRow}>
+                            <span
+                                class="{iconCircle} bg-primary-container text-on-primary-container size-9"
+                            >
                                 <Icon icon={checkCircleIcon} size={20} />
                             </span>
                             <div>
@@ -303,7 +380,7 @@
                                     Everything looks good
                                 </p>
                                 <p
-                                    class="text-on-surface-variant mt-0.5 text-xs"
+                                    class="text-on-surface-variant mt-0.5 text-[13px]"
                                 >
                                     No failed deployments or cluster problems
                                     found.
@@ -312,8 +389,10 @@
                         </div>
                     {:else}
                         {#if summary.failedDeploymentCount > 0}
-                            <a href="#recent-activity" class="attention-row">
-                                <span class="status-icon error">
+                            <a href="#recent-activity" class={listRow}>
+                                <span
+                                    class="{iconCircle} bg-error-container text-on-error-container size-9"
+                                >
                                     <Icon icon={deployedCodeIcon} size={20} />
                                 </span>
                                 <span class="min-w-0 flex-1">
@@ -325,7 +404,7 @@
                                         )} with a failed deployment
                                     </span>
                                     <span
-                                        class="text-on-surface-variant block text-xs"
+                                        class="text-on-surface-variant block text-[13px]"
                                         >Review recent deployment activity</span
                                     >
                                 </span>
@@ -334,8 +413,10 @@
                         {/if}
 
                         {#each disconnectedDataSources as source (source.dataSourceId)}
-                            <a href="/data-sources" class="attention-row">
-                                <span class="status-icon error">
+                            <a href="/data-sources" class={listRow}>
+                                <span
+                                    class="{iconCircle} bg-error-container text-on-error-container size-9"
+                                >
                                     <Icon icon={databaseIcon} size={20} />
                                 </span>
                                 <span class="min-w-0 flex-1">
@@ -344,7 +425,7 @@
                                         >{source.label}</span
                                     >
                                     <span
-                                        class="text-on-surface-variant block truncate text-xs"
+                                        class="text-on-surface-variant block truncate text-[13px]"
                                     >
                                         {source.error ??
                                             "Data source is unreachable"}
@@ -355,8 +436,10 @@
                         {/each}
 
                         {#each unhealthyMachines as item (`${item.dataSourceId}:${item.machine.id}`)}
-                            <a href="/machines" class="attention-row">
-                                <span class="status-icon error">
+                            <a href="/machines" class={listRow}>
+                                <span
+                                    class="{iconCircle} bg-error-container text-on-error-container size-9"
+                                >
                                     <Icon icon={computerIcon} size={20} />
                                 </span>
                                 <span class="min-w-0 flex-1">
@@ -365,7 +448,7 @@
                                         >{item.machine.name}</span
                                     >
                                     <span
-                                        class="text-on-surface-variant block text-xs"
+                                        class="text-on-surface-variant block text-[13px]"
                                     >
                                         Machine is {item.machine.state.toLowerCase()}
                                     </span>
@@ -378,10 +461,12 @@
             </section>
 
             <section id="recent-activity" aria-labelledby="activity-title">
-                <div class="section-heading">
+                <div class={sectionHeading}>
                     <div>
-                        <h2 id="activity-title">Recent activity</h2>
-                        <p>
+                        <h2 id="activity-title" class="text-lg font-medium">
+                            Recent activity
+                        </h2>
+                        <p class="text-on-surface-variant mt-0.5 text-[13px]">
                             Latest deployments across your workspaces
                             {#if summary.activeDeploymentCount > 0}
                                 · {summary.activeDeploymentCount} active
@@ -392,8 +477,10 @@
 
                 <Card variant="outlined" id="activity-card">
                     {#if summary.recentDeployments.length === 0}
-                        <div class="empty-row">
-                            <span class="status-icon neutral">
+                        <div class={emptyRow}>
+                            <span
+                                class="{iconCircle} bg-surface-container-high text-on-surface-variant size-9"
+                            >
                                 <Icon icon={historyIcon} size={20} />
                             </span>
                             <div>
@@ -401,7 +488,7 @@
                                     No deployments yet
                                 </p>
                                 <p
-                                    class="text-on-surface-variant mt-0.5 text-xs"
+                                    class="text-on-surface-variant mt-0.5 text-[13px]"
                                 >
                                     Deployment activity will appear here.
                                 </p>
@@ -411,11 +498,12 @@
                         {#each summary.recentDeployments as deployment (deployment.id)}
                             <a
                                 href={`/workspace/${deployment.workspaceId}/${deployment.serviceId}/deployments?view=${deployment.id}`}
-                                class="activity-row"
+                                class={listRow}
                             >
                                 <span
                                     class={[
-                                        "deployment-state",
+                                        iconCircle,
+                                        "size-9",
                                         deploymentClasses(deployment),
                                     ]}
                                 >
@@ -434,7 +522,7 @@
                                             "Unnamed service"}
                                     </span>
                                     <span
-                                        class="text-on-surface-variant block truncate text-xs"
+                                        class="text-on-surface-variant block truncate text-[13px]"
                                     >
                                         {deployment.workspaceName ??
                                             "Workspace"} · {formatTime(
@@ -443,7 +531,7 @@
                                     </span>
                                 </span>
                                 <span
-                                    class="text-on-surface-variant shrink-0 text-xs font-medium"
+                                    class="text-on-surface-variant shrink-0 text-[13px] font-medium"
                                 >
                                     {deploymentLabel(deployment)}
                                 </span>
@@ -455,10 +543,16 @@
         </div>
 
         <section class="mt-6" aria-labelledby="workspaces-title">
-            <div class="section-heading workspaces-heading">
+            <div
+                class="flex min-h-16 items-center justify-between gap-4 px-1 pt-1 pb-3"
+            >
                 <div>
-                    <h2 id="workspaces-title">Workspaces</h2>
-                    <p>Your most recently updated environments</p>
+                    <h2 id="workspaces-title" class="text-lg font-medium">
+                        Workspaces
+                    </h2>
+                    <p class="text-on-surface-variant mt-0.5 text-[13px]">
+                        Your most recently updated environments
+                    </p>
                 </div>
                 <Button href="/workspace" variant="text" iconType="left">
                     View all
@@ -468,8 +562,10 @@
 
             {#if summary.workspaces.length === 0}
                 <Card variant="outlined">
-                    <div class="empty-workspaces">
-                        <span class="summary-icon primary">
+                    <div class="p-8 text-center">
+                        <span
+                            class="{iconCircle} bg-primary-container text-on-primary-container size-12"
+                        >
                             <Icon icon={workspacesIcon} size={24} />
                         </span>
                         <h3 class="mt-3 font-medium">
@@ -489,50 +585,56 @@
                     </div>
                 </Card>
             {:else}
-                <div class="workspace-grid">
+                <Card variant="filled" id="workspaces-card">
                     {#each summary.workspaces.slice(0, 6) as item (item.id)}
                         <a
                             href={`/workspace/${item.id}`}
-                            class="workspace-card"
+                            class={[
+                                "border-outline-variant hover:bg-surface-container grid min-h-18 min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3.5 border-b px-4 py-3.5 text-inherit no-underline transition-colors last:border-b-0",
+                                focusRing,
+                            ]}
                         >
-                            <Card variant="elevated">
-                                <span class="workspace-icon">
-                                    <Icon icon={workspacesIcon} size={24} />
+                            <span
+                                class="text-primary inline-flex size-9 items-center justify-center"
+                            >
+                                <Icon icon={workspacesIcon} size={20} />
+                            </span>
+                            <span class="flex min-w-0 flex-col overflow-hidden">
+                                <span
+                                    class="truncate text-[0.9375rem] font-medium"
+                                >
+                                    {item.name ?? item.slug}
                                 </span>
-                                <span class="min-w-0 flex-1">
-                                    <span class="block truncate font-medium">
-                                        {item.name ?? item.slug}
-                                    </span>
-                                    <span
-                                        class="text-on-surface-variant mt-0.5 block truncate text-xs"
-                                    >
+                                <span
+                                    class="text-on-surface-variant mt-0.5 flex min-w-0 items-center gap-1.5 text-[13px]"
+                                >
+                                    <span>
                                         {item.serviceCount}
-                                        {plural(item.serviceCount, "service")} · {item.dataSourceLabel}
+                                        {plural(item.serviceCount, "service")}
+                                    </span>
+                                    <span aria-hidden="true">·</span>
+                                    <span
+                                        class="flex min-w-0 items-center gap-1 overflow-hidden"
+                                    >
+                                        <Icon icon={databaseIcon} size={14} />
+                                        <span class="truncate"
+                                            >{presentWorkspaceDataSource(
+                                                item
+                                            )}</span
+                                        >
                                     </span>
                                 </span>
-                                <Icon icon={arrowForwardIcon} size={18} />
-                            </Card>
+                            </span>
+                            <Icon icon={arrowForwardIcon} size={18} />
                         </a>
                     {/each}
-                </div>
+                </Card>
             {/if}
         </section>
     {/if}
 </div>
 
 <style>
-    .overview-page {
-        max-width: 96rem;
-        margin-inline: auto;
-        padding-block: 0.5rem 2rem;
-    }
-
-    .getting-started-copy {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-    }
-
     :global(#getting-started-card.m3-container) {
         display: flex;
         align-items: center;
@@ -543,115 +645,13 @@
         background: var(--m3c-primary-container-subtle);
     }
 
-    .summary-grid {
+    :global(#summary-card.m3-container) {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 0.75rem;
-    }
-
-    .summary-card {
-        min-width: 0;
-        color: inherit;
-        text-decoration: none;
-    }
-
-    :global(.summary-card > .m3-container) {
-        display: grid;
-        grid-template-columns: auto 1fr;
-        grid-template-rows: auto auto;
-        column-gap: 0.875rem;
-        width: 100%;
-        min-height: 7.75rem;
-        padding: 1rem;
-        border-radius: var(--m3-shape-large);
+        grid-template-columns: minmax(15rem, 0.72fr) minmax(32rem, 1.6fr);
+        overflow: hidden;
+        padding: 0;
+        border-radius: var(--m3-shape-extra-large);
         background: var(--m3c-surface-container-low);
-    }
-
-    .summary-icon,
-    .status-icon,
-    .deployment-state,
-    .workspace-icon {
-        display: inline-flex;
-        flex-shrink: 0;
-        align-items: center;
-        justify-content: center;
-        border-radius: var(--m3-shape-full);
-    }
-
-    .summary-icon {
-        grid-row: 1 / 3;
-        width: 3rem;
-        height: 3rem;
-        align-self: center;
-    }
-
-    .summary-icon.primary,
-    .workspace-icon {
-        color: var(--m3c-on-primary-container);
-        background: var(--m3c-primary-container);
-    }
-
-    .summary-icon.secondary {
-        color: var(--m3c-on-secondary-container);
-        background: var(--m3c-secondary-container);
-    }
-
-    .summary-icon.tertiary {
-        color: var(--m3c-on-tertiary-container);
-        background: var(--m3c-tertiary-container);
-    }
-
-    .summary-icon.neutral {
-        color: var(--m3c-on-surface-variant);
-        background: var(--m3c-surface-container-high);
-    }
-
-    .summary-icon.attention {
-        color: var(--m3c-on-error-container);
-        background: var(--m3c-error-container);
-    }
-
-    .summary-value {
-        align-self: end;
-        font-size: 1.75rem;
-        font-weight: 500;
-        line-height: 1.1;
-    }
-
-    .summary-label {
-        color: var(--m3c-on-surface-variant);
-        align-self: start;
-        margin-top: 0.25rem;
-        font-size: 0.75rem;
-    }
-
-    .dashboard-grid {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
-        gap: 1rem;
-    }
-
-    .section-heading {
-        min-height: 4rem;
-        padding: 0.25rem 0.25rem 0.75rem;
-    }
-
-    .section-heading h2 {
-        font-size: 1.125rem;
-        font-weight: 500;
-    }
-
-    .section-heading p {
-        color: var(--m3c-on-surface-variant);
-        margin-top: 0.125rem;
-        font-size: 0.75rem;
-    }
-
-    .workspaces-heading {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1rem;
     }
 
     :global(#attention-card.m3-container),
@@ -661,102 +661,15 @@
         overflow: hidden;
     }
 
-    .attention-row,
-    .activity-row {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        min-height: 4.25rem;
-        padding: 0.75rem 1rem;
-        color: inherit;
-        text-decoration: none;
-        border-bottom: 1px solid var(--m3c-outline-variant);
-        transition: background-color 150ms ease;
-    }
-
-    .attention-row:hover,
-    .activity-row:hover {
+    :global(#workspaces-card.m3-container) {
+        overflow: hidden;
+        padding: 0;
+        border-radius: var(--m3-shape-large);
         background: var(--m3c-surface-container-low);
     }
 
-    .attention-row:last-child,
-    .activity-row:last-child {
-        border-bottom: 0;
-    }
-
-    .empty-row {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        min-height: 8rem;
-        padding: 1.25rem;
-    }
-
-    .status-icon,
-    .deployment-state {
-        width: 2.25rem;
-        height: 2.25rem;
-    }
-
-    .status-icon.error {
-        color: var(--m3c-on-error-container);
-        background: var(--m3c-error-container);
-    }
-
-    .status-icon.success {
-        color: var(--m3c-on-primary-container);
-        background: var(--m3c-primary-container);
-    }
-
-    .status-icon.neutral {
-        color: var(--m3c-on-surface-variant);
-        background: var(--m3c-surface-container-high);
-    }
-
-    .workspace-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 0.75rem;
-    }
-
-    .workspace-card {
-        min-width: 0;
-        color: inherit;
-        text-decoration: none;
-    }
-
-    :global(.workspace-card > .m3-container) {
-        display: flex;
-        align-items: center;
-        gap: 0.875rem;
-        width: 100%;
-        min-width: 0;
-        padding: 1rem;
-        border-radius: var(--m3-shape-large);
-    }
-
-    .workspace-icon {
-        width: 2.75rem;
-        height: 2.75rem;
-    }
-
-    .empty-workspaces {
-        padding: 2rem;
-        text-align: center;
-    }
-
     @media (max-width: 74rem) {
-        .summary-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .workspace-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-    }
-
-    @media (max-width: 56rem) {
-        .dashboard-grid {
+        :global(#summary-card.m3-container) {
             grid-template-columns: minmax(0, 1fr);
         }
     }
@@ -765,11 +678,6 @@
         :global(#getting-started-card.m3-container) {
             align-items: stretch;
             flex-direction: column;
-        }
-
-        .summary-grid,
-        .workspace-grid {
-            grid-template-columns: minmax(0, 1fr);
         }
     }
 </style>

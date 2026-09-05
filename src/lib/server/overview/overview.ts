@@ -1,7 +1,7 @@
 import { count, desc, eq, sql } from "drizzle-orm";
 
 import { db } from "#lib/db";
-import { dataSource, deployments, services, workspace } from "#lib/db/schema";
+import { dataSource, deployments, gitSource, services, workspace } from "#lib/db/schema";
 
 const RECENT_DEPLOYMENT_LIMIT = 8;
 
@@ -12,7 +12,7 @@ export const getOrganizationOverview = async (organizationId: string) => {
                 .select({
                     createdAt: workspace.createdAt,
                     dataSourceId: workspace.dataSourceId,
-                    dataSourceLabel: sql<string>`coalesce(${dataSource.gitUrl}, ${dataSource.uncloudUrl})`,
+                    dataSourceLabel: sql<string>`coalesce(${gitSource.name}, ${gitSource.url}, ${dataSource.uncloudUrl})`,
                     id: workspace.id,
                     name: workspace.name,
                     serviceCount: count(services.id),
@@ -20,9 +20,17 @@ export const getOrganizationOverview = async (organizationId: string) => {
                 })
                 .from(workspace)
                 .innerJoin(dataSource, eq(dataSource.id, workspace.dataSourceId))
+                .innerJoin(gitSource, eq(gitSource.id, dataSource.gitSourceId))
                 .leftJoin(services, eq(services.workspaceId, workspace.id))
                 .where(eq(workspace.organizationId, organizationId))
-                .groupBy(workspace.id, dataSource.id, dataSource.gitUrl, dataSource.uncloudUrl)
+                .groupBy(
+                    workspace.id,
+                    dataSource.id,
+                    dataSource.uncloudUrl,
+                    gitSource.id,
+                    gitSource.name,
+                    gitSource.url,
+                )
                 .orderBy(desc(workspace.updatedAt)),
             db
                 .select({ count: count() })

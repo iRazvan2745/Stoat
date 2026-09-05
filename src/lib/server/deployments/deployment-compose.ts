@@ -49,7 +49,9 @@ const isNamedVolumeSource = (source: string): boolean => {
     return !/^[A-Za-z]:[\\/]/u.test(source);
 };
 
-const prefixShortVolumeSpec = (spec: string, prefix: string): string => {
+type Rename = (name: string) => string;
+
+const prefixShortVolumeSpec = (spec: string, rename: Rename): string => {
     const separatorIndex = spec.indexOf(":");
 
     if (separatorIndex <= 0) {
@@ -62,12 +64,12 @@ const prefixShortVolumeSpec = (spec: string, prefix: string): string => {
         return spec;
     }
 
-    return `${prefix}-${spec}`;
+    return `${rename(source)}${spec.slice(separatorIndex)}`;
 };
 
-const prefixVolumeMount = (node: unknown, prefix: string): void => {
+const prefixVolumeMount = (node: unknown, rename: Rename): void => {
     if (isScalar(node) && typeof node.value === "string") {
-        node.value = prefixShortVolumeSpec(node.value, prefix);
+        node.value = prefixShortVolumeSpec(node.value, rename);
         return;
     }
 
@@ -90,24 +92,24 @@ const prefixVolumeMount = (node: unknown, prefix: string): void => {
     const source = node.get("source", true);
 
     if (isScalar(source) && typeof source.value === "string" && isNamedVolumeSource(source.value)) {
-        source.value = prefixName(source.value, prefix);
+        source.value = rename(source.value);
     }
 };
 
-const prefixServiceVolumes = (service: YAMLMap, prefix: string): void => {
+const prefixServiceVolumes = (service: YAMLMap, rename: Rename): void => {
     const volumes = service.get("volumes", true);
 
     if (isSeq(volumes)) {
         for (const item of volumes.items) {
-            prefixVolumeMount(item, prefix);
+            prefixVolumeMount(item, rename);
         }
         return;
     }
 
-    prefixVolumeMount(volumes, prefix);
+    prefixVolumeMount(volumes, rename);
 };
 
-const prefixTopLevelVolumes = (volumes: unknown, prefix: string): void => {
+const prefixTopLevelVolumes = (volumes: unknown, rename: Rename): void => {
     if (!isMap(volumes)) {
         return;
     }
@@ -117,17 +119,17 @@ const prefixTopLevelVolumes = (volumes: unknown, prefix: string): void => {
             continue;
         }
 
-        pair.key.value = prefixName(pair.key.value, prefix);
+        pair.key.value = rename(pair.key.value);
     }
 };
 
-const prefixDependsOn = (service: YAMLMap, prefix: string): void => {
+const prefixDependsOn = (service: YAMLMap, rename: Rename): void => {
     const dependsOn = service.get("depends_on", true);
 
     if (isSeq(dependsOn)) {
         for (const item of dependsOn.items) {
             if (isScalar(item) && typeof item.value === "string") {
-                item.value = prefixName(item.value, prefix);
+                item.value = rename(item.value);
             }
         }
         return;
@@ -136,7 +138,7 @@ const prefixDependsOn = (service: YAMLMap, prefix: string): void => {
     if (isMap(dependsOn)) {
         for (const pair of dependsOn.items) {
             if (isScalar(pair.key) && typeof pair.key.value === "string") {
-                pair.key.value = prefixName(pair.key.value, prefix);
+                pair.key.value = rename(pair.key.value);
             }
         }
     }
@@ -144,7 +146,7 @@ const prefixDependsOn = (service: YAMLMap, prefix: string): void => {
 
 const CADDY_UPSTREAMS_SERVICE = /(?<open>\{\{\s*upstreams\s+")(?<name>[^"]+)(?<close>")/gu;
 
-const prefixCaddyUpstreams = (service: YAMLMap, prefix: string): void => {
+const prefixCaddyUpstreams = (service: YAMLMap, rename: Rename): void => {
     const caddy = service.get("x-caddy", true);
 
     if (!isScalar(caddy) || typeof caddy.value !== "string") {
@@ -153,8 +155,7 @@ const prefixCaddyUpstreams = (service: YAMLMap, prefix: string): void => {
 
     caddy.value = caddy.value.replace(
         CADDY_UPSTREAMS_SERVICE,
-        (_match, open: string, name: string, close: string) =>
-            `${open}${prefixName(name, prefix)}${close}`,
+        (_match, open: string, name: string, close: string) => `${open}${rename(name)}${close}`,
     );
 };
 
@@ -262,7 +263,7 @@ const ensureEnvFile = (service: YAMLMap): void => {
     }
 };
 
-export function formatComposeFile(compose: string, prefix?: string): FormattedCompose {
+function transformComposeNames(compose: string, rename: Rename): FormattedCompose {
     const doc = YAML.parseDocument(compose);
 
     if (doc.errors.length > 0) {
@@ -282,26 +283,41 @@ export function formatComposeFile(compose: string, prefix?: string): FormattedCo
             throw new Error("Invalid service name");
         }
 
-        const serviceName = prefixName(pair.key.value, prefix);
+        const serviceName = rename(pair.key.value);
         pair.key.value = serviceName;
         serviceNames.push(serviceName);
 
-        if (prefix && isMap(pair.value)) {
-            prefixServiceVolumes(pair.value, prefix);
-            prefixDependsOn(pair.value, prefix);
-            prefixCaddyUpstreams(pair.value, prefix);
+        if (isMap(pair.value)) {
+            prefixServiceVolumes(pair.value, rename);
+            prefixDependsOn(pair.value, rename);
+            prefixCaddyUpstreams(pair.value, rename);
         }
     }
 
-    if (prefix) {
-        prefixTopLevelVolumes(doc.get("volumes", true), prefix);
-    }
+    prefixTopLevelVolumes(doc.get("volumes", true), rename);
 
     return {
         serviceCount: serviceNames.length,
         serviceNames,
         yaml: doc.toString(),
     };
+}
+
+export function formatComposeFile(compose: string, prefix?: string): FormattedCompose {
+    return transformComposeNames(compose, (name) => prefixName(name, prefix));
+}
+
+/** Undo only the transformations made by formatComposeFile; keep user YAML intact. */
+export function unformatComposeFile(compose: string, prefix?: string): string {
+    const separator = prefix ? `${prefix}-` : undefined;
+    const result = transformComposeNames(compose, (name) =>
+        separator && name.startsWith(separator) ? name.slice(separator.length) : name,
+    );
+    // A Git edit may introduce two names that collapse to the same unprefixed key.
+    if (YAML.parseDocument(result.yaml).errors.length > 0) {
+        throw new Error("Compose names collide after removing the Stoat prefix");
+    }
+    return result.yaml;
 }
 
 export function applyEnvironmentVariables(

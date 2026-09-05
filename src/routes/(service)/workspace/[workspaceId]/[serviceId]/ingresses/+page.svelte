@@ -1,6 +1,6 @@
 <script lang="ts">
-    import contentCopyIcon from "@ktibow/iconset-material-symbols/content-copy-outline";
     import addIcon from "@ktibow/iconset-material-symbols/add";
+    import contentCopyIcon from "@ktibow/iconset-material-symbols/content-copy-outline";
     import deleteIcon from "@ktibow/iconset-material-symbols/delete-outline";
     import dnsIcon from "@ktibow/iconset-material-symbols/dns";
     import editIcon from "@ktibow/iconset-material-symbols/edit-outline";
@@ -60,7 +60,10 @@
         { text: "UDP", value: "udp" },
     ];
     const composeServiceOptions = $derived(
-        (info?.composeServices ?? []).map((name) => ({ text: name, value: name }))
+        (info?.composeServices ?? []).map((name) => ({
+            text: name,
+            value: name,
+        }))
     );
 
     let editorOpen = $state(false);
@@ -75,7 +78,9 @@
 
     const parsedPort = $derived(Number(containerPort));
     const parsedPublishedPort = $derived(Number(publishedPort));
-    const isTransportProtocol = $derived(protocol === "tcp" || protocol === "udp");
+    const isTransportProtocol = $derived(
+        protocol === "tcp" || protocol === "udp"
+    );
     const publishedPortIsValid = $derived(
         !isTransportProtocol ||
             (Number.isInteger(parsedPublishedPort) &&
@@ -107,7 +112,9 @@
         containerPort = String(route.containerPort);
         hostname = route.editableHostname ?? "";
         protocol = route.protocol;
-        publishedPort = String(route.editablePublishedPort ?? route.publishedPort ?? "");
+        publishedPort = String(
+            route.editablePublishedPort ?? route.publishedPort ?? ""
+        );
         editorOpen = true;
     };
 
@@ -122,7 +129,9 @@
             const route = {
                 composeService,
                 containerPort: parsedPort,
-                ...(hostname.trim() === "" ? {} : { hostname: hostname.trim() }),
+                ...(hostname.trim() === ""
+                    ? {}
+                    : { hostname: hostname.trim() }),
                 protocol,
                 ...(publishedPort !== "" &&
                 (isTransportProtocol ||
@@ -147,7 +156,9 @@
             editorOpen = false;
             await ingressQuery.refresh();
         } catch (error) {
-            snackbar(error instanceof Error ? error.message : "Unable to save route");
+            snackbar(
+                error instanceof Error ? error.message : "Unable to save route"
+            );
         } finally {
             submitting = false;
         }
@@ -163,12 +174,19 @@
         submitting = true;
 
         try {
-            await deleteServiceIngress({ routeId, serviceId: params.serviceId });
+            await deleteServiceIngress({
+                routeId,
+                serviceId: params.serviceId,
+            });
             deletingRoute = undefined;
             snackbar("Route deleted from Compose");
             await ingressQuery.refresh();
         } catch (error) {
-            snackbar(error instanceof Error ? error.message : "Unable to delete route");
+            snackbar(
+                error instanceof Error
+                    ? error.message
+                    : "Unable to delete route"
+            );
         } finally {
             submitting = false;
         }
@@ -458,7 +476,9 @@
             </Button>
             <Button
                 variant="filled"
-                disabled={!ready || info === null || composeServiceOptions.length === 0}
+                disabled={!ready ||
+                    info === null ||
+                    composeServiceOptions.length === 0}
                 onclick={openCreateRoute}
             >
                 <Icon icon={addIcon} />
@@ -683,7 +703,11 @@
     </div>
 
     {#snippet buttons()}
-        <Button variant="text" disabled={submitting} onclick={() => (editorOpen = false)}>
+        <Button
+            variant="text"
+            disabled={submitting}
+            onclick={() => (editorOpen = false)}
+        >
             Cancel
         </Button>
         <Button disabled={!routeIsValid || submitting} onclick={saveRoute}>
@@ -699,9 +723,11 @@
 >
     <div class="flex flex-col gap-2">
         <p class="text-on-surface">
-            Delete <span class="font-mono">{deletingRoute
-                ? routeHeadline(deletingRoute)
-                : "this route"}</span> from the Compose file?
+            Delete <span class="font-mono"
+                >{deletingRoute
+                    ? routeHeadline(deletingRoute)
+                    : "this route"}</span
+            > from the Compose file?
         </p>
         <p class="m3-font-body-small text-on-surface-variant">
             This does not redeploy the service.

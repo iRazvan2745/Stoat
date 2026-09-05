@@ -9,6 +9,7 @@
     import settingsIcon from "@ktibow/iconset-material-symbols/settings-outline";
     import { FAB, NavigationRailItem } from "m3-svelte";
 
+    import PageShell from "#lib/components/page-shell.svelte";
     import Sidebar from "#lib/components/sidebar.svelte";
 
     let { children, data, params } = $props();
@@ -73,12 +74,9 @@
         {/snippet}
     </Sidebar>
 
-    <main
-        class="bg-surface m:p-6 mt-6 h-[calc(100svh-1.5rem)] min-w-0 flex-1 overflow-y-auto p-4"
-        style="border-radius: var(--m3-shape-extra-large) 0 0 var(--m3-shape-extra-large)"
-    >
+    <PageShell>
         {#key params.serviceId}
             {@render children()}
         {/key}
-    </main>
+    </PageShell>
 </div>

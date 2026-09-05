@@ -21,9 +21,9 @@ import { formatComposeFile } from "#lib/server/deployments/deployment-compose";
 import {
     addComposeIngressRoute,
     deleteComposeIngressRoute,
-    type ComposeIngressRouteInput,
     updateComposeIngressRoute,
 } from "#lib/server/services/compose-ingress-routes";
+import type { ComposeIngressRouteInput } from "#lib/server/services/compose-ingress-routes";
 import {
     deleteEnvironmentVariablesForService,
     replaceEnvironmentVariables,
@@ -226,7 +226,7 @@ export async function moveService(serviceId: string, targetWorkspaceId: string) 
     try {
         const [updated] = await db
             .update(services)
-            .set({ workspaceId: targetWorkspace.id })
+            .set({ groupName: null, workspaceId: targetWorkspace.id })
             .where(
                 and(eq(services.id, serviceId), eq(services.workspaceId, record.sourceWorkspaceId)),
             )

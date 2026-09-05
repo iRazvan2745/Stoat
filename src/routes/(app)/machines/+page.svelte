@@ -14,7 +14,7 @@
         ).length ?? 0
     );
     const machineGroups = $derived.by(() => {
-        const {current} = machines;
+        const { current } = machines;
 
         if (!current) {
             return [];

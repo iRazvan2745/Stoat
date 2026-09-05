@@ -4,6 +4,7 @@ import { detectDeploymentFailure } from "#lib/domain/deployments/failure";
 import type { ServiceSettings } from "#lib/domain/services/settings";
 
 export interface Deployment {
+    gitCommit?: string | null;
     createdAt: Date;
     finishedAt: Date | null;
     id: string;

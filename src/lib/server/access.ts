@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 
 import { db } from "#lib/db";
-import { dataSource, member, services, workspace } from "#lib/db/schema";
+import { dataSource, gitSource, member, services, workspace } from "#lib/db/schema";
 
 export const hasAccessToThisDataSource = async (
     userId: string,
@@ -15,6 +15,20 @@ export const hasAccessToThisDataSource = async (
         .limit(1);
 
     return row !== undefined;
+};
+
+export const hasAccessToThisGitSource = async (
+    userId: string,
+    gitSourceId: string,
+): Promise<boolean> => {
+    const [match] = await db
+        .select({ id: gitSource.id })
+        .from(gitSource)
+        .innerJoin(member, eq(member.organizationId, gitSource.organizationId))
+        .where(and(eq(gitSource.id, gitSourceId), eq(member.userId, userId)))
+        .limit(1);
+
+    return match !== undefined;
 };
 
 export const hasAccessToThisWorkspace = async (

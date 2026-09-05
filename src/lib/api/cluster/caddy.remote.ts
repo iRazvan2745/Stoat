@@ -36,7 +36,7 @@ export interface OrganizationCaddyConfigsResult {
 }
 
 const dataSourceLabel = (source: OrganizationDataSourceConnection): string =>
-    source.gitUrl ?? source.uncloudUrl;
+    source.gitSource.name || source.uncloudUrl;
 
 const getErrorMessage = (error: unknown, label: string): string =>
     error instanceof Error && error.message

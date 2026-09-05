@@ -1,4 +1,5 @@
 // oxlint-disable func-style
+import { stripAnsi } from "#lib/domain/logs/ansi";
 export interface ContainerLogSource {
     id: string;
     label: string;
@@ -177,14 +178,23 @@ export function trimContainerLogs(logs: ContainerLogRecord[], maxLines: number):
 export function filterContainerLogs(
     logs: ContainerLogRecord[],
     selectedIds: readonly string[],
+    search = "",
+    stderrOnly = false,
 ): ContainerLogRecord[] {
-    if (selectedIds.length === 0) {
+    const query = search.trim().toLowerCase();
+
+    if (selectedIds.length === 0 && !query && !stderrOnly) {
         return logs;
     }
 
     const selected = new Set(selectedIds);
 
-    return logs.filter((log) => selected.has(log.containerId));
+    return logs.filter(
+        (log) =>
+            (selected.size === 0 || selected.has(log.containerId)) &&
+            (!stderrOnly || log.stream === "stderr") &&
+            (!query || stripAnsi(log.message).toLowerCase().includes(query)),
+    );
 }
 
 export function matchContainerId(

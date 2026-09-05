@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { goto } from "$app/navigation";
     import addIcon from "@ktibow/iconset-material-symbols/add";
     import computerIcon from "@ktibow/iconset-material-symbols/computer-outline";
     import databaseIcon from "@ktibow/iconset-material-symbols/database";
@@ -12,6 +13,7 @@
         NavigationRailItem,
     } from "m3-svelte";
 
+    import PageShell from "#lib/components/page-shell.svelte";
     import Sidebar from "#lib/components/sidebar.svelte";
 
     let { children, data } = $props();
@@ -40,12 +42,12 @@
                         <ExpressiveMenuItem
                             leadingIcon={addIcon}
                             label="Create Workspace"
-                            onclick={() => (fabMenuOpen = false)}
-                        />
-                        <ExpressiveMenuItem
-                            leadingIcon={addIcon}
-                            label="Share"
-                            onclick={() => (fabMenuOpen = false)}
+                            onclick={async () => {
+                                fabMenuOpen = false;
+                                await goto(
+                                    "/workspace?createWorkspaceDialogOpen=true"
+                                );
+                            }}
                         />
                     </ExpressiveMenu>
                 </div>
@@ -86,11 +88,9 @@
         {/snippet}
     </Sidebar>
 
-    <main
-        class="bg-surface m:p-8 mt-6 h-[calc(100svh-1.5rem)] min-h-0 min-w-0 flex-1 overflow-y-auto rounded-md p-4"
-    >
+    <PageShell>
         {@render children()}
-    </main>
+    </PageShell>
 </div>
 
 <style>

@@ -38,6 +38,10 @@ docker build -f Dockerfile -t stoat:test .
 docker build -f sidecar/Dockerfile -t stoat-sidecar:test sidecar
 ```
 
+## Git synchronization
+
+Git Sources support two-way synchronization, formatted Compose history, and automatic deployment of every new commit. See [Git synchronization](docs/git-sync.md) for setup, repository layout, and conflict handling.
+
 ## Images and releases
 
 GitHub Actions publishes these images to GHCR:

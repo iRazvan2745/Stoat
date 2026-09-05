@@ -6,6 +6,7 @@ import { db } from "#lib/db";
 import { deployments } from "#lib/db/schema";
 import {
     hasAccessToThisDataSource,
+    hasAccessToThisGitSource,
     hasAccessToThisService,
     hasAccessToThisWorkspace,
 } from "#lib/server/access";
@@ -40,6 +41,9 @@ const requireResourceAccess = async (
 
 export const requireDataSourceAccess = (dataSourceId: string): Promise<AuthenticatedSession> =>
     requireResourceAccess(dataSourceId, hasAccessToThisDataSource);
+
+export const requireGitSourceAccess = (gitSourceId: string): Promise<AuthenticatedSession> =>
+    requireResourceAccess(gitSourceId, hasAccessToThisGitSource);
 
 export const requireWorkspaceAccess = (workspaceId: string): Promise<AuthenticatedSession> =>
     requireResourceAccess(workspaceId, hasAccessToThisWorkspace);

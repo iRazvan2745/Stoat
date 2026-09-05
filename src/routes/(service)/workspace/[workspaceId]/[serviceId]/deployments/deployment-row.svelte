@@ -64,6 +64,11 @@
 
                 <span class="text-on-surface-variant text-xs sm:flex-1">
                     {formatDate(deployment.createdAt)}
+                    {#if deployment.gitCommit}
+                        · <span class="font-mono" title={deployment.gitCommit}
+                            >Commit {deployment.gitCommit.slice(0, 8)}</span
+                        >
+                    {/if}
                 </span>
             </div>
 

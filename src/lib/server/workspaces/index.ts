@@ -5,7 +5,6 @@ import { eq, inArray } from "drizzle-orm";
 import { db } from "#lib/db";
 import { dataSource, environmentVariables, member, services, workspace } from "#lib/db/schema";
 import { createWorkspaceFolder, workspacePath } from "#lib/server/data-sources/paths";
-import { getRepo } from "#lib/server/shared/git";
 import { uniqueSlug } from "#lib/server/shared/slugs";
 
 export const listWorkspaces = async (userId: string) => {
@@ -32,7 +31,10 @@ export const createWorkspace = async ({
     dataSourceId: string;
     name: string;
 }) => {
-    const [source] = await db.select().from(dataSource).where(eq(dataSource.id, dataSourceId));
+    const [source] = await db
+        .select({ source: dataSource })
+        .from(dataSource)
+        .where(eq(dataSource.id, dataSourceId));
 
     if (!source) {
         throw new Error("Data source not found");
@@ -52,7 +54,7 @@ export const createWorkspace = async ({
         .values({
             dataSourceId,
             name,
-            organizationId: source.organizationId,
+            organizationId: source.source.organizationId,
             slug,
         })
         .returning();
@@ -64,9 +66,6 @@ export const createWorkspace = async ({
     const repoPath = workspacePath(created.id);
 
     try {
-        if (source.gitUrl) {
-            await getRepo({ repoPath, repoUrl: source.gitUrl });
-        }
         await createWorkspaceFolder(repoPath, created.slug);
     } catch (error) {
         await db.delete(workspace).where(eq(workspace.id, created.id));

@@ -52,7 +52,7 @@
         )
     );
     const selectedDataSourceLabel = $derived(
-        selectedDataSource?.gitUrl ??
+        selectedDataSource?.gitSource.name ??
             selectedDataSource?.uncloudUrl ??
             "Select a data source"
     );
@@ -196,7 +196,7 @@
                             {#each dataSources.current ?? [] as source (source.id)}
                                 <ExpressiveMenuItem
                                     leadingIcon={databaseIcon}
-                                    label={source.gitUrl ?? source.uncloudUrl}
+                                    label={`${source.gitSource.name} · ${source.uncloudUrl}`}
                                     selected={source.id ===
                                         dataSourceId.current}
                                     onclick={() => selectDataSource(source.id)}

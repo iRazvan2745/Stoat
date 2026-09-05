@@ -8,6 +8,7 @@ export default defineConfig({
     // upstream instead of restyling it to local lint rules.
     ignorePatterns: [...(core.ignorePatterns ?? []), "src/lib/components/flow/**"],
     rules: {
+        complexity: "error",
         "func-style": "off",
         "no-nested-ternary": "off",
         "unicorn/require-module-specifiers": "off",

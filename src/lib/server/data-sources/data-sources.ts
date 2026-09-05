@@ -4,14 +4,23 @@ import fs from "node:fs/promises";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "#lib/db";
-import { dataSource, services, workspace } from "#lib/db/schema";
+import { dataSource, gitSource, services, workspace } from "#lib/db/schema";
+import { GIT_AUTH_METHODS, gitSourceSummary } from "#lib/domain/data-sources";
+import type {
+    CreateGitSourceInputOutput,
+    GitAuthMethod,
+    GitSourceConnection,
+    GitSourceSummary,
+    UpdateGitSourceInputOutput,
+} from "#lib/domain/data-sources";
 import {
     composeServiceName,
     discoverComposeFiles,
     repositoryName,
 } from "#lib/server/data-sources/discovery";
 import { createWorkspaceFolder, workspacePath } from "#lib/server/data-sources/paths";
-import { getRepo } from "#lib/server/shared/git";
+import { withGitRepo } from "#lib/server/shared/git";
+import { gitAuthenticationFromSource, validateGitSource } from "#lib/server/shared/git-auth";
 import { uniqueSlug } from "#lib/server/shared/slugs";
 import { normalizeUncloudUrl } from "#lib/server/uncloud";
 
@@ -30,7 +39,16 @@ export interface UncloudDataSource {
     uncloudUrl: string;
 }
 
+export interface OrganizationGitSource extends GitSourceSummary {
+    syncEnabled: boolean;
+    syncResult: import("#lib/domain/git-sync").GitSyncResult | null;
+    organizationId: string;
+}
+
 export interface OrganizationDataSource {
+    gitSource: OrganizationGitSource;
+    gitSourceId: string;
+    /** @deprecated Use `gitSource.url`; retained for existing clients. */
     gitUrl: string | null;
     id: string;
     organizationId: string;
@@ -38,7 +56,238 @@ export interface OrganizationDataSource {
 }
 
 export interface OrganizationDataSourceConnection
-    extends OrganizationDataSource, UncloudDataSource {}
+    extends OrganizationDataSource, UncloudDataSource {
+    gitSource: GitSourceConnection & OrganizationGitSource;
+}
+
+export interface CreateDataSourceOptions {
+    gitSourceId?: string | null;
+    /** @deprecated A Git Source is preferred; this creates one for old clients. */
+    gitUrl?: string | null;
+    organizationId: string;
+    uncloudToken?: string | null;
+    uncloudUrl: string;
+}
+
+export interface UpdateDataSourceOptions {
+    gitSourceId?: string | null;
+    id: string;
+    /** @deprecated A Git Source is preferred; this creates one for old clients. */
+    gitUrl?: string | null;
+    uncloudToken?: string | null;
+    uncloudUrl: string;
+}
+
+export interface CreateGitSourceRecordInput extends CreateGitSourceInputOutput {
+    organizationId: string;
+}
+
+export interface UpdateGitSourceRecordInput extends UpdateGitSourceInputOutput {}
+
+type GitSourceRow = typeof gitSource.$inferSelect;
+
+const toGitSourceConnection = (source: GitSourceRow): GitSourceConnection => ({
+    ...source,
+    authMethod: source.authMethod as GitAuthMethod,
+    hasPassword: Boolean(source.password),
+    hasPrivateKey: Boolean(source.sshPrivateKey),
+    hasToken: Boolean(source.token),
+    sshKnownHostsConfigured: Boolean(source.sshKnownHosts),
+});
+
+const toGitSourceSummary = (source: GitSourceRow): OrganizationGitSource => ({
+    ...gitSourceSummary(toGitSourceConnection(source)),
+    syncEnabled: source.syncEnabled,
+    syncResult: source.syncResult,
+    organizationId: source.organizationId,
+});
+
+const cleanSecret = (value: string | null | undefined): string | null | undefined => {
+    if (value === undefined) {
+        return undefined;
+    }
+
+    return value === "" ? null : value;
+};
+
+const assertGitAuthMethod: (authMethod: string) => asserts authMethod is GitAuthMethod = (
+    authMethod,
+) => {
+    if (!(GIT_AUTH_METHODS as readonly string[]).includes(authMethod)) {
+        throw new Error(`Unsupported Git authentication method: ${authMethod}`);
+    }
+};
+
+const getGitSourceRow = async (gitSourceId: string): Promise<GitSourceRow> => {
+    const [source] = await db.select().from(gitSource).where(eq(gitSource.id, gitSourceId));
+
+    if (!source) {
+        throw new Error("Git Source not found");
+    }
+
+    return source;
+};
+
+export const getGitSourceForOrganization = async (
+    gitSourceId: string,
+    organizationId: string,
+): Promise<OrganizationGitSource> => {
+    const [source] = await db
+        .select()
+        .from(gitSource)
+        .where(and(eq(gitSource.id, gitSourceId), eq(gitSource.organizationId, organizationId)));
+
+    if (!source) {
+        throw new Error("Git Source not found for organization");
+    }
+
+    return toGitSourceSummary(source);
+};
+
+export const getGitSourceConnection = async (gitSourceId: string): Promise<GitSourceConnection> =>
+    toGitSourceConnection(await getGitSourceRow(gitSourceId));
+
+export const listGitSourcesForOrganization = async (
+    organizationId: string,
+): Promise<OrganizationGitSource[]> => {
+    const rows = await db
+        .select()
+        .from(gitSource)
+        .where(eq(gitSource.organizationId, organizationId))
+        .orderBy(gitSource.createdAt);
+
+    return rows.toReversed().map(toGitSourceSummary);
+};
+
+export const createGitSource = async ({
+    authMethod,
+    name,
+    organizationId,
+    password,
+    sshKnownHosts,
+    sshPassphrase,
+    sshPrivateKey,
+    token,
+    url,
+    username,
+}: CreateGitSourceRecordInput): Promise<OrganizationGitSource> => {
+    assertGitAuthMethod(authMethod);
+    const validated = validateGitSource({
+        authentication: {
+            knownHosts: sshKnownHosts,
+            method: authMethod,
+            passphrase: sshPassphrase,
+            password,
+            privateKey: sshPrivateKey,
+            token,
+            username,
+        },
+        url,
+    });
+    const { authentication } = validated;
+
+    const [created] = await db
+        .insert(gitSource)
+        .values({
+            authMethod,
+            name: name.trim(),
+            organizationId,
+            password: authentication.method === "basic" ? (authentication.password ?? null) : null,
+            sshKnownHosts:
+                authentication.method === "ssh" ? (authentication.knownHosts ?? null) : null,
+            sshPassphrase:
+                authentication.method === "ssh" ? (authentication.passphrase ?? null) : null,
+            sshPrivateKey:
+                authentication.method === "ssh" ? (authentication.privateKey ?? null) : null,
+            token: authentication.method === "token" ? (authentication.token ?? null) : null,
+            url: validated.url,
+            username: authentication.method === "none" ? null : (authentication.username ?? null),
+        })
+        .returning();
+
+    if (!created) {
+        throw new Error("Unable to create Git Source");
+    }
+
+    return toGitSourceSummary(created);
+};
+
+export const updateGitSource = async ({
+    authMethod,
+    id: gitSourceId,
+    name,
+    password,
+    sshKnownHosts,
+    sshPassphrase,
+    sshPrivateKey,
+    token,
+    url,
+    username,
+}: UpdateGitSourceRecordInput): Promise<OrganizationGitSource> => {
+    const existing = await getGitSourceRow(gitSourceId);
+    const nextAuthMethod = authMethod ?? existing.authMethod;
+    assertGitAuthMethod(nextAuthMethod);
+    const validated = validateGitSource({
+        authentication: {
+            knownHosts: sshKnownHosts === undefined ? existing.sshKnownHosts : sshKnownHosts,
+            method: nextAuthMethod,
+            passphrase: sshPassphrase === undefined ? existing.sshPassphrase : sshPassphrase,
+            password: password === undefined ? existing.password : password,
+            privateKey: sshPrivateKey === undefined ? existing.sshPrivateKey : sshPrivateKey,
+            token: token === undefined ? existing.token : token,
+            username: username === undefined ? existing.username : username,
+        },
+        url: url ?? existing.url,
+    });
+    const { authentication } = validated;
+
+    const [updated] = await db
+        .update(gitSource)
+        .set({
+            authMethod: nextAuthMethod,
+            ...(name === undefined ? {} : { name: name.trim() }),
+            password: authentication.method === "basic" ? (authentication.password ?? null) : null,
+            sshKnownHosts:
+                authentication.method === "ssh" ? (authentication.knownHosts ?? null) : null,
+            sshPassphrase:
+                authentication.method === "ssh" ? (authentication.passphrase ?? null) : null,
+            sshPrivateKey:
+                authentication.method === "ssh" ? (authentication.privateKey ?? null) : null,
+            token: authentication.method === "token" ? (authentication.token ?? null) : null,
+            url: validated.url,
+            username: authentication.method === "none" ? null : (authentication.username ?? null),
+        })
+        .where(eq(gitSource.id, gitSourceId))
+        .returning();
+
+    if (!updated) {
+        throw new Error("Git Source not found");
+    }
+
+    return toGitSourceSummary(updated);
+};
+
+export const deleteGitSource = async (gitSourceId: string) => {
+    const linkedDataSources = await db
+        .select({ id: dataSource.id })
+        .from(dataSource)
+        .where(eq(dataSource.gitSourceId, gitSourceId));
+
+    if (linkedDataSources.length > 0) {
+        const noun = linkedDataSources.length === 1 ? "data source" : "data sources";
+        throw new Error(
+            `Git Source has ${linkedDataSources.length} linked ${noun}; reassign them before deleting the Git Source`,
+        );
+    }
+
+    const [deleted] = await db.delete(gitSource).where(eq(gitSource.id, gitSourceId)).returning();
+
+    if (!deleted) {
+        throw new Error("Git Source not found");
+    }
+
+    return [toGitSourceSummary(deleted)];
+};
 
 export const getServiceDataSource = async (serviceId: string): Promise<UncloudDataSource> => {
     const [source] = await db
@@ -58,53 +307,123 @@ export const getServiceDataSource = async (serviceId: string): Promise<UncloudDa
     return source;
 };
 
-const dataSourceListFields = {
-    gitUrl: dataSource.gitUrl,
-    id: dataSource.id,
-    organizationId: dataSource.organizationId,
-    uncloudUrl: dataSource.uncloudUrl,
+const toOrganizationDataSource = ({
+    git,
+    source,
+}: {
+    git: GitSourceRow;
+    source: typeof dataSource.$inferSelect;
+}): OrganizationDataSource => {
+    const summary = toGitSourceSummary(git);
+
+    return {
+        gitSource: summary,
+        gitSourceId: git.id,
+        gitUrl: git.url,
+        id: source.id,
+        organizationId: source.organizationId,
+        uncloudUrl: source.uncloudUrl,
+    };
 };
+
+const toOrganizationDataSourceConnection = ({
+    git,
+    source,
+}: {
+    git: GitSourceRow;
+    source: typeof dataSource.$inferSelect;
+}): OrganizationDataSourceConnection => ({
+    ...toOrganizationDataSource({ git, source }),
+    gitSource: {
+        ...toGitSourceConnection(git),
+        syncEnabled: git.syncEnabled,
+        syncResult: git.syncResult,
+        organizationId: source.organizationId,
+    },
+    uncloudToken: source.uncloudToken,
+    uncloudUrl: source.uncloudUrl,
+});
 
 export const listDataSourcesForOrganization = async (
     organizationId: string,
 ): Promise<OrganizationDataSource[]> => {
     const rows = await db
-        .select(dataSourceListFields)
+        .select({ git: gitSource, source: dataSource })
         .from(dataSource)
+        .innerJoin(gitSource, eq(gitSource.id, dataSource.gitSourceId))
         .where(eq(dataSource.organizationId, organizationId))
         .orderBy(dataSource.createdAt);
 
-    return rows.toReversed();
+    return rows.toReversed().map(toOrganizationDataSource);
 };
 
 export const listDataSourceConnectionsForOrganization = async (
     organizationId: string,
 ): Promise<OrganizationDataSourceConnection[]> => {
     const rows = await db
-        .select({
-            ...dataSourceListFields,
-            uncloudToken: dataSource.uncloudToken,
-        })
+        .select({ git: gitSource, source: dataSource })
         .from(dataSource)
+        .innerJoin(gitSource, eq(gitSource.id, dataSource.gitSourceId))
         .where(eq(dataSource.organizationId, organizationId))
         .orderBy(dataSource.createdAt);
 
-    return rows.toReversed();
+    return rows.toReversed().map(toOrganizationDataSourceConnection);
 };
 
-export const createDataSource = async (
-    gitUrl: string | null,
-    uncloudUrl: string,
-    organizationId: string,
-) => {
-    const [created] = await db
-        .insert(dataSource)
-        .values({
-            gitUrl,
-            organizationId,
-            uncloudUrl: normalizeUncloudUrl(uncloudUrl),
-        })
-        .returning();
+export const createDataSource = async ({
+    gitSourceId,
+    gitUrl,
+    organizationId,
+    uncloudToken,
+    uncloudUrl,
+}: CreateDataSourceOptions) => {
+    const [created] = await db.transaction(async (tx) => {
+        let assignedGitSourceId = gitSourceId?.trim() || null;
+
+        if (assignedGitSourceId) {
+            const [assignedSource] = await tx
+                .select({ id: gitSource.id })
+                .from(gitSource)
+                .where(
+                    and(
+                        eq(gitSource.id, assignedGitSourceId),
+                        eq(gitSource.organizationId, organizationId),
+                    ),
+                );
+
+            if (!assignedSource) {
+                throw new Error("Git Source not found for organization");
+            }
+        } else {
+            // Keep old clients usable while ensuring every data source still
+            // has a first-class Git Source assignment.
+            const legacyUrl = gitUrl?.trim() || null;
+            const [createdGitSource] = await tx
+                .insert(gitSource)
+                .values({
+                    name: legacyUrl ? repositoryName(legacyUrl) : "Local Git Source",
+                    organizationId,
+                    url: legacyUrl,
+                })
+                .returning({ id: gitSource.id });
+
+            if (!createdGitSource) {
+                throw new Error("Unable to create Git Source for data source");
+            }
+
+            assignedGitSourceId = createdGitSource.id;
+        }
+
+        return await tx
+            .insert(dataSource)
+            .values({
+                gitSourceId: assignedGitSourceId,
+                organizationId,
+                uncloudToken: cleanSecret(uncloudToken) ?? null,
+                uncloudUrl: normalizeUncloudUrl(uncloudUrl),
+            })
+            .returning();
+    });
 
     if (!created) {
         throw new Error("Unable to create data source");
@@ -113,12 +432,87 @@ export const createDataSource = async (
     return created;
 };
 
-export const updateDataSource = async (id: string, gitUrl: string | null, uncloudUrl: string) => {
-    const [updated] = await db
-        .update(dataSource)
-        .set({ gitUrl, uncloudUrl: normalizeUncloudUrl(uncloudUrl) })
-        .where(eq(dataSource.id, id))
-        .returning();
+export const updateDataSource = async ({
+    gitSourceId,
+    gitUrl,
+    id,
+    uncloudToken,
+    uncloudUrl,
+}: UpdateDataSourceOptions) => {
+    const [updated] = await db.transaction(async (tx) => {
+        const [existing] = await tx.select().from(dataSource).where(eq(dataSource.id, id));
+
+        if (!existing) {
+            throw new Error("Data source not found");
+        }
+
+        let assignedGitSourceId = gitSourceId === undefined ? existing.gitSourceId : gitSourceId;
+
+        if (assignedGitSourceId === null || assignedGitSourceId.trim() === "") {
+            const legacyUrl = gitUrl?.trim() || null;
+            const [createdGitSource] = await tx
+                .insert(gitSource)
+                .values({
+                    name: legacyUrl ? repositoryName(legacyUrl) : "Local Git Source",
+                    organizationId: existing.organizationId,
+                    url: legacyUrl,
+                })
+                .returning({ id: gitSource.id });
+
+            if (!createdGitSource) {
+                throw new Error("Unable to create Git Source for data source");
+            }
+
+            assignedGitSourceId = createdGitSource.id;
+        } else {
+            const [assignedSource] = await tx
+                .select({ id: gitSource.id })
+                .from(gitSource)
+                .where(
+                    and(
+                        eq(gitSource.id, assignedGitSourceId),
+                        eq(gitSource.organizationId, existing.organizationId),
+                    ),
+                );
+
+            if (!assignedSource) {
+                throw new Error("Git Source not found for organization");
+            }
+
+            // Legacy clients can still replace their URL. Keep that operation
+            // isolated in a new source rather than mutating a source shared by
+            // other data sources.
+            if (gitUrl !== undefined) {
+                const legacyUrl = gitUrl?.trim() || null;
+                const [createdGitSource] = await tx
+                    .insert(gitSource)
+                    .values({
+                        name: legacyUrl ? repositoryName(legacyUrl) : "Local Git Source",
+                        organizationId: existing.organizationId,
+                        url: legacyUrl,
+                    })
+                    .returning({ id: gitSource.id });
+
+                if (!createdGitSource) {
+                    throw new Error("Unable to create Git Source for data source");
+                }
+
+                assignedGitSourceId = createdGitSource.id;
+            }
+        }
+
+        return await tx
+            .update(dataSource)
+            .set({
+                gitSourceId: assignedGitSourceId,
+                ...(uncloudToken === undefined
+                    ? {}
+                    : { uncloudToken: cleanSecret(uncloudToken) ?? null }),
+                uncloudUrl: normalizeUncloudUrl(uncloudUrl),
+            })
+            .where(eq(dataSource.id, id))
+            .returning();
+    });
 
     if (!updated) {
         throw new Error("Data source not found");
@@ -150,26 +544,30 @@ export const deleteDataSource = async (id: string) => {
 };
 
 export const discoverDataSource = async (id: string): Promise<DataSourceDiscoveryResult> => {
-    const [source] = await db.select().from(dataSource).where(eq(dataSource.id, id));
+    const [source] = await db
+        .select({ git: gitSource, source: dataSource })
+        .from(dataSource)
+        .innerJoin(gitSource, eq(gitSource.id, dataSource.gitSourceId))
+        .where(eq(dataSource.id, id));
 
     if (!source) {
         throw new Error("Data source not found");
     }
 
-    if (!source.gitUrl) {
+    if (!source.git.url) {
         throw new Error("Data source has no Git URL");
     }
 
-    const name = repositoryName(source.gitUrl);
+    const name = repositoryName(source.git.url);
 
     const [foundWorkspace] = await db
         .select()
         .from(workspace)
         .where(
             and(
-                eq(workspace.dataSourceId, source.id),
+                eq(workspace.dataSourceId, source.source.id),
                 eq(workspace.name, name),
-                eq(workspace.organizationId, source.organizationId),
+                eq(workspace.organizationId, source.source.organizationId),
             ),
         )
         .limit(1);
@@ -190,9 +588,9 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
         const [createdWorkspace] = await db
             .insert(workspace)
             .values({
-                dataSourceId: source.id,
+                dataSourceId: source.source.id,
                 name,
-                organizationId: source.organizationId,
+                organizationId: source.source.organizationId,
                 slug,
             })
             .returning();
@@ -206,7 +604,14 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
     }
 
     const repoPath = workspacePath(targetWorkspace.id);
-    await getRepo({ repoPath, repoUrl: source.gitUrl });
+    await withGitRepo(
+        {
+            authentication: gitAuthenticationFromSource(source.git),
+            repoPath,
+            repoUrl: source.git.url,
+        },
+        async () => {},
+    );
 
     const discovery = await discoverComposeFiles(repoPath);
 
@@ -218,7 +623,7 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
         }
 
         return {
-            dataSourceId: source.id,
+            dataSourceId: source.source.id,
             discovered: 0,
             existing: 0,
             imported: 0,
@@ -236,7 +641,7 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
         })
         .from(services)
         .innerJoin(workspace, eq(workspace.id, services.workspaceId))
-        .where(eq(workspace.dataSourceId, source.id));
+        .where(eq(workspace.dataSourceId, source.source.id));
     const generatedComposePaths = new Set(
         linkedServices.flatMap(({ service, workspaceId, workspaceSlug }) => [
             `${workspaceSlug}/${service.slug ?? service.id}/compose.yaml`,
@@ -296,7 +701,7 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
     }
 
     return {
-        dataSourceId: source.id,
+        dataSourceId: source.source.id,
         discovered: discovery.files.length,
         existing,
         imported,
