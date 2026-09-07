@@ -615,8 +615,6 @@ export const publishServiceDeployment = async (
     snapshot: DeploymentSnapshot,
 ): Promise<{ deploymentId: string; jobId: string }> =>
     await withSourceRepository(snapshot.git.id, async (context) => {
-        if (!(await processHistory(context)) || context.result.issues.length > 0)
-            throw new GitSyncError(context.result.issues.join("\n"));
         const [current] = await db
             .select()
             .from(services)
@@ -637,18 +635,18 @@ export const publishServiceDeployment = async (
         await publishAppChanges(context, snapshot.service.id);
         const commit = await headCommit(context.repo);
         if (!commit) throw new GitSyncError("The repository does not have a commit to deploy");
-        const wasUnseen = context.source.lastSyncedCommit !== commit;
-        if (!(await processHistory(context)))
-            throw new GitSyncError(context.result.issues.join("\n"));
-        if (wasUnseen) {
+        snapshot.gitCommit = commit;
+        snapshot.gitCompose = exportGitCompose(current, currentWorkspace);
+        if (context.source.lastSyncedCommit !== commit) {
             const deploymentId = commitDeploymentId(snapshot.git.id, snapshot.service.id, commit);
             const [deployment] = await db
                 .select()
                 .from(deployments)
                 .where(eq(deployments.id, deploymentId));
-            if (deployment) return { deploymentId, jobId: deployment.jobId ?? deploymentId };
+            if (!deployment) return await enqueueDeployment(snapshot, { deploymentId });
+            if (!deployment.finishedAt)
+                return { deploymentId, jobId: deployment.jobId ?? deploymentId };
         }
         // An explicit redeploy of unchanged configuration still records the same Git commit.
-        snapshot.gitCommit = commit;
         return await enqueueDeployment(snapshot);
     });

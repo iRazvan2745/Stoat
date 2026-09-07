@@ -52,6 +52,9 @@ interface DeploymentJob {
     service_id: string;
 }
 
+const jsonSafeSnapshot = (snapshot: DeploymentSnapshot): DeploymentSnapshot =>
+    JSON.parse(JSON.stringify(snapshot)) as DeploymentSnapshot;
+
 class DeploymentQueueJob extends Job.make("deployment", {
     dedupe: ({ service_id, git_commit }) =>
         git_commit ? `${service_id}:${git_commit}` : service_id,
@@ -341,7 +344,7 @@ export async function enqueueDeployment(
                     deployment_id: deployment.id,
                     git_commit: snapshot.gitCommit,
                     service_id,
-                    snapshot,
+                    snapshot: jsonSafeSnapshot(snapshot),
                 },
                 { jobId: deployment.id },
             ),
