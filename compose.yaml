@@ -18,7 +18,8 @@ services:
             - "3000/https"
         pull_policy: always
         env_file:
-            - .env
+            - path: .env
+              required: false
         depends_on:
             stoat-db:
                 condition: service_healthy
