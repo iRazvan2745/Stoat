@@ -8,8 +8,8 @@ import { and, eq } from "drizzle-orm";
 import type { SimpleGit } from "simple-git";
 
 import { db } from "#lib/db";
-import { dataSource, deployments, gitSource, services, workspace } from "#lib/db/schema";
-import type { GitServiceSyncState, GitSyncResult } from "#lib/domain/git-sync";
+import { dataSource, deployments, gitSource, resources, workspace } from "#lib/db/schema";
+import type { GitResourceSyncState, GitSyncResult } from "#lib/domain/git-sync";
 import { repositoryName } from "#lib/server/data-sources/discovery";
 import { gitSourcePath } from "#lib/server/data-sources/paths";
 import { formatComposeFile } from "#lib/server/deployments/deployment-compose";
@@ -38,11 +38,11 @@ import { gitAuthenticationFromSource } from "#lib/server/shared/git-auth";
 import { withGitSourceLock } from "#lib/server/shared/git-lock";
 import { uniqueSlug } from "#lib/server/shared/slugs";
 
-type Service = typeof services.$inferSelect;
+type Resource = typeof resources.$inferSelect;
 type Workspace = typeof workspace.$inferSelect;
 type Source = typeof gitSource.$inferSelect;
-interface LinkedService {
-    service: Service;
+interface LinkedResource {
+    resource: Resource;
     workspace: Workspace;
 }
 interface SyncContext {
@@ -62,34 +62,34 @@ const addIssue = (context: SyncContext, message: string): void => {
     if (!context.result.issues.includes(message)) context.result.issues.push(message);
 };
 
-const listLinkedServices = async (sourceId: string): Promise<LinkedService[]> =>
+const listLinkedResources = async (sourceId: string): Promise<LinkedResource[]> =>
     await db
-        .select({ service: services, workspace })
-        .from(services)
-        .innerJoin(workspace, eq(workspace.id, services.workspaceId))
+        .select({ resource: resources, workspace })
+        .from(resources)
+        .innerJoin(workspace, eq(workspace.id, resources.workspaceId))
         .innerJoin(dataSource, eq(dataSource.id, workspace.dataSourceId))
         .where(eq(dataSource.gitSourceId, sourceId));
 
-const stateFor = (service: Service, sourceId: string): GitServiceSyncState | null =>
-    service.gitSync?.sourceId === sourceId ? service.gitSync : null;
+const stateFor = (resource: Resource, sourceId: string): GitResourceSyncState | null =>
+    resource.gitSync?.sourceId === sourceId ? resource.gitSync : null;
 
-const pathFor = ({ service, workspace: wrk }: LinkedService, sourceId: string): string =>
-    stateFor(service, sourceId)?.path ??
-    service.settings.sourcePath ??
-    canonicalComposePath(service, wrk);
+const pathFor = ({ resource, workspace: wrk }: LinkedResource, sourceId: string): string =>
+    stateFor(resource, sourceId)?.path ??
+    resource.settings.sourcePath ??
+    canonicalComposePath(resource, wrk);
 
-const findLinkedService = (
+const findLinkedResource = (
     file: RepositoryComposeFile,
-    linked: LinkedService[],
+    linked: LinkedResource[],
     sourceId: string,
-): LinkedService | undefined => {
+): LinkedResource | undefined => {
     const { metadata } = readGitCompose(file.compose);
     return (
-        linked.find(({ service }) => metadata?.serviceId === service.id) ??
+        linked.find(({ resource }) => metadata?.resourceId === resource.id) ??
         linked.find((row) => pathFor(row, sourceId) === file.path) ??
         linked.find(
-            ({ service, workspace: wrk }) =>
-                file.path === `${wrk.slug}/${service.slug ?? service.id}/compose.yaml`,
+            ({ resource, workspace: wrk }) =>
+                file.path === `${wrk.slug}/${resource.slug ?? resource.id}/compose.yaml`,
         )
     );
 };
@@ -97,7 +97,7 @@ const findLinkedService = (
 const importFile = async (
     context: SyncContext,
     file: RepositoryComposeFile,
-): Promise<LinkedService> => {
+): Promise<LinkedResource> => {
     const { metadata, raw } = readGitCompose(file.compose);
     const location = inferComposeLocation(
         file.path,
@@ -105,10 +105,10 @@ const importFile = async (
     );
     if (
         location.workspaceName.length > 128 ||
-        location.serviceName.length > 128 ||
+        location.resourceName.length > 128 ||
         (location.groupName?.length ?? 0) > 80
     )
-        throw new GitComposeError("Workspace, service, or group folder name is too long");
+        throw new GitComposeError("Workspace, resource, or group folder name is too long");
     const sources = await db
         .select()
         .from(dataSource)
@@ -155,28 +155,28 @@ const importFile = async (
             .returning();
     }
     if (!wrk) throw new GitSyncError("Unable to create workspace");
-    const name = metadata?.name ?? location.serviceName;
+    const name = metadata?.name ?? location.resourceName;
     const slug = await uniqueSlug(
         name,
         async (candidate) =>
             (
                 await db
-                    .select({ id: services.id })
-                    .from(services)
-                    .where(eq(services.slug, candidate))
+                    .select({ id: resources.id })
+                    .from(resources)
+                    .where(eq(resources.slug, candidate))
             ).length > 0,
     );
     const importedSlug = metadata?.slug ?? slug;
     const [occupied] = await db
-        .select({ id: services.id })
-        .from(services)
-        .where(eq(services.slug, importedSlug));
+        .select({ id: resources.id })
+        .from(resources)
+        .where(eq(resources.slug, importedSlug));
     if (occupied)
         throw new GitSyncError(
-            "The Git service slug is already used by another service; choose a unique slug and matching formatted names",
+            "The Git resource slug is already used by another resource; choose a unique slug and matching formatted names",
         );
-    const [service] = await db
-        .insert(services)
+    const [resource] = await db
+        .insert(resources)
         .values({
             workspaceId: wrk.id,
             name,
@@ -187,39 +187,39 @@ const importFile = async (
             settings: { sourcePath: file.path, shouldPrefix: metadata?.shouldPrefix ?? false },
         })
         .returning();
-    if (!service) throw new GitSyncError("Unable to import service");
-    service.gitSync = {
+    if (!resource) throw new GitSyncError("Unable to import resource");
+    resource.gitSync = {
         sourceId: context.source.id,
         path: file.path,
-        appHash: composeFingerprint(exportGitCompose(service, wrk)),
+        appHash: composeFingerprint(exportGitCompose(resource, wrk)),
         repoHash: composeFingerprint(file.compose),
     };
     const [updated] = await db
-        .update(services)
-        .set({ gitSync: service.gitSync })
-        .where(eq(services.id, service.id))
+        .update(resources)
+        .set({ gitSync: resource.gitSync })
+        .where(eq(resources.id, resource.id))
         .returning();
-    if (!updated) throw new GitSyncError("Imported service was removed during sync");
+    if (!updated) throw new GitSyncError("Imported resource was removed during sync");
     context.result.imported += 1;
-    return { service: updated, workspace: wrk };
+    return { resource: updated, workspace: wrk };
 };
 
 const updateFromCommit = async (
     context: SyncContext,
-    row: LinkedService,
+    row: LinkedResource,
     file: RepositoryComposeFile,
-): Promise<{ raw: string; service: Service }> => {
-    const { service, workspace: wrk } = row;
+): Promise<{ raw: string; resource: Resource }> => {
+    const { resource, workspace: wrk } = row;
     const prefix =
-        service.settings.shouldPrefix === false ? undefined : (service.slug ?? service.id);
+        resource.settings.shouldPrefix === false ? undefined : (resource.slug ?? resource.id);
     const decoded = readGitCompose(file.compose, prefix);
-    const appExport = exportGitCompose(service, wrk);
+    const appExport = exportGitCompose(resource, wrk);
     const appHash = composeFingerprint(appExport);
     const repoHash = composeFingerprint(file.compose);
-    const base = stateFor(service, context.source.id);
+    const base = stateFor(resource, context.source.id);
     const legacyMatches =
         !decoded.metadata &&
-        composeFingerprint(formatComposeFile(service.value ?? "", prefix).yaml) ===
+        composeFingerprint(formatComposeFile(resource.value ?? "", prefix).yaml) ===
             composeFingerprint(decoded.formatted);
     const moved = Boolean(base && base.path !== file.path);
     const comparisonBase = moved && base ? { ...base, repoHash: "moved" } : base;
@@ -233,8 +233,8 @@ const updateFromCommit = async (
             "Both the app and Git differ. Reconcile the Compose/settings in the app with this Git version, then sync again; neither version was overwritten",
         );
     }
-    const remoteService: Service = {
-        ...service,
+    const remoteResource: Resource = {
+        ...resource,
         value: decoded.raw,
         ...(decoded.metadata
             ? {
@@ -242,14 +242,14 @@ const updateFromCommit = async (
                   slug: decoded.metadata.slug,
                   icon: decoded.metadata.icon,
                   groupName: decoded.metadata.groupName,
-                  settings: { ...service.settings, shouldPrefix: decoded.metadata.shouldPrefix },
+                  settings: { ...resource.settings, shouldPrefix: decoded.metadata.shouldPrefix },
               }
             : {}),
     };
     const remotePrefix =
-        remoteService.settings.shouldPrefix === false
+        remoteResource.settings.shouldPrefix === false
             ? undefined
-            : (remoteService.slug ?? remoteService.id);
+            : (remoteResource.slug ?? remoteResource.id);
     if (
         composeFingerprint(formatComposeFile(decoded.raw, remotePrefix).yaml) !==
         composeFingerprint(decoded.formatted)
@@ -264,7 +264,7 @@ const updateFromCommit = async (
             file.path,
             repositoryName(context.source.url ?? "Repository"),
         );
-        remoteService.groupName = location.groupName;
+        remoteResource.groupName = location.groupName;
         if (location.workspaceName !== wrk.slug && location.workspaceName !== wrk.name) {
             const candidates = await db
                 .select({ workspace })
@@ -281,11 +281,11 @@ const updateFromCommit = async (
                     "Create the destination workspace in the app before moving this Git folder",
                 );
             targetWorkspace = existing;
-            remoteService.workspaceId = existing.id;
+            remoteResource.workspaceId = existing.id;
         }
     }
-    const next = direction === "pull" ? remoteService : service;
-    const gitSync: GitServiceSyncState = {
+    const next = direction === "pull" ? remoteResource : resource;
+    const gitSync: GitResourceSyncState = {
         sourceId: context.source.id,
         path: file.path,
         repoHash,
@@ -295,7 +295,7 @@ const updateFromCommit = async (
                 : composeFingerprint(exportGitCompose(next, targetWorkspace)),
     };
     const updated = await db
-        .update(services)
+        .update(resources)
         .set({
             ...(direction === "pull"
                 ? {
@@ -310,40 +310,40 @@ const updateFromCommit = async (
                 : {}),
             gitSync,
         })
-        .where(and(eq(services.id, service.id), eq(services.updatedAt, service.updatedAt)))
+        .where(and(eq(resources.id, resource.id), eq(resources.updatedAt, resource.updatedAt)))
         .returning();
     if (!updated[0])
-        throw new GitSyncError("The service changed while syncing; retry to use its latest edits");
+        throw new GitSyncError("The resource changed while syncing; retry to use its latest edits");
     if (direction === "pull") context.result.updated += 1;
-    return { raw: decoded.raw, service: remoteService };
+    return { raw: decoded.raw, resource: remoteResource };
 };
 
-const commitDeploymentId = (sourceId: string, serviceId: string, commit: string): string => {
-    const hash = createHash("sha256").update(`${sourceId}:${serviceId}:${commit}`).digest("hex");
+const commitDeploymentId = (sourceId: string, resourceId: string, commit: string): string => {
+    const hash = createHash("sha256").update(`${sourceId}:${resourceId}:${commit}`).digest("hex");
     return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}`;
 };
 
-const deployCommitService = async (
+const deployCommitResource = async (
     context: SyncContext,
-    service: Service,
+    resource: Resource,
     commit: string,
     gitCompose: string,
     gitValidationError?: string,
 ): Promise<void> => {
-    const snapshot = await captureDeploymentSnapshot(service.id);
-    snapshot.service = {
-        ...snapshot.service,
-        groupName: service.groupName,
-        name: service.name,
-        slug: service.slug,
-        value: service.value,
-        icon: service.icon,
-        settings: service.settings,
+    const snapshot = await captureDeploymentSnapshot(resource.id);
+    snapshot.resource = {
+        ...snapshot.resource,
+        groupName: resource.groupName,
+        name: resource.name,
+        slug: resource.slug,
+        value: resource.value,
+        icon: resource.icon,
+        settings: resource.settings,
     };
     snapshot.gitCommit = commit;
     snapshot.gitCompose = gitCompose;
     snapshot.gitValidationError = gitValidationError;
-    const deploymentId = commitDeploymentId(context.source.id, service.id, commit);
+    const deploymentId = commitDeploymentId(context.source.id, resource.id, commit);
     const [existing] = await db
         .select({ id: deployments.id })
         .from(deployments)
@@ -354,7 +354,7 @@ const deployCommitService = async (
 
 const processCommit = async (context: SyncContext, commit: string): Promise<boolean> => {
     const files = await readCommitComposeFiles(context.repo, commit, context.cache);
-    const previousServiceIds = new Set<string>();
+    const previousResourceIds = new Set<string>();
     if (context.source.lastSyncedCommit) {
         const previousFiles = await readCommitComposeFiles(
             context.repo,
@@ -364,25 +364,25 @@ const processCommit = async (context: SyncContext, commit: string): Promise<bool
         for (const file of previousFiles) {
             try {
                 const metadata = readGitCompose(file.compose).metadata;
-                if (metadata) previousServiceIds.add(metadata.serviceId);
+                if (metadata) previousResourceIds.add(metadata.resourceId);
             } catch {
                 // A broken earlier file must not prevent importing its fixing commit.
             }
         }
     }
-    const linked = await listLinkedServices(context.source.id);
+    const linked = await listLinkedResources(context.source.id);
     const seen = new Set<string>();
     let successful = true;
     for (const file of files) {
         let matched = linked.find((row) => pathFor(row, context.source.id) === file.path);
         try {
-            let row = findLinkedService(file, linked, context.source.id);
+            let row = findLinkedResource(file, linked, context.source.id);
             if (!row) {
                 const metadata = readGitCompose(file.compose).metadata;
-                if (metadata && previousServiceIds.has(metadata.serviceId)) {
+                if (metadata && previousResourceIds.has(metadata.resourceId)) {
                     addIssue(
                         context,
-                        `${file.path}: this service was deleted in the app. Remove its Git file to complete the deletion; it was not recreated.`,
+                        `${file.path}: this resource was deleted in the app. Remove its Git file to complete the deletion; it was not recreated.`,
                     );
                     continue;
                 }
@@ -390,22 +390,22 @@ const processCommit = async (context: SyncContext, commit: string): Promise<bool
                 linked.push(row);
             }
             matched = row;
-            if (seen.has(row.service.id))
-                throw new GitSyncError("Multiple Compose files map to this service");
-            seen.add(row.service.id);
+            if (seen.has(row.resource.id))
+                throw new GitSyncError("Multiple Compose files map to this resource");
+            seen.add(row.resource.id);
             const prepared = await updateFromCommit(context, row, file);
-            await deployCommitService(
+            await deployCommitResource(
                 context,
-                prepared.service,
+                prepared.resource,
                 commit,
                 readGitCompose(file.compose).formatted,
             );
         } catch (error) {
             if (error instanceof GitComposeError && matched) {
-                seen.add(matched.service.id);
-                await deployCommitService(
+                seen.add(matched.resource.id);
+                await deployCommitResource(
                     context,
-                    matched.service,
+                    matched.resource,
                     commit,
                     file.compose,
                     error.message,
@@ -417,11 +417,11 @@ const processCommit = async (context: SyncContext, commit: string): Promise<bool
         }
     }
     for (const row of linked) {
-        if (!seen.has(row.service.id) && stateFor(row.service, context.source.id)) {
+        if (!seen.has(row.resource.id) && stateFor(row.resource, context.source.id)) {
             successful = false;
             addIssue(
                 context,
-                `${pathFor(row, context.source.id)} @ ${commit.slice(0, 8)}: file removed or renamed without its x-stoat identity. The app service was preserved.`,
+                `${pathFor(row, context.source.id)} @ ${commit.slice(0, 8)}: file removed or renamed without its x-stoat identity. The app resource was preserved.`,
             );
         }
     }
@@ -451,22 +451,22 @@ const processHistory = async (context: SyncContext): Promise<boolean> => {
 
 const publishAppChanges = async (
     context: SyncContext,
-    requestedServiceId?: string,
+    requestedResourceId?: string,
 ): Promise<void> => {
-    const linked = await listLinkedServices(context.source.id);
+    const linked = await listLinkedResources(context.source.id);
     const head = await headCommit(context.repo);
     const files = head ? await readCommitComposeFiles(context.repo, head, context.cache) : [];
     const writes: { path: string; compose: string }[] = [];
     const removals: string[] = [];
     for (const row of linked) {
-        if (requestedServiceId && row.service.id !== requestedServiceId) continue;
-        if (!row.service.value) continue;
+        if (requestedResourceId && row.resource.id !== requestedResourceId) continue;
+        if (!row.resource.value) continue;
         const relativePath = pathFor(row, context.source.id);
         const currentFile = files.find((file) => file.path === relativePath);
-        const compose = exportGitCompose(row.service, row.workspace);
+        const compose = exportGitCompose(row.resource, row.workspace);
         if (currentFile && composeFingerprint(compose) === composeFingerprint(currentFile.compose))
             continue;
-        const base = stateFor(row.service, context.source.id);
+        const base = stateFor(row.resource, context.source.id);
         if (base && !currentFile)
             throw new GitSyncError(
                 `Git deleted ${relativePath}; restore or reconcile it before publishing`,
@@ -476,20 +476,20 @@ const publishAppChanges = async (
         const metadata = currentFile ? readGitCompose(currentFile.compose).metadata : null;
         const structureChanged =
             metadata &&
-            (metadata.groupName !== (row.service.groupName ?? null) ||
+            (metadata.groupName !== (row.resource.groupName ?? null) ||
                 metadata.workspaceId !== row.workspace.id ||
                 metadata.workspaceSlug !== row.workspace.slug ||
-                metadata.slug !== row.service.slug);
+                metadata.slug !== row.resource.slug);
         const targetPath = structureChanged
-            ? canonicalComposePath(row.service, row.workspace)
+            ? canonicalComposePath(row.resource, row.workspace)
             : relativePath;
         if (targetPath !== relativePath) {
             if (files.some((file) => file.path === targetPath))
-                throw new GitSyncError(`Another service already uses ${targetPath}`);
+                throw new GitSyncError(`Another resource already uses ${targetPath}`);
             removals.push(relativePath);
         }
         if (writes.some((file) => file.path === targetPath))
-            throw new GitSyncError(`Multiple services map to ${targetPath}`);
+            throw new GitSyncError(`Multiple resources map to ${targetPath}`);
         writes.push({ compose, path: targetPath });
     }
     // Complete validation before writing any file. Never stage unrelated repository content.
@@ -610,15 +610,13 @@ export const syncGitSource = async (
         return context.result;
     });
 
-/** Publish before enqueue so the durable snapshot and deployment record have a commit. */
-export const publishServiceDeployment = async (
-    snapshot: DeploymentSnapshot,
-): Promise<{ deploymentId: string; jobId: string }> =>
+/** Git sync for a manual deployment snapshot. Mutates snapshot with commit/compose. */
+export const attachGitCommitToSnapshot = async (snapshot: DeploymentSnapshot): Promise<string> =>
     await withSourceRepository(snapshot.git.id, async (context) => {
         const [current] = await db
             .select()
-            .from(services)
-            .where(eq(services.id, snapshot.service.id));
+            .from(resources)
+            .where(eq(resources.id, snapshot.resource.id));
         const [currentWorkspace] = current
             ? await db.select().from(workspace).where(eq(workspace.id, current.workspaceId))
             : [];
@@ -626,27 +624,36 @@ export const publishServiceDeployment = async (
             !current ||
             !currentWorkspace ||
             exportGitCompose(current, currentWorkspace) !==
-                exportGitCompose(snapshot.service, snapshot.workspace)
+                exportGitCompose(snapshot.resource, snapshot.workspace)
         ) {
             throw new GitSyncError(
-                "Service configuration changed during Git sync. Refresh the service before deploying.",
+                "Resource configuration changed during Git sync. Refresh the resource before deploying.",
             );
         }
-        await publishAppChanges(context, snapshot.service.id);
+        await publishAppChanges(context, snapshot.resource.id);
         const commit = await headCommit(context.repo);
         if (!commit) throw new GitSyncError("The repository does not have a commit to deploy");
         snapshot.gitCommit = commit;
         snapshot.gitCompose = exportGitCompose(current, currentWorkspace);
-        if (context.source.lastSyncedCommit !== commit) {
-            const deploymentId = commitDeploymentId(snapshot.git.id, snapshot.service.id, commit);
-            const [deployment] = await db
-                .select()
-                .from(deployments)
-                .where(eq(deployments.id, deploymentId));
-            if (!deployment) return await enqueueDeployment(snapshot, { deploymentId });
-            if (!deployment.finishedAt)
-                return { deploymentId, jobId: deployment.jobId ?? deploymentId };
-        }
-        // An explicit redeploy of unchanged configuration still records the same Git commit.
-        return await enqueueDeployment(snapshot);
+        return commit;
     });
+
+/** Publish before enqueue so the durable snapshot and deployment record have a commit. */
+export const publishResourceDeployment = async (
+    snapshot: DeploymentSnapshot,
+): Promise<{ deploymentId: string; jobId: string }> => {
+    const commit = await attachGitCommitToSnapshot(snapshot);
+    const [source] = await db.select().from(gitSource).where(eq(gitSource.id, snapshot.git.id));
+    if (source?.lastSyncedCommit !== commit) {
+        const deploymentId = commitDeploymentId(snapshot.git.id, snapshot.resource.id, commit);
+        const [deployment] = await db
+            .select()
+            .from(deployments)
+            .where(eq(deployments.id, deploymentId));
+        if (!deployment) return await enqueueDeployment(snapshot, { deploymentId });
+        if (!deployment.finishedAt)
+            return { deploymentId, jobId: deployment.jobId ?? deploymentId };
+    }
+    // An explicit redeploy of unchanged configuration still records the same Git commit.
+    return await enqueueDeployment(snapshot);
+};

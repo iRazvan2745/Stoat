@@ -45,6 +45,9 @@
         parseAsString.withDefault("")
     );
     let dataSourceMenuOpen = $state(false);
+    let creating = $state(false);
+
+    const workspaces = $derived(workspace.current ?? []);
 
     const selectedDataSource = $derived(
         dataSources.current?.find(
@@ -59,7 +62,7 @@
     const hasSelectedDataSource = $derived(selectedDataSource !== undefined);
 
     const create = async (): Promise<void> => {
-        if (!newWorkspace.name.current.trim()) {
+        if (!newWorkspace.name.current.trim() || creating) {
             return;
         }
 
@@ -67,6 +70,8 @@
             snackbar("Attach a data source before creating a workspace");
             return;
         }
+
+        creating = true;
 
         try {
             await createWorkspace({
@@ -89,6 +94,8 @@
                     ? error.message
                     : "Unable to create workspace"
             );
+        } finally {
+            creating = false;
         }
     };
 
@@ -101,6 +108,8 @@
     const closeCreateDialog = (): void => {
         dataSourceMenuOpen = false;
         createWorkspaceDialogOpen.set(false);
+        newWorkspace.set({ name: "" });
+        dataSourceId.set("");
     };
 
     const selectDataSource = (id: string): void => {
@@ -115,29 +124,38 @@
 </script>
 
 <header class="flex items-center justify-between">
-    <p class="text-lg">Workspaces</p>
+    <h1 class="m3-font-headline-small text-on-surface">Workspaces</h1>
     <div class="flex items-center gap-2">
         <Button onclick={openCreateDialog}>Create Workspace</Button>
-        <Button variant="tonal" onclick={async () => await workspace.refresh()}>
+        <Button
+            variant="tonal"
+            aria-label="Refresh workspaces"
+            disabled={workspace.loading}
+            onclick={() => workspace.refresh()}
+        >
             <Icon icon={refreshIcon} />
         </Button>
     </div>
 </header>
 <main>
-    {#if workspace.loading}
+    {#if workspace.loading && !workspace.current}
         <div class="mt-10">
             <LoadingIndicator aria-label="Workspace loading indicator" />
         </div>
+    {:else if workspace.error}
+        <div class="text-error m3-font-body-medium p-6" role="alert">
+            {workspace.error.message}
+        </div>
     {:else}
-        {#if (await listWorkspaces()).length === 0}
-            <div class="text-on-surface-variant px-5 py-10 text-center text-sm">
-                No data sources found.
+        {#if workspaces.length === 0}
+            <div class="text-on-surface-variant m3-font-body-medium px-5 py-10 text-center">
+                No workspaces yet.
             </div>
         {/if}
         <div
             class="m:grid-cols-2 l:grid-cols-3 grid grid-cols-1 gap-2 xl:grid-cols-4"
         >
-            {#each await listWorkspaces() as wrk}
+            {#each workspaces as wrk (wrk.id)}
                 <div class="workspace-card">
                     <Card
                         variant="elevated"
@@ -167,8 +185,12 @@
             placeholder="Weasel"
         />
 
-        {#if dataSources.loading}
+        {#if dataSources.loading && !dataSources.current}
             <LoadingIndicator aria-label="Loading data sources" />
+        {:else if dataSources.error}
+            <p class="text-error m3-font-body-medium" role="alert">
+                {dataSources.error.message}
+            </p>
         {:else}
             <div class="data-source-picker">
                 <Button
@@ -217,7 +239,7 @@
                 {/if}
             </div>
             {#if (dataSources.current?.length ?? 0) === 0}
-                <p class="text-on-surface-variant text-sm">
+                <p class="text-on-surface-variant m3-font-body-medium">
                     Add a data source before creating a workspace.
                 </p>
             {/if}
@@ -227,7 +249,7 @@
     {#snippet buttons()}
         <Button variant="text" onclick={closeCreateDialog}>Cancel</Button>
 
-        <Button disabled={!hasSelectedDataSource} onclick={create}
+        <Button disabled={creating || !hasSelectedDataSource} onclick={create}
             >Create</Button
         >
     {/snippet}

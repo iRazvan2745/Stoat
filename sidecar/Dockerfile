@@ -12,7 +12,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /out/sidecar ./cmd/sid
 
 FROM alpine:3.23.3
 
-RUN apk --no-cache add ca-certificates \
+RUN apk --no-cache add ca-certificates util-linux \
     && addgroup -S sidecar \
     && adduser -S -G sidecar sidecar
 

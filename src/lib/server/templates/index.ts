@@ -6,7 +6,7 @@ import * as v from "valibot";
 
 import { parseEnvFile } from "#lib/domain/environment";
 import { ensureSvgNamespace, svglIconUrl } from "#lib/domain/templates";
-import type { ServiceTemplate, TemplateManifest, TemplateVersion } from "#lib/domain/templates";
+import type { ResourceTemplate, TemplateManifest, TemplateVersion } from "#lib/domain/templates";
 
 const TemplateManifestSchema = v.object({
     description: v.pipe(v.string(), v.minLength(1)),
@@ -195,13 +195,13 @@ export async function readTemplateManifest(appPath: string): Promise<TemplateMan
     return parsed.output;
 }
 
-export async function listTemplates(root = defaultTemplatesRoot()): Promise<ServiceTemplate[]> {
+export async function listTemplates(root = defaultTemplatesRoot()): Promise<ResourceTemplate[]> {
     if (!(await isDirectory(root))) {
         return [];
     }
 
     const entries = await fs.readdir(root, { withFileTypes: true });
-    const templates: ServiceTemplate[] = [];
+    const templates: ResourceTemplate[] = [];
 
     for (const entry of entries) {
         if (!entry.isDirectory() || !SAFE_SEGMENT.test(entry.name)) {

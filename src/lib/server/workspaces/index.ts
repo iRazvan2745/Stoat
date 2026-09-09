@@ -3,7 +3,14 @@ import fs from "node:fs/promises";
 import { eq, inArray } from "drizzle-orm";
 
 import { db } from "#lib/db";
-import { dataSource, environmentVariables, member, services, workspace } from "#lib/db/schema";
+import {
+    dataSource,
+    environmentVariables,
+    member,
+    resources,
+    workspace,
+    workspaceEnvironmentVariables,
+} from "#lib/db/schema";
 import { createWorkspaceFolder, workspacePath } from "#lib/server/data-sources/paths";
 import { uniqueSlug } from "#lib/server/shared/slugs";
 
@@ -84,16 +91,21 @@ export const deleteWorkspace = async (id: string) => {
     }
 
     const deleted = await db.transaction(async (tx) => {
-        // environment_variables.service_id is onDelete: "restrict", so the
-        // services rows cannot be deleted while variables still reference them.
-        const workspaceServices = tx
-            .select({ id: services.id })
-            .from(services)
-            .where(eq(services.workspaceId, id));
+        // environment_variables.resource_id is onDelete: "restrict", so the
+        // resources rows cannot be deleted while variables still reference them.
+        const workspaceResources = tx
+            .select({ id: resources.id })
+            .from(resources)
+            .where(eq(resources.workspaceId, id));
         await tx
             .delete(environmentVariables)
-            .where(inArray(environmentVariables.serviceId, workspaceServices));
-        await tx.delete(services).where(eq(services.workspaceId, id));
+            .where(inArray(environmentVariables.resourceId, workspaceResources));
+        await tx.delete(resources).where(eq(resources.workspaceId, id));
+        // workspace_environment_variables.workspace_id is onDelete: "restrict",
+        // so workspace-level variables must go before the workspace row.
+        await tx
+            .delete(workspaceEnvironmentVariables)
+            .where(eq(workspaceEnvironmentVariables.workspaceId, id));
 
         return await tx.delete(workspace).where(eq(workspace.id, id)).returning();
     });

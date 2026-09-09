@@ -6,7 +6,7 @@ import {
     buildDeploymentLogView,
     getChangeSummary,
     getEmptyLogFilterMessage,
-} from "../src/routes/(service)/workspace/[workspaceId]/[serviceId]/deployments/deployment-log-view.ts";
+} from "../src/routes/(resource)/workspace/[workspaceId]/[resourceId]/deployments/deployment-log-view.ts";
 
 const log = (
     partial: Partial<DeploymentLogRecord> & Pick<DeploymentLogRecord, "id" | "message">,

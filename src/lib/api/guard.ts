@@ -7,7 +7,7 @@ import { deployments } from "#lib/db/schema";
 import {
     hasAccessToThisDataSource,
     hasAccessToThisGitSource,
-    hasAccessToThisService,
+    hasAccessToThisResource,
     hasAccessToThisWorkspace,
 } from "#lib/server/access";
 
@@ -26,7 +26,7 @@ export const requireSession = (): AuthenticatedSession => {
     return locals.session;
 };
 
-const requireResourceAccess = async (
+const requireAccess = async (
     resourceId: string,
     checkAccess: AccessCheck,
 ): Promise<AuthenticatedSession> => {
@@ -40,23 +40,23 @@ const requireResourceAccess = async (
 };
 
 export const requireDataSourceAccess = (dataSourceId: string): Promise<AuthenticatedSession> =>
-    requireResourceAccess(dataSourceId, hasAccessToThisDataSource);
+    requireAccess(dataSourceId, hasAccessToThisDataSource);
 
 export const requireGitSourceAccess = (gitSourceId: string): Promise<AuthenticatedSession> =>
-    requireResourceAccess(gitSourceId, hasAccessToThisGitSource);
+    requireAccess(gitSourceId, hasAccessToThisGitSource);
 
 export const requireWorkspaceAccess = (workspaceId: string): Promise<AuthenticatedSession> =>
-    requireResourceAccess(workspaceId, hasAccessToThisWorkspace);
+    requireAccess(workspaceId, hasAccessToThisWorkspace);
 
-export const requireServiceAccess = (serviceId: string): Promise<AuthenticatedSession> =>
-    requireResourceAccess(serviceId, hasAccessToThisService);
+export const requireResourceAccess = (resourceId: string): Promise<AuthenticatedSession> =>
+    requireAccess(resourceId, hasAccessToThisResource);
 
 export const requireDeploymentAccess = async (
     deploymentId: string,
 ): Promise<AuthenticatedSession> => {
     const session = requireSession();
     const [deployment] = await db
-        .select({ serviceId: deployments.serviceId })
+        .select({ resourceId: deployments.resourceId })
         .from(deployments)
         .where(eq(deployments.id, deploymentId));
 
@@ -64,7 +64,7 @@ export const requireDeploymentAccess = async (
         error(404, "Deployment not found");
     }
 
-    if (!(await hasAccessToThisService(session.user.id, deployment.serviceId))) {
+    if (!(await hasAccessToThisResource(session.user.id, deployment.resourceId))) {
         error(403, "Forbidden");
     }
 

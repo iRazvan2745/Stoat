@@ -5,15 +5,14 @@ import path from "node:path";
 import * as v from "valibot";
 import YAML, { isNode } from "yaml";
 
-import type { GitServiceSyncState } from "#lib/domain/git-sync";
-import type { ServiceSettings } from "#lib/domain/services/settings";
+import type { GitResourceSyncState } from "#lib/domain/git-sync";
+import type { ResourceSettings } from "#lib/domain/resources/settings";
 import { formatComposeFile, unformatComposeFile } from "#lib/server/deployments/deployment-compose";
 
 const Name = v.pipe(v.string(), v.minLength(1), v.maxLength(128));
 const Slug = v.pipe(v.string(), v.regex(/^[a-z0-9][a-z0-9-]*$/u));
 const MetadataInput = v.object({
     version: v.literal(1),
-    serviceId: Name,
     workspaceId: Name,
     dataSourceId: Name,
     name: v.nullable(Name),
@@ -23,17 +22,18 @@ const MetadataInput = v.object({
     groupName: v.nullable(v.pipe(v.string(), v.minLength(1), v.maxLength(80))),
     icon: v.nullable(v.string()),
     shouldPrefix: v.boolean(),
+    resourceId: Name,
 });
 export type GitComposeMetadata = v.InferOutput<typeof MetadataInput>;
 
-export interface GitComposeService {
+export interface GitComposeResource {
     id: string;
     name: string | null;
     slug: string | null;
     groupName?: string | null;
     icon: string | null;
     value: string | null;
-    settings: ServiceSettings;
+    settings: ResourceSettings;
 }
 
 export interface GitComposeWorkspace {
@@ -47,30 +47,30 @@ export const composeFingerprint = (value: string): string =>
     createHash("sha256").update(YAML.parseDocument(value).toString()).digest("hex");
 
 export const metadataFor = (
-    service: GitComposeService,
+    resource: GitComposeResource,
     workspace: GitComposeWorkspace,
 ): GitComposeMetadata => ({
     version: 1,
-    serviceId: service.id,
+    resourceId: resource.id,
     workspaceId: workspace.id,
     dataSourceId: workspace.dataSourceId,
-    name: service.name,
-    slug: service.slug ?? service.id,
+    name: resource.name,
+    slug: resource.slug ?? resource.id,
     workspaceName: workspace.name,
     workspaceSlug: workspace.slug,
-    groupName: service.groupName ?? null,
-    icon: service.icon,
-    shouldPrefix: service.settings.shouldPrefix !== false,
+    groupName: resource.groupName ?? null,
+    icon: resource.icon,
+    shouldPrefix: resource.settings.shouldPrefix !== false,
 });
 
 /** Git stores deployment names and non-secret app metadata; values remain uninlined. */
 export const exportGitCompose = (
-    service: GitComposeService,
+    resource: GitComposeResource,
     workspace: GitComposeWorkspace,
 ): string => {
-    const metadata = metadataFor(service, workspace);
+    const metadata = metadataFor(resource, workspace);
     const formatted = formatComposeFile(
-        service.value ?? "",
+        resource.value ?? "",
         metadata.shouldPrefix ? metadata.slug : undefined,
     );
     if (formatted.serviceCount === 0)
@@ -94,7 +94,7 @@ export const readGitCompose = (
     const extension: unknown = isNode(node) ? node.toJSON() : node;
     const parsed = extension === undefined ? null : v.safeParse(MetadataInput, extension);
     if (parsed && !parsed.success) throw new GitComposeError("Invalid x-stoat metadata");
-    const metadata = parsed?.output ?? null;
+    const metadata: GitComposeMetadata | null = parsed?.output ?? null;
     document.delete("x-stoat");
     const formatted = document.toString();
     const prefix = metadata ? (metadata.shouldPrefix ? metadata.slug : undefined) : fallbackPrefix;
@@ -110,14 +110,14 @@ export const readGitCompose = (
 };
 
 export const canonicalComposePath = (
-    service: GitComposeService,
+    resource: GitComposeResource,
     workspace: GitComposeWorkspace,
 ): string => {
     // Percent encoding keeps group labels reversible and prevents path traversal.
     const folders = [workspace.slug];
-    if (service.groupName)
-        folders.push(encodeURIComponent(service.groupName).replaceAll(".", "%2E"));
-    folders.push(service.slug ?? service.id, "compose.yaml");
+    if (resource.groupName)
+        folders.push(encodeURIComponent(resource.groupName).replaceAll(".", "%2E"));
+    folders.push(resource.slug ?? resource.id, "compose.yaml");
     return folders.join("/");
 };
 
@@ -136,7 +136,7 @@ export const assertRepositoryPath = (relativePath: string): void => {
 export const inferComposeLocation = (
     relativePath: string,
     repository: string,
-): { workspaceName: string; serviceName: string; groupName: string | null } => {
+): { workspaceName: string; resourceName: string; groupName: string | null } => {
     assertRepositoryPath(relativePath);
     const folders = relativePath.split("/").slice(0, -1);
     let groupName: string | null = null;
@@ -149,7 +149,7 @@ export const inferComposeLocation = (
     }
     return {
         workspaceName: folders.length >= 2 ? (folders[0] ?? repository) : repository,
-        serviceName: folders.at(-1) ?? repository,
+        resourceName: folders.at(-1) ?? repository,
         groupName,
     };
 };
@@ -159,7 +159,7 @@ export type SyncDirection = "unchanged" | "pull" | "push" | "conflict";
 export const syncDirection = (
     appHash: string,
     repoHash: string,
-    base: GitServiceSyncState | null,
+    base: GitResourceSyncState | null,
 ): SyncDirection => {
     if (appHash === repoHash) return "unchanged";
     if (!base) return "conflict";

@@ -10,11 +10,12 @@ import (
 )
 
 type deployProgressWriter struct {
+	ctx    context.Context
 	events chan<- DeployComposeEvent
 }
 
-func newDeployProgressWriter(events chan<- DeployComposeEvent) *deployProgressWriter {
-	return &deployProgressWriter{events: events}
+func newDeployProgressWriter(ctx context.Context, events chan<- DeployComposeEvent) *deployProgressWriter {
+	return &deployProgressWriter{ctx: ctx, events: events}
 }
 
 func (w *deployProgressWriter) Start(context.Context) error { return nil }
@@ -22,16 +23,31 @@ func (w *deployProgressWriter) Start(context.Context) error { return nil }
 func (w *deployProgressWriter) Stop() {}
 
 func (w *deployProgressWriter) Event(event progress.Event) {
-	w.events <- progressComposeEvent(event)
+	_ = emitDeployComposeEvent(w.ctx, w.events, progressComposeEvent(event))
 }
 
 func (w *deployProgressWriter) Events(events []progress.Event) {
 	for _, event := range events {
-		w.Event(event)
+		if !emitDeployComposeEvent(w.ctx, w.events, progressComposeEvent(event)) {
+			return
+		}
 	}
 }
 
 func (w *deployProgressWriter) TailMsgf(string, ...any) {}
+
+func emitDeployComposeEvent(
+	ctx context.Context,
+	events chan<- DeployComposeEvent,
+	event DeployComposeEvent,
+) bool {
+	select {
+	case events <- event:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
 
 func progressComposeEvent(event progress.Event) DeployComposeEvent {
 	return DeployComposeEvent{
@@ -153,24 +169,26 @@ func runComposeDeployment(
 ) {
 	plan, err := composeDeploy.Plan(ctx)
 	if err != nil {
-		events <- DeployComposeEvent{Type: "error", Error: err.Error()}
+		emitDeployComposeEvent(ctx, events, DeployComposeEvent{Type: "error", Error: err.Error()})
 		return
 	}
 	if plan.IsEmpty() {
-		events <- DeployComposeEvent{Type: "complete", DeployStatus: "up to date"}
+		emitDeployComposeEvent(ctx, events, DeployComposeEvent{Type: "complete", DeployStatus: "up to date"})
 		return
 	}
 
-	events <- DeployComposeEvent{
+	if !emitDeployComposeEvent(ctx, events, DeployComposeEvent{
 		Type:       "plan",
 		Operations: planOperationsFromCompose(plan),
-	}
-
-	deployCtx := progress.WithContextWriter(ctx, newDeployProgressWriter(events))
-	if err := plan.Execute(deployCtx, cli); err != nil {
-		events <- DeployComposeEvent{Type: "error", Error: err.Error()}
+	}) {
 		return
 	}
 
-	events <- DeployComposeEvent{Type: "complete", DeployStatus: "deployed"}
+	deployCtx := progress.WithContextWriter(ctx, newDeployProgressWriter(ctx, events))
+	if err := plan.Execute(deployCtx, cli); err != nil {
+		emitDeployComposeEvent(ctx, events, DeployComposeEvent{Type: "error", Error: err.Error()})
+		return
+	}
+
+	emitDeployComposeEvent(ctx, events, DeployComposeEvent{Type: "complete", DeployStatus: "deployed"})
 }

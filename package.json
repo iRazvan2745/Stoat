@@ -23,7 +23,7 @@
         "db:studio": "drizzle-kit studio",
         "auth:schema": "auth generate --config src/lib/auth/index --output src/lib/db/auth.schema.ts --yes",
         "test": "vp test",
-        "test:git-sync": "vp test --config integration/vite.config.ts",
+        "test:git-sync": "vp test --config vite.integration.config.ts",
         "fix": "ultracite fix",
         "generate:schema": "task_schema=$(mktemp) && (cd sidecar && go run ./cmd/openapi > \"$task_schema\") && openapi-typescript \"$task_schema\" -o schema.d.ts && rm \"$task_schema\""
     },
@@ -59,7 +59,7 @@
         "@tailwindcss/vite": "^4.3.3",
         "@types/node": "^24.13.3",
         "auth": "^1.7.2",
-        "better-auth": "^1.7.2",
+        "better-auth": "^1.7.3",
         "drizzle-kit": "1.0.0-rc.5-ab785fc",
         "drizzle-orm": "1.0.0-rc.5-ab785fc",
         "lefthook": "^2.1.12",

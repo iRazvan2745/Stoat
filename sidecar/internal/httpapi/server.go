@@ -30,6 +30,8 @@ import (
 
 const (
 	maxExecOutputBytes   = 1024 * 1024
+	maxRequestBodyBytes  = 8 * 1024 * 1024
+	maxComposeFileBytes  = 4 * 1024 * 1024
 	uncloudMetricsPort   = 51090
 	uncloudMetricsPath   = "/metrics"
 	metricsClientTimeout = 5 * time.Second
@@ -164,6 +166,7 @@ func New(backend Backend, cfg Config) (*Server, error) {
 	}
 	s.app = fiber.New(fiber.Config{
 		DisableStartupMessage: true,
+		BodyLimit:             maxRequestBodyBytes,
 		ErrorHandler:          s.errorHandler,
 	})
 	s.app.Use(recover.New(recover.Config{EnableStackTrace: false}))
@@ -523,9 +526,21 @@ func (s *Server) deployCompose(c *fiber.Ctx) error {
 	if err := decodeJSON(c, &request); err != nil {
 		return writeError(c, err)
 	}
+	if len(request.Compose) > base64.StdEncoding.EncodedLen(maxComposeFileBytes) {
+		return writeError(c, fiber.NewError(
+			fiber.StatusRequestEntityTooLarge,
+			"compose file must not exceed 4 MiB",
+		))
+	}
 	content, err := base64.StdEncoding.DecodeString(request.Compose)
 	if err != nil {
 		return writeError(c, fiber.NewError(fiber.StatusBadRequest, "invalid base64-encoded compose file: "+err.Error()))
+	}
+	if len(content) > maxComposeFileBytes {
+		return writeError(c, fiber.NewError(
+			fiber.StatusRequestEntityTooLarge,
+			"compose file must not exceed 4 MiB",
+		))
 	}
 	if len(bytes.TrimSpace(content)) == 0 {
 		return writeError(c, fiber.NewError(fiber.StatusBadRequest, "compose file must not be empty"))

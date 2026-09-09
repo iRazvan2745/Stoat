@@ -1,7 +1,7 @@
 import { count, desc, eq, sql } from "drizzle-orm";
 
 import { db } from "#lib/db";
-import { dataSource, deployments, gitSource, services, workspace } from "#lib/db/schema";
+import { dataSource, deployments, gitSource, resources, workspace } from "#lib/db/schema";
 
 const RECENT_DEPLOYMENT_LIMIT = 8;
 
@@ -15,13 +15,13 @@ export const getOrganizationOverview = async (organizationId: string) => {
                     dataSourceLabel: sql<string>`coalesce(${gitSource.name}, ${gitSource.url}, ${dataSource.uncloudUrl})`,
                     id: workspace.id,
                     name: workspace.name,
-                    serviceCount: count(services.id),
+                    resourceCount: count(resources.id),
                     slug: workspace.slug,
                 })
                 .from(workspace)
                 .innerJoin(dataSource, eq(dataSource.id, workspace.dataSourceId))
                 .innerJoin(gitSource, eq(gitSource.id, dataSource.gitSourceId))
-                .leftJoin(services, eq(services.workspaceId, workspace.id))
+                .leftJoin(resources, eq(resources.workspaceId, workspace.id))
                 .where(eq(workspace.organizationId, organizationId))
                 .groupBy(
                     workspace.id,
@@ -37,37 +37,37 @@ export const getOrganizationOverview = async (organizationId: string) => {
                 .from(dataSource)
                 .where(eq(dataSource.organizationId, organizationId)),
             db
-                .selectDistinctOn([deployments.serviceId], {
+                .selectDistinctOn([deployments.resourceId], {
                     finishedAt: deployments.finishedAt,
                     outcome: deployments.outcome,
-                    serviceId: deployments.serviceId,
+                    resourceId: deployments.resourceId,
                 })
                 .from(deployments)
-                .innerJoin(services, eq(services.id, deployments.serviceId))
-                .innerJoin(workspace, eq(workspace.id, services.workspaceId))
+                .innerJoin(resources, eq(resources.id, deployments.resourceId))
+                .innerJoin(workspace, eq(workspace.id, resources.workspaceId))
                 .where(eq(workspace.organizationId, organizationId))
-                .orderBy(deployments.serviceId, desc(deployments.createdAt), desc(deployments.id)),
+                .orderBy(deployments.resourceId, desc(deployments.createdAt), desc(deployments.id)),
             db
                 .select({
                     createdAt: deployments.createdAt,
                     finishedAt: deployments.finishedAt,
                     id: deployments.id,
                     outcome: deployments.outcome,
-                    serviceId: services.id,
-                    serviceName: services.name,
+                    resourceId: resources.id,
+                    resourceName: resources.name,
                     workspaceId: workspace.id,
                     workspaceName: workspace.name,
                 })
                 .from(deployments)
-                .innerJoin(services, eq(services.id, deployments.serviceId))
-                .innerJoin(workspace, eq(workspace.id, services.workspaceId))
+                .innerJoin(resources, eq(resources.id, deployments.resourceId))
+                .innerJoin(workspace, eq(workspace.id, resources.workspaceId))
                 .where(eq(workspace.organizationId, organizationId))
                 .orderBy(desc(deployments.createdAt), desc(deployments.id))
                 .limit(RECENT_DEPLOYMENT_LIMIT),
         ]);
 
-    const serviceCount = workspaceRows.reduce(
-        (total, workspaceRow) => total + workspaceRow.serviceCount,
+    const resourceCount = workspaceRows.reduce(
+        (total, workspaceRow) => total + workspaceRow.resourceCount,
         0,
     );
     const activeDeploymentCount = latestDeployments.filter(
@@ -82,7 +82,7 @@ export const getOrganizationOverview = async (organizationId: string) => {
         dataSourceCount: dataSourceTotal?.count ?? 0,
         failedDeploymentCount,
         recentDeployments,
-        serviceCount,
+        resourceCount,
         workspaces: workspaceRows,
     };
 };

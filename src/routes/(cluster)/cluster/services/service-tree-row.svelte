@@ -60,14 +60,14 @@
         </div>
 
         <div class="min-w-0">
-            <div class="text-on-surface truncate text-sm font-medium">
+            <div class="m3-font-label-large text-on-surface truncate">
                 {label}
             </div>
 
             <div
                 class="
           text-on-surface-variant
-          truncate font-mono text-[11px]
+          m3-font-label-small truncate font-mono
         "
             >
                 {service.id}
@@ -79,8 +79,7 @@
     <div>
         <span
             class={[
-                "inline-flex rounded-full px-2.5 py-1",
-                "text-xs font-medium capitalize",
+                "m3-font-label-medium inline-flex rounded-full px-2.5 py-1 capitalize",
                 modeClasses(service.mode),
             ]}
         >
@@ -95,8 +94,9 @@
                 class="
           bg-surface-container
           text-on-surface-variant
+          m3-font-label-medium
           truncate rounded-full
-          px-2.5 py-1 text-xs
+          px-2.5 py-1
         "
             >
                 {container.machineName}
@@ -105,7 +105,7 @@
     </div>
 
     <!-- Containers -->
-    <div class="text-on-surface text-sm">
+    <div class="m3-font-body-medium text-on-surface">
         {service.containers.length}
     </div>
 </div>

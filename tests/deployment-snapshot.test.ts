@@ -21,13 +21,13 @@ it("serializes enqueue data before later configuration edits", () => {
             url: "https://old.example/repository.git",
             username: "git",
         },
-        service: {
+        resource: {
             groupName: null,
             icon: "old-icon",
-            id: "service",
-            name: "Old service",
+            id: "resource",
+            name: "Old resource",
             settings: {},
-            slug: "old-service",
+            slug: "old-resource",
             type: "compose",
             value: "services:\n  old:\n    image: old:1\n",
             workspaceId: "workspace",
@@ -55,12 +55,12 @@ it("serializes enqueue data before later configuration edits", () => {
     const queued = JSON.parse(JSON.stringify(encoded)) as DeploymentSnapshot;
 
     record.git.url = "https://new.example/repository.git";
-    record.service.value = "services:\n  new:\n    image: new:2\n";
+    record.resource.value = "services:\n  new:\n    image: new:2\n";
     record.source.uncloudToken = "new-uncloud-token";
     record.source.uncloudUrl = "https://new.uncloud.example";
     variable.value = "new-target";
 
-    expect(queued.service.value).toContain("old:1");
+    expect(queued.resource.value).toContain("old:1");
     expect(queued.environment).toEqual([{ name: "DEPLOY_TARGET", value: "old-target" }]);
     expect(queued.source).toMatchObject({
         uncloudToken: "old-uncloud-token",

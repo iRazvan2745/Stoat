@@ -256,7 +256,7 @@
 
         {#if canScrollY}
             <div
-                class="bg-outline-variant/50 absolute top-1 right-1 bottom-1 w-1.5 rounded-full opacity-0 group-hover:opacity-100"
+                class="bg-outline-variant/50 absolute top-1 right-1 bottom-1 w-1.5 rounded-full opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 group-focus-within:opacity-100"
             >
                 <motion.div
                     class="bg-outline absolute w-full rounded-full"
@@ -270,7 +270,7 @@
 
         {#if canScrollX}
             <div
-                class="bg-outline-variant/50 absolute right-1 bottom-1 left-1 h-1.5 rounded-full opacity-0 group-hover:opacity-100"
+                class="bg-outline-variant/50 absolute right-1 bottom-1 left-1 h-1.5 rounded-full opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 group-focus-within:opacity-100"
             >
                 <motion.div
                     class="bg-outline absolute h-full rounded-full"

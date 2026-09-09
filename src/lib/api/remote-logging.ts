@@ -47,6 +47,7 @@ const SAFE_IDENTIFIER_KEYS = new Set([
     "dataSourceId",
     "deploymentId",
     "id",
+    "resourceId",
     "serviceId",
     "version",
     "workspaceId",

@@ -4,7 +4,7 @@ import {
     findPublishedTcpPort,
     listComposePorts,
     parseComposePortSpec,
-} from "#lib/server/services/compose-ports";
+} from "#lib/server/resources/compose-ports";
 
 describe("parseComposePortSpec", () => {
     it("parses docker short, mapped, and host-ip forms", () => {

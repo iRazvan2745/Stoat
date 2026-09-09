@@ -28,8 +28,8 @@ services:
 volumes:
   data:
 `;
-const service = {
-    id: "svc",
+const resource = {
+    id: "res",
     name: "Web",
     slug: "web-abc12",
     groupName: "Customer apps",
@@ -45,7 +45,7 @@ const workspace = {
 };
 
 it("round-trips formatting and metadata while retaining unformatted app names and comments", () => {
-    const exported = exportGitCompose(service, workspace);
+    const exported = exportGitCompose(resource, workspace);
     expect(exported).toContain("web-abc12-web:");
     expect(exported).toContain("web-abc12-data:/data");
     expect(exported).toContain('upstreams "web-abc12-db"');
@@ -54,7 +54,7 @@ it("round-trips formatting and metadata while retaining unformatted app names an
     expect(decoded.raw).toContain("# keep my jokes, clanker");
     expect(decoded.raw).not.toContain("x-stoat");
     expect(decoded.metadata).toMatchObject({
-        serviceId: "svc",
+        resourceId: "res",
         groupName: "Customer apps",
         shouldPrefix: true,
     });
@@ -79,15 +79,15 @@ it("rejects collisions introduced by conflicting Git names", () => {
     );
 });
 
-it("maps workspace, group and service folders without allowing traversal", () => {
-    const relativePath = canonicalComposePath(service, workspace);
+it("maps workspace, group and resource folders without allowing traversal", () => {
+    const relativePath = canonicalComposePath(resource, workspace);
     expect(relativePath).toBe("production-abc12/Customer%20apps/web-abc12/compose.yaml");
     expect(inferComposeLocation(relativePath, "Repository")).toEqual({
         workspaceName: "production-abc12",
         groupName: "Customer apps",
-        serviceName: "web-abc12",
+        resourceName: "web-abc12",
     });
-    expect(canonicalComposePath({ ...service, groupName: "../ops" }, workspace)).toContain(
+    expect(canonicalComposePath({ ...resource, groupName: "../ops" }, workspace)).toContain(
         "%2E%2E%2Fops",
     );
     for (const invalid of [

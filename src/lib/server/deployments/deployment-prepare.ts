@@ -12,7 +12,7 @@ import {
     inlineEnvironmentVariables,
 } from "#lib/server/deployments/deployment-compose";
 import { consumeDeployStream } from "#lib/server/deployments/deployment-stream";
-import { serviceComposePrefix } from "#lib/server/services/services";
+import { resourceComposePrefix } from "#lib/server/resources/resources";
 import { withGitRepo } from "#lib/server/shared/git";
 import { gitAuthenticationFromSource } from "#lib/server/shared/git-auth";
 import { withKeyedLock } from "#lib/server/shared/locks";
@@ -48,8 +48,8 @@ async function addDeploymentLog(
     });
 }
 
-const ensureEnvIgnored = async (serviceDir: string): Promise<void> => {
-    const gitignorePath = path.join(serviceDir, ".gitignore");
+const ensureEnvIgnored = async (resourceDir: string): Promise<void> => {
+    const gitignorePath = path.join(resourceDir, ".gitignore");
     let existing = "";
 
     try {
@@ -79,24 +79,24 @@ export async function prepareDeployment(
         }
     };
 
-    const { environment, git, service: svc, source, workspace: wrk } = snapshot;
+    const { environment, git, resource, source, workspace: wrk } = snapshot;
 
-    if (!svc?.value) {
+    if (!resource?.value) {
         throw new Error("the compose is invalid");
     }
 
     if (snapshot.gitValidationError) throw new Error(snapshot.gitValidationError);
-    const serviceSlug = svc.slug ?? svc.id;
+    const resourceSlug = resource.slug ?? resource.id;
     const formatted = formatComposeFile(
-        snapshot.gitCompose ?? svc.value,
-        snapshot.gitCompose === undefined ? serviceComposePrefix(svc) : undefined,
+        snapshot.gitCompose ?? resource.value,
+        snapshot.gitCompose === undefined ? resourceComposePrefix(resource) : undefined,
     );
     const deployCompose = inlineEnvironmentVariables(formatted.yaml, environment);
     const repoPath = workspacePath(wrk.id);
-    const servicePath = path.join(wrk.slug, serviceSlug);
-    const dataServiceDir = path.join(repoPath, servicePath);
+    const resourcePath = path.join(wrk.slug, resourceSlug);
+    const dataResourceDir = path.join(repoPath, resourcePath);
 
-    await log("stdout", `Preparing deployment for service ${svc.name} (${serviceSlug})`);
+    await log("stdout", `Preparing deployment for resource ${resource.name} (${resourceSlug})`);
     await log("debug", `Parsed compose file with ${formatted.serviceCount} services`);
 
     if (environment.length > 0) {
@@ -105,7 +105,7 @@ export async function prepareDeployment(
 
     throwIfCancelled();
 
-    // Serialize git work per workspace: services in the same workspace share
+    // Serialize git work per workspace: resources in the same workspace share
     // one checkout, so concurrent deploys must not interleave pull/commit/push.
     const gitUrl = snapshot.gitCommit ? null : git.url;
 
@@ -120,9 +120,9 @@ export async function prepareDeployment(
                           repoUrl: gitUrl,
                       },
                       async (repo) => {
-                          await fs.mkdir(dataServiceDir, { recursive: true });
-                          const dataComposePath = path.join(dataServiceDir, "compose.yaml");
-                          const dataEnvPath = path.join(dataServiceDir, ".env");
+                          await fs.mkdir(dataResourceDir, { recursive: true });
+                          const dataComposePath = path.join(dataResourceDir, "compose.yaml");
+                          const dataEnvPath = path.join(dataResourceDir, ".env");
                           // Commit the raw (non-interpolated) compose so secret values never enter
                           // git history; the deploy payload sent to uncloud is built separately.
                           await fs.writeFile(dataComposePath, formatted.yaml, "utf-8");
@@ -142,13 +142,13 @@ export async function prepareDeployment(
                               await fs.rm(dataEnvPath, { force: true });
                           }
 
-                          await ensureEnvIgnored(dataServiceDir);
+                          await ensureEnvIgnored(dataResourceDir);
 
                           throwIfCancelled();
 
-                          const composeRepoPath = path.join(servicePath, "compose.yaml");
-                          const gitignoreRepoPath = path.join(servicePath, ".gitignore");
-                          const envRepoPath = path.join(servicePath, ".env");
+                          const composeRepoPath = path.join(resourcePath, "compose.yaml");
+                          const gitignoreRepoPath = path.join(resourcePath, ".gitignore");
+                          const envRepoPath = path.join(resourcePath, ".env");
 
                           // Drop a .env committed by earlier versions from the index (not the
                           // working tree) so it stops being tracked and pushed.
@@ -180,7 +180,7 @@ export async function prepareDeployment(
                               }
 
                               const commit = await repo.commit(
-                                  `Committing new changes on Service ${svc.name} before deploying`,
+                                  `Committing new changes on Resource ${resource.name} before deploying`,
                               );
                               await log("debug", `Committed changes: ${commit.commit}`);
                               await log(
@@ -236,7 +236,7 @@ export async function prepareDeployment(
         const errorBody: unknown = deploy.error;
         const detail = typeof errorBody === "string" ? errorBody : JSON.stringify(errorBody);
         const httpStatus = deploy.response ? ` (HTTP ${deploy.response.status})` : "";
-        throw new Error(`Failed to deploy service${httpStatus}: ${detail}`);
+        throw new Error(`Failed to deploy resource${httpStatus}: ${detail}`);
     }
 
     if (!deploy.response) {
@@ -244,5 +244,5 @@ export async function prepareDeployment(
     }
 
     await consumeDeployStream(deploy.response, log);
-    await log("stdout", `Deployed service ${svc.name} (${serviceSlug})`);
+    await log("stdout", `Deployed resource ${resource.name} (${resourceSlug})`);
 }

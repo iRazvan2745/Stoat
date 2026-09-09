@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "#lib/db";
-import { dataSource, gitSource, services, workspace } from "#lib/db/schema";
+import { dataSource, gitSource, resources, workspace } from "#lib/db/schema";
 import { GIT_AUTH_METHODS, gitSourceSummary } from "#lib/domain/data-sources";
 import type {
     CreateGitSourceInputOutput,
@@ -108,6 +108,28 @@ const cleanSecret = (value: string | null | undefined): string | null | undefine
     }
 
     return value === "" ? null : value;
+};
+
+/**
+ * Legacy data source clients used to submit a repository URL directly. Keep
+ * that compatibility path subject to the same validation and credential
+ * stripping as first-class Git Sources before it reaches Git or the database.
+ */
+const legacyGitSource = (
+    gitUrl: string | null | undefined,
+): { name: string; url: string | null } => {
+    const rawUrl = gitUrl?.trim() || null;
+
+    if (!rawUrl) {
+        return { name: "Local Git Source", url: null };
+    }
+
+    const validated = validateGitSource({
+        authentication: { method: "none" },
+        url: rawUrl,
+    });
+
+    return { name: repositoryName(validated.url), url: validated.url };
 };
 
 const assertGitAuthMethod: (authMethod: string) => asserts authMethod is GitAuthMethod = (
@@ -289,19 +311,19 @@ export const deleteGitSource = async (gitSourceId: string) => {
     return [toGitSourceSummary(deleted)];
 };
 
-export const getServiceDataSource = async (serviceId: string): Promise<UncloudDataSource> => {
+export const getResourceDataSource = async (resourceId: string): Promise<UncloudDataSource> => {
     const [source] = await db
         .select({
             uncloudToken: dataSource.uncloudToken,
             uncloudUrl: dataSource.uncloudUrl,
         })
-        .from(services)
-        .innerJoin(workspace, eq(workspace.id, services.workspaceId))
+        .from(resources)
+        .innerJoin(workspace, eq(workspace.id, resources.workspaceId))
         .innerJoin(dataSource, eq(dataSource.id, workspace.dataSourceId))
-        .where(eq(services.id, serviceId));
+        .where(eq(resources.id, resourceId));
 
     if (!source) {
-        throw new Error("Data source not found for service");
+        throw new Error("Data source not found for resource");
     }
 
     return source;
@@ -397,13 +419,13 @@ export const createDataSource = async ({
         } else {
             // Keep old clients usable while ensuring every data source still
             // has a first-class Git Source assignment.
-            const legacyUrl = gitUrl?.trim() || null;
+            const legacy = legacyGitSource(gitUrl);
             const [createdGitSource] = await tx
                 .insert(gitSource)
                 .values({
-                    name: legacyUrl ? repositoryName(legacyUrl) : "Local Git Source",
+                    name: legacy.name,
                     organizationId,
-                    url: legacyUrl,
+                    url: legacy.url,
                 })
                 .returning({ id: gitSource.id });
 
@@ -449,13 +471,13 @@ export const updateDataSource = async ({
         let assignedGitSourceId = gitSourceId === undefined ? existing.gitSourceId : gitSourceId;
 
         if (assignedGitSourceId === null || assignedGitSourceId.trim() === "") {
-            const legacyUrl = gitUrl?.trim() || null;
+            const legacy = legacyGitSource(gitUrl);
             const [createdGitSource] = await tx
                 .insert(gitSource)
                 .values({
-                    name: legacyUrl ? repositoryName(legacyUrl) : "Local Git Source",
+                    name: legacy.name,
                     organizationId: existing.organizationId,
-                    url: legacyUrl,
+                    url: legacy.url,
                 })
                 .returning({ id: gitSource.id });
 
@@ -483,13 +505,13 @@ export const updateDataSource = async ({
             // isolated in a new source rather than mutating a source shared by
             // other data sources.
             if (gitUrl !== undefined) {
-                const legacyUrl = gitUrl?.trim() || null;
+                const legacy = legacyGitSource(gitUrl);
                 const [createdGitSource] = await tx
                     .insert(gitSource)
                     .values({
-                        name: legacyUrl ? repositoryName(legacyUrl) : "Local Git Source",
+                        name: legacy.name,
                         organizationId: existing.organizationId,
-                        url: legacyUrl,
+                        url: legacy.url,
                     })
                     .returning({ id: gitSource.id });
 
@@ -633,24 +655,24 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
         };
     }
 
-    const linkedServices = await db
+    const linkedResources = await db
         .select({
-            service: services,
+            resource: resources,
             workspaceId: workspace.id,
             workspaceSlug: workspace.slug,
         })
-        .from(services)
-        .innerJoin(workspace, eq(workspace.id, services.workspaceId))
+        .from(resources)
+        .innerJoin(workspace, eq(workspace.id, resources.workspaceId))
         .where(eq(workspace.dataSourceId, source.source.id));
     const generatedComposePaths = new Set(
-        linkedServices.flatMap(({ service, workspaceId, workspaceSlug }) => [
-            `${workspaceSlug}/${service.slug ?? service.id}/compose.yaml`,
-            `${workspaceId}/${service.slug ?? service.id}/compose.yaml`,
+        linkedResources.flatMap(({ resource, workspaceId, workspaceSlug }) => [
+            `${workspaceSlug}/${resource.slug ?? resource.id}/compose.yaml`,
+            `${workspaceId}/${resource.slug ?? resource.id}/compose.yaml`,
         ]),
     );
     const importedSourcePaths = new Set(
-        linkedServices.flatMap(({ service }) =>
-            service.settings?.sourcePath ? [service.settings.sourcePath] : [],
+        linkedResources.flatMap(({ resource }) =>
+            resource.settings?.sourcePath ? [resource.settings.sourcePath] : [],
         ),
     );
 
@@ -667,19 +689,19 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
             continue;
         }
 
-        const serviceName = composeServiceName(file.relativePath);
-        const slug = await uniqueSlug(serviceName, async (candidate) => {
+        const resourceName = composeServiceName(file.relativePath);
+        const slug = await uniqueSlug(resourceName, async (candidate) => {
             const matches = await db
-                .select({ slug: services.slug })
-                .from(services)
-                .where(eq(services.slug, candidate));
+                .select({ slug: resources.slug })
+                .from(resources)
+                .where(eq(resources.slug, candidate));
 
             return matches.length > 0;
         });
-        const [createdService] = await db
-            .insert(services)
+        const [createdResource] = await db
+            .insert(resources)
             .values({
-                name: serviceName,
+                name: resourceName,
                 settings: {
                     shouldPrefix: false,
                     sourcePath: file.relativePath,
@@ -691,11 +713,11 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
             })
             .returning();
 
-        if (!createdService) {
+        if (!createdResource) {
             throw new Error(`Unable to import ${file.relativePath}`);
         }
 
-        await createWorkspaceFolder(repoPath, targetWorkspace.slug, createdService.slug ?? slug);
+        await createWorkspaceFolder(repoPath, targetWorkspace.slug, createdResource.slug ?? slug);
         importedSourcePaths.add(file.relativePath);
         imported += 1;
     }

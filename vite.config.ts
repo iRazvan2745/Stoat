@@ -12,7 +12,9 @@ const functionsMixinsPre = {
 
 const functionsMixinsPost = {
     ...functionsMixins({ deps: ["m3-svelte"] }),
-    enforce: "post" as const,
+    // Expand mixins introduced by Tailwind's CSS imports before Vite turns CSS
+    // into JavaScript and before CSS minification removes mixin terminators.
+    enforce: "pre" as const,
     name: "vite-plugin-functions-mixins:post",
 };
 
@@ -44,7 +46,8 @@ export default defineConfig({
     },
     plugins: lazyPlugins(() => [
         functionsMixinsPre,
-        tailwindcss(),
+        tailwindcss({ optimize: false }),
+        functionsMixinsPost,
         sveltekit({
             // Stoat runs as a Node.js server in production.
             adapter: adapter(),
@@ -63,7 +66,6 @@ export default defineConfig({
                 remoteFunctions: true,
             },
         }),
-        functionsMixinsPost,
     ]),
     server: {
         watch: {
@@ -75,5 +77,6 @@ export default defineConfig({
     },
     test: {
         include: ["tests/**/*.test.ts", "src/**/*.test.ts"],
+        exclude: ["tests/integration/**"],
     },
 });

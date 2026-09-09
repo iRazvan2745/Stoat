@@ -1,20 +1,23 @@
 # Stoat
 
-Stoat is a SvelteKit control plane for managing Uncloud data sources, workspaces, services, deployments, and cluster resources.
+Stoat is a SvelteKit control plane for managing Uncloud data sources, workspaces, resources, deployments, and cluster resources.
 
 ## Development
 
-Requirements: Node.js 24, pnpm 11, Go 1.26 for the sidecar, and Docker for PostgreSQL.
+Requirements: Vite+ (`vp`), Node.js 24 (minimum 22.22), Go 1.26 for the sidecar, and Docker for PostgreSQL. Vite+ manages the pinned pnpm version.
 
 ```sh
-pnpm install
+vp install
 cp .env.example .env
+# In .env, set DATABASE_URL=postgres://stoat:stoat@localhost:5434/stoat
+# and APP_URL=http://localhost:5173; replace APP_SECRET with a random secret.
+# Set ALLOW_SIGNUP=true to create your initial local account.
 docker compose -f compose.dev.yaml up -d
-pnpm run db:push
-pnpm dev
+vp run db:push
+vp dev
 ```
 
-The development database is published at `localhost:5434`. The default local app URL is `http://localhost:5173`.
+The development database is published at `localhost:5434`. The default local app URL is `http://localhost:5173`. `vp run dev` uses the optional global `portless` CLI; set `APP_URL` to its origin when using that script. Disable signup again after creating your account if registration should remain closed.
 
 For the sidecar, run it from `sidecar/`:
 
@@ -29,11 +32,12 @@ It serves the Uncloud API on `127.0.0.1:80`. Use `--connect` to select the Unclo
 Run the same checks used by GitHub Actions before opening a pull request:
 
 ```sh
-vp check --no-fmt
+vp check
+vp run check-types
 vp test
-pnpm run build
+vp run build
 
-(cd sidecar && gofmt -w . && go test ./... && go vet ./...)
+(cd sidecar && go test ./... && go vet ./...)
 docker build -f Dockerfile -t stoat:test .
 docker build -f sidecar/Dockerfile -t stoat-sidecar:test sidecar
 ```

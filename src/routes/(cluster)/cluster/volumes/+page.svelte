@@ -1,6 +1,7 @@
 <script lang="ts">
     // oxlint-disable func-style
-    import { Button, Card, Divider, LoadingIndicator } from "m3-svelte";
+    import databaseIcon from "@ktibow/iconset-material-symbols/database";
+    import { Button, Card, Divider, Icon, LoadingIndicator } from "m3-svelte";
 
     import { listVolumes } from "#lib/api/cluster/volumes.remote";
 
@@ -26,9 +27,9 @@
 
 <div class="flex items-center justify-between gap-4 p-5">
     <div>
-        <h1 class="text-on-surface text-lg font-medium">Volumes</h1>
+        <h1 class="m3-font-headline-small text-on-surface">Volumes</h1>
 
-        <p class="text-on-surface-variant mt-0.5 text-sm">
+        <p class="m3-font-body-medium text-on-surface-variant mt-0.5">
             {volumes.current?.items.length ?? 0}
             {(volumes.current?.items.length ?? 0) === 1 ? "volume" : "volumes"}
         </p>
@@ -42,7 +43,7 @@
             <LoadingIndicator aria-label="Loading volumes" />
         </div>
     {:else if volumes.error}
-        <div class="text-error p-6 text-sm">
+        <div class="text-error m3-font-body-medium p-6">
             {volumes.error.message}
         </div>
     {:else}
@@ -51,12 +52,12 @@
             <div
                 class="
           text-on-surface-variant
+          m3-font-label-medium
           bg-surface-container-high grid
           min-w-275
           grid-cols-[minmax(240px,1.4fr)_200px_120px_minmax(260px,1fr)] items-center
           gap-4 px-5
-          py-3 text-xs
-          font-medium
+          py-3
         "
             >
                 <span>Volume</span>
@@ -89,28 +90,18 @@
                 rounded-full p-1.5
               "
                         >
-                            <svg
-                                width="18"
-                                height="18"
-                                viewBox="0 0 24 24"
-                                aria-hidden="true"
-                            >
-                                <path
-                                    d="M12 3C7.58 3 4 4.79 4 7s3.58 4 8 4 8-1.79 8-4-3.58-4-8-4zM4 9v5c0 2.21 3.58 4 8 4s8-1.79 8-4V9c0 2.21-3.58 4-8 4s-8-1.79-8-4zm0 7v2c0 2.21 3.58 4 8 4s8-1.79 8-4v-2c0 2.21-3.58 4-8 4s-8-1.79-8-4z"
-                                    fill="currentColor"
-                                />
-                            </svg>
+                            <Icon icon={databaseIcon} size={18} />
                         </div>
 
                         <div class="min-w-0">
                             <div
-                                class="text-on-surface truncate text-sm font-medium"
+                                class="m3-font-label-large text-on-surface truncate"
                             >
                                 {metadata(item).Name ?? item.machineId}
                             </div>
 
                             <div
-                                class="text-on-surface-variant truncate text-[11px]"
+                                class="m3-font-label-small text-on-surface-variant truncate"
                             >
                                 {metadata(item).Driver ?? "local"} volume
                             </div>
@@ -118,18 +109,18 @@
                     </div>
 
                     <!-- Machine -->
-                    <div class="text-on-surface truncate text-sm">
+                    <div class="m3-font-body-medium text-on-surface truncate">
                         {item.machineName}
                     </div>
 
                     <!-- Driver -->
-                    <div class="text-on-surface truncate text-sm">
+                    <div class="m3-font-body-medium text-on-surface truncate">
                         {metadata(item).Driver ?? "—"}
                     </div>
 
                     <!-- Mountpoint -->
                     <div
-                        class="text-on-surface-variant truncate font-mono text-sm"
+                        class="text-on-surface-variant m3-font-body-medium truncate font-mono"
                     >
                         {metadata(item).Mountpoint ?? "—"}
                     </div>
@@ -142,7 +133,7 @@
 
             {#if (volumes.current?.items.length ?? 0) === 0}
                 <div
-                    class="text-on-surface-variant px-5 py-10 text-center text-sm"
+                    class="text-on-surface-variant m3-font-body-medium px-5 py-10 text-center"
                 >
                     No volumes found.
                 </div>

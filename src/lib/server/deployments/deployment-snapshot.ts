@@ -1,8 +1,16 @@
 import { asc, eq } from "drizzle-orm";
 
 import { db } from "#lib/db";
-import { dataSource, environmentVariables, gitSource, services, workspace } from "#lib/db/schema";
-import { parseServiceSettings } from "#lib/domain/services/settings";
+import {
+    dataSource,
+    environmentVariables,
+    gitSource,
+    resources,
+    workspace,
+    workspaceEnvironmentVariables,
+} from "#lib/db/schema";
+import { mergeEnvironmentVariables } from "#lib/domain/environment";
+import { parseResourceSettings } from "#lib/domain/resources/settings";
 
 /** Server-only: contains environment secrets and destination credentials. */
 export interface DeploymentSnapshot {
@@ -12,8 +20,8 @@ export interface DeploymentSnapshot {
     // Keep this payload JSON-native. The queue encodes it as JSON, so database
     // timestamps from full Drizzle rows would make enqueue fail (and are not
     // needed while preparing a deployment).
-    service: Pick<
-        typeof services.$inferSelect,
+    resource: Pick<
+        typeof resources.$inferSelect,
         | "groupName"
         | "icon"
         | "id"
@@ -58,15 +66,15 @@ export const createDeploymentSnapshot = (
 ): DeploymentSnapshot => ({
     environment: environment.map(({ name, value }) => ({ name, value })),
     git: { ...record.git },
-    service: {
-        ...record.service,
-        settings: parseServiceSettings(record.service.settings),
+    resource: {
+        ...record.resource,
+        settings: parseResourceSettings(record.resource.settings),
     },
     source: { ...record.source },
     workspace: { ...record.workspace },
 });
 
-export const captureDeploymentSnapshot = async (serviceId: string): Promise<DeploymentSnapshot> =>
+export const captureDeploymentSnapshot = async (resourceId: string): Promise<DeploymentSnapshot> =>
     await db.transaction(
         async (tx) => {
             const [record] = await tx
@@ -84,16 +92,16 @@ export const captureDeploymentSnapshot = async (serviceId: string): Promise<Depl
                         url: gitSource.url,
                         username: gitSource.username,
                     },
-                    service: {
-                        groupName: services.groupName,
-                        icon: services.icon,
-                        id: services.id,
-                        name: services.name,
-                        settings: services.settings,
-                        slug: services.slug,
-                        type: services.type,
-                        value: services.value,
-                        workspaceId: services.workspaceId,
+                    resource: {
+                        groupName: resources.groupName,
+                        icon: resources.icon,
+                        id: resources.id,
+                        name: resources.name,
+                        settings: resources.settings,
+                        slug: resources.slug,
+                        type: resources.type,
+                        value: resources.value,
+                        workspaceId: resources.workspaceId,
                     },
                     source: {
                         gitSourceId: dataSource.gitSourceId,
@@ -110,23 +118,34 @@ export const captureDeploymentSnapshot = async (serviceId: string): Promise<Depl
                         slug: workspace.slug,
                     },
                 })
-                .from(services)
-                .innerJoin(workspace, eq(workspace.id, services.workspaceId))
+                .from(resources)
+                .innerJoin(workspace, eq(workspace.id, resources.workspaceId))
                 .innerJoin(dataSource, eq(dataSource.id, workspace.dataSourceId))
                 .innerJoin(gitSource, eq(gitSource.id, dataSource.gitSourceId))
-                .where(eq(services.id, serviceId));
-            if (!record?.service.value) {
-                throw new Error("Service or valid compose configuration not found");
+                .where(eq(resources.id, resourceId));
+            if (!record?.resource.value) {
+                throw new Error("Resource or valid compose configuration not found");
             }
-            const environment = await tx
+            const resourceVars = await tx
                 .select({
                     name: environmentVariables.name,
                     value: environmentVariables.value,
                 })
                 .from(environmentVariables)
-                .where(eq(environmentVariables.serviceId, serviceId))
+                .where(eq(environmentVariables.resourceId, resourceId))
                 .orderBy(asc(environmentVariables.name));
-            return createDeploymentSnapshot(record, environment);
+            const workspaceVars = await tx
+                .select({
+                    name: workspaceEnvironmentVariables.name,
+                    value: workspaceEnvironmentVariables.value,
+                })
+                .from(workspaceEnvironmentVariables)
+                .where(eq(workspaceEnvironmentVariables.workspaceId, record.workspace.id))
+                .orderBy(asc(workspaceEnvironmentVariables.name));
+            return createDeploymentSnapshot(
+                record,
+                mergeEnvironmentVariables(workspaceVars, resourceVars),
+            );
         },
         { accessMode: "read only", isolationLevel: "repeatable read" },
     );

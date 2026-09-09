@@ -5,7 +5,7 @@ import {
     deleteComposeIngressRoute,
     listEditableComposeIngressRoutes,
     updateComposeIngressRoute,
-} from "#lib/server/services/compose-ingress-routes";
+} from "#lib/server/resources/compose-ingress-routes";
 
 const COMPOSE = `services:
   web:

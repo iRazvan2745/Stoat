@@ -9,9 +9,9 @@
     } from "m3-svelte";
     import { parseAsString, useQueryState } from "nuqs-svelte";
 
-    import { createServiceFromTemplate } from "#lib/api/services.remote";
+    import { createResourceFromTemplate } from "#lib/api/resources.remote";
     import { listTemplates } from "#lib/api/templates.remote";
-    import type { ServiceTemplate } from "#lib/domain/templates";
+    import type { ResourceTemplate } from "#lib/domain/templates";
 
     import TemplateCard from "./template-card.svelte";
 
@@ -33,15 +33,15 @@
         "selectedTemplateVersion",
         parseAsString.withDefault("")
     );
-    let serviceName = $state("");
+    let resourceName = $state("");
     let submitting = $state(false);
 
     const templates = $derived(templatesQuery.current ?? []);
     const selectedTemplate = $derived(
         templates.find((template) => template.appId === selectedAppId.current)
     );
-    const resolvedServiceName = $derived(
-        serviceName.trim() || selectedTemplate?.name.trim() || ""
+    const resolvedResourceName = $derived(
+        resourceName.trim() || selectedTemplate?.name.trim() || ""
     );
     const resolvedVersion = $derived(
         selectedTemplate?.versions.some(
@@ -51,10 +51,10 @@
             : (selectedTemplate?.versions[0]?.version ?? "")
     );
 
-    const selectTemplate = (template: ServiceTemplate): void => {
+    const selectTemplate = (template: ResourceTemplate): void => {
         selectedAppId.current = template.appId;
         selectedVersion.current = template.versions[0]?.version ?? "";
-        serviceName = template.name;
+        resourceName = template.name;
     };
 
     const close = (): void => {
@@ -62,14 +62,14 @@
         submitting = false;
         selectedAppId.set("");
         selectedVersion.set("");
-        serviceName = "";
+        resourceName = "";
     };
 
     const create = async (): Promise<void> => {
         if (
             !selectedAppId.current ||
             !resolvedVersion ||
-            !resolvedServiceName ||
+            !resolvedResourceName ||
             submitting
         ) {
             return;
@@ -78,20 +78,20 @@
         submitting = true;
 
         try {
-            await createServiceFromTemplate({
+            await createResourceFromTemplate({
                 appId: selectedAppId.current,
-                name: resolvedServiceName,
+                name: resolvedResourceName,
                 version: resolvedVersion,
                 workspaceId,
             });
             close();
-            snackbar("Service created");
+            snackbar("Resource created");
             await oncreated();
         } catch (error) {
             snackbar(
                 error instanceof Error
                     ? error.message
-                    : "Unable to create service from template"
+                    : "Unable to create resource from template"
             );
         } finally {
             submitting = false;
@@ -111,9 +111,9 @@
                 <LoadingIndicator aria-label="Loading templates" />
             </div>
         {:else if templatesQuery.error}
-            <p class="text-error text-sm">{templatesQuery.error.message}</p>
+            <p class="text-error m3-font-body-medium">{templatesQuery.error.message}</p>
         {:else if templates.length === 0}
-            <p class="text-on-surface-variant text-sm">
+            <p class="text-on-surface-variant m3-font-body-medium">
                 No templates found in /templates.
             </p>
         {:else}
@@ -132,7 +132,7 @@
                     <div class="flex flex-col gap-3">
                         {#if selectedTemplate.versions.length > 1}
                             <div class="flex flex-wrap items-center gap-2">
-                                <p class="text-on-surface-variant text-sm">
+                                <p class="text-on-surface-variant m3-font-body-medium">
                                     Version
                                 </p>
                                 {#each selectedTemplate.versions as version (version.version)}
@@ -152,7 +152,7 @@
                         {/if}
 
                         <TextFieldOutlined
-                            bind:value={serviceName}
+                            bind:value={resourceName}
                             label="Name"
                             required
                             placeholder={selectedTemplate.name}
@@ -168,14 +168,14 @@
                 disabled={submitting ||
                     !selectedAppId.current ||
                     !resolvedVersion ||
-                    !resolvedServiceName}
+                    !resolvedResourceName}
                 onclick={create}
             >
                 {#if submitting}
                     <LoadingIndicator
                         size={18}
                         center={false}
-                        aria-label="Creating service"
+                        aria-label="Creating resource"
                     />
                     Adding...
                 {:else}

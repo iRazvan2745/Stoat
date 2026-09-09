@@ -20,15 +20,16 @@
     import { parseAsBoolean, useQueryState } from "nuqs-svelte";
 
     import {
-        createService,
-        listServicesInWorkspace,
-    } from "#lib/api/services.remote";
+        createResource,
+        listResourcesInWorkspace,
+    } from "#lib/api/resources.remote";
     import {
         deleteWorkspace,
         getWorkspace,
         listWorkspaces,
     } from "#lib/api/workspaces.remote";
-    import ServiceGroups from "#lib/components/services/service-groups.svelte";
+    import ResourceGroups from "#lib/components/resources/resource-groups.svelte";
+    import WorkspaceEnvironmentSection from "#lib/components/resources/workspace-environment-section.svelte";
 
     import type { PageProps } from "./$types";
     import TemplatesDialog from "./templates-dialog.svelte";
@@ -38,7 +39,7 @@
     // svelte-ignore state_referenced_locally
     const workspace = getWorkspace(params.workspaceId);
     // svelte-ignore state_referenced_locally
-    const services = listServicesInWorkspace(params.workspaceId);
+    const resources = listResourcesInWorkspace(params.workspaceId);
 
     let createDialogOpen = useQueryState(
         "createDialogOpen",
@@ -50,11 +51,11 @@
     );
 
     let compose = $state("");
-    let serviceName = $state("");
+    let resourceName = $state("");
     let submitting = $state(false);
 
     let actionsMenuOpen = $state(false);
-    let addServiceMenuOpen = $state(false);
+    let addResourceMenuOpen = $state(false);
     const deleteWorkspaceDialogOpen = useQueryState(
         "deleteWorkspaceDialogOpen",
         parseAsBoolean.withDefault(false)
@@ -62,31 +63,31 @@
     let deletingWorkspace = $state(false);
 
     const create = async (): Promise<void> => {
-        if (!serviceName.trim()) {
+        if (!resourceName.trim()) {
             return;
         }
 
         submitting = true;
 
         try {
-            await createService({
-                name: serviceName.trim(),
+            await createResource({
+                name: resourceName.trim(),
                 value: compose.trim(),
                 workspaceId: params.workspaceId,
             });
 
             createDialogOpen.set(false);
-            serviceName = "";
+            resourceName = "";
             compose = "";
 
-            snackbar("Service created");
+            snackbar("Resource created");
 
-            await services.refresh();
+            await resources.refresh();
         } catch (error) {
             snackbar(
                 error instanceof Error
                     ? error.message
-                    : "Unable to create service"
+                    : "Unable to create resource"
             );
         } finally {
             submitting = false;
@@ -114,7 +115,7 @@
 </script>
 
 <div class="flex items-center justify-between gap-4">
-    <h1 class="text-on-surface text-lg font-medium">
+    <h1 class="m3-font-headline-small text-on-surface">
         {workspace.current?.name ?? "…"}
     </h1>
 
@@ -122,37 +123,35 @@
         <div class="relative">
             <Button
                 iconType="left"
-                aria-expanded={addServiceMenuOpen}
+                aria-expanded={addResourceMenuOpen}
                 aria-haspopup="menu"
-                style={addServiceMenuOpen
+                style={addResourceMenuOpen
                     ? "anchor-name: --m3-menu-anchor"
                     : undefined}
                 onclick={() => {
                     actionsMenuOpen = false;
-                    addServiceMenuOpen = !addServiceMenuOpen;
+                    addResourceMenuOpen = !addResourceMenuOpen;
                 }}
             >
                 <Icon icon={addIcon} size={18} />
-                Add service
+                Add resource
             </Button>
 
-            {#if addServiceMenuOpen}
-                <ExpressiveMenu anchored x="end" y="down" label="Add service">
+            {#if addResourceMenuOpen}
+                <ExpressiveMenu anchored x="end" y="down" label="Add resource">
                     <ExpressiveMenuItem
                         leadingIcon={codeBlocksIcon}
                         label="Compose"
-                        //details="Paste a Docker Compose file"
                         onclick={() => {
-                            addServiceMenuOpen = false;
+                            addResourceMenuOpen = false;
                             createDialogOpen.set(true);
                         }}
                     />
                     <ExpressiveMenuItem
                         leadingIcon={widgetsIcon}
                         label="Template"
-                        //details="Start from a packaged app"
                         onclick={() => {
-                            addServiceMenuOpen = false;
+                            addResourceMenuOpen = false;
                             templatesDialogOpen.set(true);
                         }}
                     />
@@ -165,7 +164,7 @@
             aria-label="Refresh workspace"
             onclick={async () => {
                 await workspace.refresh();
-                await services.refresh();
+                await resources.refresh();
             }}
         >
             <Icon icon={refreshIcon} />
@@ -182,7 +181,7 @@
                     ? "anchor-name: --m3-menu-anchor"
                     : undefined}
                 onclick={() => {
-                    addServiceMenuOpen = false;
+                    addResourceMenuOpen = false;
                     actionsMenuOpen = !actionsMenuOpen;
                 }}
             >
@@ -210,29 +209,31 @@
     </div>
 </div>
 
-<div id="services-card">
-    {#if services.loading}
+<WorkspaceEnvironmentSection workspaceId={params.workspaceId} />
+
+<div id="resources-card">
+    {#if resources.loading}
         <div class="flex min-h-32 items-center justify-center">
-            <LoadingIndicator aria-label="Loading services" />
+            <LoadingIndicator aria-label="Loading resources" />
         </div>
-    {:else if services.error}
-        <div class="text-error p-6 text-sm">{services.error.message}</div>
-    {:else if (services.current?.length ?? 0) === 0}
-        <div class="text-on-surface-variant px-5 py-10 text-center text-sm">
-            No services yet. Add a compose file or start from a template.
+    {:else if resources.error}
+        <div class="text-error m3-font-body-medium p-6">{resources.error.message}</div>
+    {:else if (resources.current?.length ?? 0) === 0}
+        <div class="text-on-surface-variant m3-font-body-medium px-5 py-10 text-center">
+            No resources yet. Add a compose file or start from a template.
         </div>
     {:else}
-        <ServiceGroups
-            services={services.current ?? []}
+        <ResourceGroups
+            resources={resources.current ?? []}
             workspaceId={params.workspaceId}
         />
     {/if}
 </div>
 
-<Dialog bind:open={createDialogOpen.current} headline="Add service">
+<Dialog bind:open={createDialogOpen.current} headline="Add resource">
     <div class="flex flex-col gap-4">
         <TextFieldOutlined
-            bind:value={serviceName}
+            bind:value={resourceName}
             label="Name"
             required
             placeholder="My Web App"
@@ -258,7 +259,7 @@
             Are you sure you want to delete this workspace?
         </p>
 
-        <p class="text-on-surface-variant text-sm">
+        <p class="text-on-surface-variant m3-font-body-medium">
             This action cannot be undone.
         </p>
     </div>
@@ -278,13 +279,13 @@
 <TemplatesDialog
     bind:open={templatesDialogOpen.current}
     workspaceId={params.workspaceId}
-    oncreated={() => services.refresh()}
+    oncreated={() => resources.refresh()}
 />
 
 <Snackbar />
 
 <style>
-    :global(#services-card.m3-container) {
+    :global(#resources-card.m3-container) {
         padding: 0;
         overflow-x: hidden;
     }

@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import type { Deployment } from "../src/routes/(service)/workspace/[workspaceId]/[serviceId]/deployments/deployment.ts";
+import type { Deployment } from "../src/routes/(resource)/workspace/[workspaceId]/[resourceId]/deployments/deployment.ts";
 import {
     getDisplayStatus,
     getDuration,
     getPhase,
     getShortId,
     isDeploymentActive,
-} from "../src/routes/(service)/workspace/[workspaceId]/[serviceId]/deployments/deployment.ts";
+} from "../src/routes/(resource)/workspace/[workspaceId]/[resourceId]/deployments/deployment.ts";
 
 const deployment = (partial: Partial<Deployment> = {}): Deployment => ({
     createdAt: new Date("2026-08-19T12:00:00.000Z"),
@@ -16,7 +16,7 @@ const deployment = (partial: Partial<Deployment> = {}): Deployment => ({
     jobId: null,
     outcome: null,
     queuedAt: null,
-    serviceId: "svc_1",
+    resourceId: "res_1",
     settings: {},
     startedAt: null,
     updatedAt: new Date("2026-08-19T12:00:00.000Z"),

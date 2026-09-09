@@ -104,7 +104,7 @@
                     alt=""
                     width="80"
                     height="80"
-                    class="size-20 rounded-[1.5rem] object-cover"
+                    class="size-20 rounded-xl object-cover"
                 />
                 <h1 class="headline">Stoat</h1>
                 <p class="supporting">

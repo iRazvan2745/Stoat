@@ -3,6 +3,7 @@ import { relations } from "drizzle-orm/_relations";
 import {
     bigserial,
     boolean,
+    doublePrecision,
     index,
     jsonb,
     pgTable,
@@ -21,10 +22,11 @@ import {
 } from "effect-mq/drizzle-postgres";
 
 import type { GitAuthMethod } from "#lib/domain/data-sources";
-import type { GitServiceSyncState, GitSyncResult } from "#lib/domain/git-sync";
-import type { ServiceSettings } from "#lib/domain/services/settings";
+import type { GitResourceSyncState, GitSyncResult } from "#lib/domain/git-sync";
+import type { ResourceSettings } from "#lib/domain/resources/settings";
+import type { UserSettings } from "#lib/domain/users/settings";
 
-import { organization } from "./auth.schema";
+import { organization, user } from "./auth.schema";
 
 export const effectMqJobs = mqJobs();
 export const effectMqJobAttempts = mqJobAttempts(effectMqJobs);
@@ -124,8 +126,8 @@ export const workspace = pgTable(
     ],
 );
 
-export const services = pgTable(
-    "services",
+export const resources = pgTable(
+    "resources",
     {
         id: text("id")
             .primaryKey()
@@ -134,13 +136,16 @@ export const services = pgTable(
             .notNull()
             .references(() => workspace.id, { onDelete: "restrict" }),
         groupName: text("group_name"),
-        gitSync: jsonb("git_sync").$type<GitServiceSyncState>(),
+        // Manual dashboard arrangement. Null sorts last so freshly created
+        // resources keep appearing at the end until the user moves them.
+        sortOrder: doublePrecision("sort_order"),
+        gitSync: jsonb("git_sync").$type<GitResourceSyncState>(),
         type: text("type").default("compose"),
         name: text("name"),
         slug: text("slug"),
         icon: text("icon"),
         value: text("value"),
-        settings: jsonb("settings").$type<ServiceSettings>().notNull().default({}),
+        settings: jsonb("settings").$type<ResourceSettings>().notNull().default({}),
         createdAt: timestamp("created_at", { withTimezone: true })
             .notNull()
             .$defaultFn(() => new Date()),
@@ -150,9 +155,9 @@ export const services = pgTable(
             .$onUpdate(() => new Date()),
     },
     (table) => [
-        index("services_workspace_id_idx").on(table.workspaceId),
+        index("resources_workspace_id_idx").on(table.workspaceId),
         // uniqueSlug() already assumes global uniqueness; NULLs are allowed.
-        uniqueIndex("services_slug_idx").on(table.slug),
+        uniqueIndex("resources_slug_idx").on(table.slug),
     ],
 );
 
@@ -185,12 +190,13 @@ export const workspaceRelations = relations(workspace, ({ many, one }) => ({
         fields: [workspace.organizationId],
         references: [organization.id],
     }),
-    services: many(services),
+    resources: many(resources),
+    workspaceEnvironmentVariables: many(workspaceEnvironmentVariables),
 }));
 
-export const servicesRelations = relations(services, ({ one }) => ({
+export const resourcesRelations = relations(resources, ({ one }) => ({
     workspace: one(workspace, {
-        fields: [services.workspaceId],
+        fields: [resources.workspaceId],
         references: [workspace.id],
     }),
 }));
@@ -202,9 +208,9 @@ export const deployments = pgTable(
             .primaryKey()
             .$defaultFn(() => crypto.randomUUID()),
 
-        serviceId: text("service_id")
+        resourceId: text("resource_id")
             .notNull()
-            .references(() => services.id, { onDelete: "cascade" }),
+            .references(() => resources.id, { onDelete: "cascade" }),
 
         createdAt: timestamp("created_at", { withTimezone: true })
             .notNull()
@@ -221,14 +227,14 @@ export const deployments = pgTable(
         outcome: text("outcome"),
         jobId: text("job_id"),
         gitCommit: text("git_commit"),
-        settings: jsonb("settings").$type<ServiceSettings>().notNull().default({}),
+        settings: jsonb("settings").$type<ResourceSettings>().notNull().default({}),
     },
     (table) => [
-        // Deployment list per service, ordered by createdAt/id (scanned
-        // backwards for DESC). The serviceId prefix also serves the
+        // Deployment list per resource, ordered by createdAt/id (scanned
+        // backwards for DESC). The resourceId prefix also serves the
         // "last successful deployment" and "unfinished deployments" queries.
-        index("deployments_service_id_created_at_idx").on(
-            table.serviceId,
+        index("deployments_resource_id_created_at_idx").on(
+            table.resourceId,
             table.createdAt,
             table.id,
         ),
@@ -261,9 +267,9 @@ export const environmentVariables = pgTable(
         id: text("id")
             .primaryKey()
             .$defaultFn(() => crypto.randomUUID()),
-        serviceId: text("service_id")
+        resourceId: text("resource_id")
             .notNull()
-            .references(() => services.id, { onDelete: "restrict" }),
+            .references(() => resources.id, { onDelete: "restrict" }),
         name: text("name").notNull(),
         value: text("value").notNull(),
         createdAt: timestamp("created_at", { withTimezone: true })
@@ -275,9 +281,61 @@ export const environmentVariables = pgTable(
             .$onUpdate(() => new Date()),
     },
     (table) => [
-        // Serves both the per-service filter and the ORDER BY name.
-        index("environment_variables_service_id_name_idx").on(table.serviceId, table.name),
+        // Serves both the per-resource filter and the ORDER BY name.
+        index("environment_variables_resource_id_name_idx").on(table.resourceId, table.name),
     ],
 );
+
+export const workspaceEnvironmentVariables = pgTable(
+    "workspace_environment_variables",
+    {
+        id: text("id")
+            .primaryKey()
+            .$defaultFn(() => crypto.randomUUID()),
+        workspaceId: text("workspace_id")
+            .notNull()
+            .references(() => workspace.id, { onDelete: "restrict" }),
+        name: text("name").notNull(),
+        value: text("value").notNull(),
+        createdAt: timestamp("created_at", { withTimezone: true })
+            .notNull()
+            .$defaultFn(() => new Date()),
+        updatedAt: timestamp("updated_at", { withTimezone: true })
+            .notNull()
+            .$defaultFn(() => new Date())
+            .$onUpdate(() => new Date()),
+    },
+    (table) => [
+        // Serves both the per-workspace filter and the ORDER BY name.
+        index("workspace_environment_variables_workspace_id_name_idx").on(
+            table.workspaceId,
+            table.name,
+        ),
+    ],
+);
+
+export const workspaceEnvironmentVariablesRelations = relations(
+    workspaceEnvironmentVariables,
+    ({ one }) => ({
+        workspace: one(workspace, {
+            fields: [workspaceEnvironmentVariables.workspaceId],
+            references: [workspace.id],
+        }),
+    }),
+);
+
+export const userSettings = pgTable("user_settings", {
+    userId: text("user_id")
+        .primaryKey()
+        .references(() => user.id, { onDelete: "cascade" }),
+    settings: jsonb("settings").$type<UserSettings>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true })
+        .notNull()
+        .$defaultFn(() => new Date()),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+        .notNull()
+        .$defaultFn(() => new Date())
+        .$onUpdate(() => new Date()),
+});
 
 export * from "./auth.schema";

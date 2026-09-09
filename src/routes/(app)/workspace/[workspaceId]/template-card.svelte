@@ -3,11 +3,11 @@
     import chevronRightIcon from "@ktibow/iconset-material-symbols/chevron-right";
     import { Icon } from "m3-svelte";
 
-    import type { ServiceTemplate } from "#lib/domain/templates";
+    import type { ResourceTemplate } from "#lib/domain/templates";
 
     interface Props {
         selected: boolean;
-        template: ServiceTemplate;
+        template: ResourceTemplate;
         onclick: () => void;
     }
 
@@ -25,10 +25,10 @@
 <button
     type="button"
     class={[
-        "template-card flex h-full min-h-64 cursor-pointer flex-col items-start gap-3 rounded-[1.25rem] border p-5 text-left",
+        "template-card m3-layer flex h-full min-h-64 cursor-pointer flex-col items-start gap-3 rounded-li border p-5 text-left transition-colors",
         selected
             ? "border-primary bg-primary-container-subtle"
-            : "border-outline-variant bg-surface-container hover:bg-surface-container-high",
+            : "border-outline-variant bg-surface-container",
     ]}
     aria-pressed={selected}
     {onclick}
@@ -75,7 +75,7 @@
         class="text-on-surface-variant mt-auto flex w-full items-center justify-between"
     >
         <span class="m3-font-label-medium">{version}</span>
-        <Icon icon={chevronRightIcon} size={18} />
+        <Icon icon={chevronRightIcon} size={18} aria-hidden="true" />
     </div>
 </button>
 

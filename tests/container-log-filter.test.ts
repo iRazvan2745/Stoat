@@ -1,7 +1,7 @@
 import { expect, it } from "vite-plus/test";
 
-import { filterContainerLogs } from "#lib/domain/services/container-logs";
-import type { ContainerLogRecord } from "#lib/domain/services/container-logs";
+import { filterContainerLogs } from "#lib/domain/resources/container-logs";
+import type { ContainerLogRecord } from "#lib/domain/resources/container-logs";
 
 const logs: ContainerLogRecord[] = [
     {

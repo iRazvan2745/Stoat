@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { listComposeCaddyIngresses, parseCaddyIngresses } from "#lib/server/services/compose-caddy";
-import { interpolateComposeVariables } from "#lib/server/services/compose-interpolate";
+import {
+    listComposeCaddyIngresses,
+    parseCaddyIngresses,
+} from "#lib/server/resources/compose-caddy";
+import { interpolateComposeVariables } from "#lib/server/resources/compose-interpolate";
 
 const SEAFILE_CADDY = `files.example.com {
   handle_path /socket.io/* {

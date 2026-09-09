@@ -156,3 +156,32 @@ export function validateEnvironmentVariables(variables: readonly EnvironmentVari
 
     return errors;
 }
+
+/**
+ * Merges workspace and resource environment variables into an effective list.
+ *
+ * Workspace variables come first; resource variables overwrite on name collision
+ * (resource wins). Workspace-only names keep input order, overridden names keep
+ * their workspace position with the resource value, and resource-only names are
+ * appended in resource input order.
+ *
+ * @param workspaceVars - Base variables inherited from the workspace.
+ * @param resourceVars - Resource-level variables that override workspace names.
+ * @returns New array with merged variables; inputs are not mutated.
+ */
+export function mergeEnvironmentVariables(
+    workspaceVars: readonly EnvironmentVariable[],
+    resourceVars: readonly EnvironmentVariable[],
+): EnvironmentVariable[] {
+    const merged = new Map<string, EnvironmentVariable>();
+
+    for (const variable of workspaceVars) {
+        merged.set(variable.name, { name: variable.name, value: variable.value });
+    }
+
+    for (const variable of resourceVars) {
+        merged.set(variable.name, { name: variable.name, value: variable.value });
+    }
+
+    return [...merged.values()];
+}

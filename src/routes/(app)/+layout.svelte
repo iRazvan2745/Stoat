@@ -32,7 +32,9 @@
                 icon={addIcon}
                 color="primary-container"
                 text={open ? "New" : undefined}
-                elevation="none"
+                aria-label="New"
+                aria-haspopup="menu"
+                aria-expanded={fabMenuOpen}
                 style="anchor-name: --m3-menu-anchor"
                 onclick={() => (fabMenuOpen = !fabMenuOpen)}
             />

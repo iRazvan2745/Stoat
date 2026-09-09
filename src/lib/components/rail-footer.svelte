@@ -83,12 +83,12 @@
     <div bind:this={root} class="relative {open ? 'w-full' : ''}">
         <button
             type="button"
-            class="flex items-center gap-3 rounded-full p-1 text-start {open
+            class="account-trigger m3-layer flex items-center gap-3 rounded-full p-1 text-start {open
                 ? 'w-full'
                 : ''}"
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            aria-label={user?.name}
+            aria-label={user?.name ?? "Account menu"}
             onclick={toggleMenu}
         >
             {#if user?.image}
@@ -113,12 +113,12 @@
                 {/await}
             {:else if $session.isPending}
                 <span
-                    class="bg-secondary-container text-on-secondary-container grid size-10 shrink-0 place-items-center rounded-full text-sm font-medium"
+                    class="bg-secondary-container text-on-secondary-container m3-font-label-large grid size-10 shrink-0 place-items-center rounded-full"
                     aria-hidden="true"
                 ></span>
             {:else}
                 <span
-                    class="bg-secondary-container text-on-secondary-container grid size-10 shrink-0 place-items-center rounded-full text-sm font-medium"
+                    class="bg-secondary-container text-on-secondary-container m3-font-label-large grid size-10 shrink-0 place-items-center rounded-full"
                 >
                     {user?.name?.charAt(0) ?? "?"}
                 </span>
@@ -126,10 +126,10 @@
 
             {#if open}
                 <span class="flex min-w-0 flex-col">
-                    <span class="text-on-surface truncate text-sm font-medium">
+                    <span class="text-on-surface m3-font-label-large truncate">
                         {user?.name}
                     </span>
-                    <span class="text-on-surface-variant truncate text-xs">
+                    <span class="text-on-surface-variant m3-font-body-small truncate">
                         {user?.email}
                     </span>
                 </span>
@@ -158,6 +158,10 @@
 </div>
 
 <style>
+    .account-trigger {
+        @apply --m3-focus-inward;
+    }
+
     :global(.account-menu > .m3-container) {
         max-height: min(32rem, calc(100svh - 2rem));
     }

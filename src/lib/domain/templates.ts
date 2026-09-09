@@ -12,7 +12,7 @@ export interface TemplateVersionSummary {
     version: string;
 }
 
-export interface ServiceTemplate {
+export interface ResourceTemplate {
     appId: string;
     description: string;
     logoSrc: string | null;

@@ -147,7 +147,7 @@
         {/if}
     </div>
 
-    <div class="search-actions" aria-label="Search actions">
+    <div class="search-actions" role="group" aria-label="Search actions">
         <Button variant="text" size="s" iconType="left" onclick={onPrevious}>
             <Icon icon={keyboardArrowUpIcon} />
             Previous
@@ -183,7 +183,7 @@
         {/if}
     </div>
 
-    <div class="search-options" aria-label="Search options">
+    <div class="search-options" role="group" aria-label="Search options">
         <label class="option m3-font-label-large">
             <Checkbox>
                 <input

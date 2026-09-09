@@ -1,6 +1,6 @@
 # Git synchronization
 
-Stoat keeps editable, unformatted Compose in the app and formatted deployment Compose in Git. Git files also contain an `x-stoat` extension with service identity, prefix settings, workspace information, group, name, and icon. Keep that extension when editing or moving files so Stoat can recognize existing services.
+Stoat keeps editable, unformatted Compose in the app and formatted deployment Compose in Git. Git files also contain an `x-stoat` extension with resource identity, prefix settings, workspace information, group, name, and icon. Keep that extension when editing or moving files so Stoat can recognize existing resources.
 
 ## Using it
 
@@ -11,24 +11,24 @@ Stoat keeps editable, unformatted Compose in the app and formatted deployment Co
 
 The first sync starts at the current commit instead of replaying the repository's entire pre-Stoat history. Subsequent syncs process every unseen commit on the checked-out branch, in first-parent order, including commits with no Compose changes. Merge commits deploy their merged tree. A burst of commits is not collapsed into a single deployment.
 
-Every recognized service present in a commit gets a deployment with that commit's SHA and immutable formatted Compose. Queue deduplication is per service and commit, so repeated syncs and retries do not create extra deployments. An explicit redeploy of unchanged configuration can still use the same commit. A normal app deployment publishes its formatted configuration before enqueueing.
+Every recognized resource present in a commit gets a deployment with that commit's SHA and immutable formatted Compose. Queue deduplication is per resource and commit, so repeated syncs and retries do not create extra deployments. An explicit redeploy of unchanged configuration can still use the same commit. A normal app deployment publishes and deploys only that resource's formatted configuration; unresolved differences in other resources remain visible on the Git Source without blocking it.
 
 Git versions Compose and non-secret app metadata. App-managed environment values remain outside Git and are captured in each private deployment snapshot. They are applied only when preparing the deployment payload.
 
 ## Repository structure
 
-New app services use:
+New app resources use:
 
 ```text
 workspace-slug/
-  service-slug/
+  resource-slug/
     compose.yaml
   Group%20name/
-    service-slug/
+    resource-slug/
       compose.yaml
 ```
 
-Existing repositories can use `compose.yaml`, `compose.yml`, `docker-compose.yaml`, or `docker-compose.yml`. Two folder levels map to workspace/service; deeper paths include a group. Older imported paths remain usable. App group changes move the tracked Compose file, and Git folder moves with preserved `x-stoat` identity update the app group. A Git move to another workspace requires that destination workspace to exist in the app.
+Existing repositories can use `compose.yaml`, `compose.yml`, `docker-compose.yaml`, or `docker-compose.yml`. Two folder levels map to workspace/resource; deeper paths include a group. Older imported paths remain usable. App group changes move the tracked Compose file, and Git folder moves with preserved `x-stoat` identity update the app group. A Git move to another workspace requires that destination workspace to exist in the app.
 
 For a new unassigned file, Stoat uses the matching workspace's cluster, a matching metadata destination, or the repository's sole cluster connection. Ambiguous destinations require an existing workspace folder; Stoat does not guess a cluster.
 
@@ -36,7 +36,7 @@ For a new unassigned file, Stoat uses the matching workspace's cluster, a matchi
 
 A sync compares the last synchronized app and Git fingerprints. If both sides changed differently, it preserves both versions and reports a conflict. **Resolve sync differences** lets you use Git changes or keep app changes. Keeping app changes queues the unseen Git revisions first, then publishes the app version as a new commit.
 
-Invalid Compose for a known service becomes a failed deployment snapshot; a later fixing commit can still proceed. Invalid files without a known service are reported instead of creating an unusable service. Missing tracked files preserve the app service and pause synchronization rather than deleting running workloads. Restore the file, retaining its metadata, to continue. When deleting a service in the app, also remove its tracked Git file; later commits will not recreate a deleted service whose identity was already synchronized.
+Invalid Compose for a known resource becomes a failed deployment snapshot; a later fixing commit can still proceed. Invalid files without a known resource are reported instead of creating an unusable resource. Missing tracked files preserve the app resource and pause synchronization rather than deleting running workloads. Restore the file, retaining its metadata, to continue. When deleting a resource in the app, also remove its tracked Git file; later commits will not recreate a deleted resource whose identity was already synchronized.
 
 Git pulls only fast-forward. Rewritten history, unfinished local changes, and failed access are reported. A failed push retains the local commit for retry. One checkout per Git Source replaces separate checkouts for new workspaces; synchronization and publication use process and PostgreSQL locks.
 

@@ -7,13 +7,13 @@ import { describe, expect, it } from "vite-plus/test";
 import { createWorkspaceFolder } from "#lib/server/data-sources/paths";
 
 describe("workspace folders", () => {
-    it("creates nested workspace and service folders", async () => {
+    it("creates nested workspace and resource folders", async () => {
         const root = await mkdtemp(path.join(tmpdir(), "stoat-data-source-"));
 
         try {
-            const folder = await createWorkspaceFolder(root, "my-workspace", "my-service-abc12");
+            const folder = await createWorkspaceFolder(root, "my-workspace", "my-resource-abc12");
 
-            expect(folder).toBe(path.join(root, "my-workspace", "my-service-abc12"));
+            expect(folder).toBe(path.join(root, "my-workspace", "my-resource-abc12"));
             await expect(access(folder)).resolves.toBeUndefined();
         } finally {
             await rm(root, { force: true, recursive: true });

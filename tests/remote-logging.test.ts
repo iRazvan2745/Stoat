@@ -126,10 +126,10 @@ describe("withRemoteLogging", () => {
         });
         const hooks = createEvlogHooks({ redact: false });
         const run = withRemoteLogging(
-            "services.getService",
+            "resources.getResource",
             "query",
-            (serviceId: string) => serviceId,
-            { inputKey: "serviceId" },
+            (resourceId: string) => resourceId,
+            { inputKey: "resourceId" },
         );
         const event = {
             locals: {},
@@ -140,7 +140,7 @@ describe("withRemoteLogging", () => {
         await hooks.handle({
             event,
             resolve: async () => {
-                await run("service-123");
+                await run("resource-123");
                 return new Response("ok");
             },
         });
@@ -149,21 +149,21 @@ describe("withRemoteLogging", () => {
         expect(events[0]?.remoteCalls).toEqual([
             {
                 input: {
-                    identifiers: { serviceId: "service-123" },
-                    keys: ["serviceId"],
+                    identifiers: { resourceId: "resource-123" },
+                    keys: ["resourceId"],
                     type: "object",
                 },
-                operation: "services.getService",
+                operation: "resources.getResource",
                 phase: "started",
                 type: "query",
             },
             {
                 input: {
-                    identifiers: { serviceId: "service-123" },
-                    keys: ["serviceId"],
+                    identifiers: { resourceId: "resource-123" },
+                    keys: ["resourceId"],
                     type: "object",
                 },
-                operation: "services.getService",
+                operation: "resources.getResource",
                 phase: "completed",
                 type: "query",
             },
@@ -183,12 +183,12 @@ describe("withRemoteLogging", () => {
         });
         const hooks = createEvlogHooks({ redact: false });
         const run = withRemoteLogging(
-            "services.deleteService",
+            "resources.deleteResource",
             "command",
-            (serviceId: string) => {
-                throw new Error(`Unable to delete ${serviceId}`);
+            (resourceId: string) => {
+                throw new Error(`Unable to delete ${resourceId}`);
             },
-            { inputKey: "serviceId" },
+            { inputKey: "resourceId" },
         );
         const event = {
             locals: {},
@@ -200,20 +200,20 @@ describe("withRemoteLogging", () => {
             hooks.handle({
                 event,
                 resolve: async () => {
-                    await run("service-123");
+                    await run("resource-123");
                     return new Response("ok");
                 },
             }),
-        ).rejects.toThrow("Unable to delete service-123");
+        ).rejects.toThrow("Unable to delete resource-123");
 
         expect(events[0]?.level).toBe("error");
         expect(events[0]?.error).toMatchObject({
-            message: "Unable to delete service-123",
+            message: "Unable to delete resource-123",
         });
         expect(events[0]?.remoteCalls).toEqual(
             expect.arrayContaining([
                 expect.objectContaining({
-                    operation: "services.deleteService",
+                    operation: "resources.deleteResource",
                     phase: "failed",
                     type: "command",
                 }),

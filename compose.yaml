@@ -37,7 +37,7 @@ services:
         image: postgres:18-alpine
         environment:
             POSTGRES_DB: stoat
-            POSTGRES_PASSWORD: stoat
+            POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-stoat}"
             POSTGRES_USER: stoat
         healthcheck:
             test: ["CMD-SHELL", "pg_isready -U stoat -d stoat"]

@@ -331,7 +331,6 @@
         border-radius: var(--m3-shape-medium);
         background: var(--m3c-primary-container);
         color: var(--m3c-on-primary-container);
-        font-weight: 600;
     }
 
     .organization-avatar img {

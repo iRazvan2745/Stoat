@@ -1,4 +1,4 @@
-export interface GitServiceSyncState {
+export interface GitResourceSyncState {
     sourceId: string;
     path: string;
     appHash: string;

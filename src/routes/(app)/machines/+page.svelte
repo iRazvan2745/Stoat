@@ -1,6 +1,6 @@
 <script lang="ts">
     import databaseIcon from "@ktibow/iconset-material-symbols/database";
-    import favoriteIcon from "@ktibow/iconset-material-symbols/favorite";
+    import monitorHeartIcon from "@ktibow/iconset-material-symbols/monitor-heart";
     import { Button, Card, Icon, LoadingIndicator } from "m3-svelte";
 
     import { listOrganizationMachines } from "#lib/api/cluster/machines.remote";
@@ -55,9 +55,9 @@
 
 <div class="flex items-center justify-between gap-4 py-5">
     <div>
-        <h1 class="text-on-surface text-lg font-medium">Machines</h1>
+        <h1 class="m3-font-headline-small text-on-surface">Machines</h1>
 
-        <p class="text-on-surface-variant mt-0.5 text-sm">
+        <p class="m3-font-body-medium text-on-surface-variant mt-0.5">
             {machineCount}
             {machineCount === 1 ? "machine" : "machines"}
             <span aria-hidden="true"> · </span>
@@ -77,9 +77,9 @@
             <LoadingIndicator aria-label="Loading machines" />
         </div>
     {:else if machines.error}
-        <div class="text-error p-6 text-sm">{machines.error.message}</div>
+        <div class="text-error m3-font-body-medium p-6">{machines.error.message}</div>
     {:else if sourceCount === 0}
-        <div class="text-on-surface-variant px-5 py-10 text-center text-sm">
+        <div class="text-on-surface-variant m3-font-body-medium px-5 py-10 text-center">
             No data sources are configured for this organization.
         </div>
     {:else}
@@ -98,25 +98,25 @@
                 >
                     <tr>
                         <th
-                            class="px-5 py-3 text-xs font-medium whitespace-nowrap"
+                            class="m3-font-label-medium px-5 py-3 whitespace-nowrap"
                             scope="col"
                         >
                             Machine
                         </th>
                         <th
-                            class="px-5 py-3 text-xs font-medium whitespace-nowrap"
+                            class="m3-font-label-medium px-5 py-3 whitespace-nowrap"
                             scope="col"
                         >
                             Public IP
                         </th>
                         <th
-                            class="px-5 py-3 text-xs font-medium whitespace-nowrap"
+                            class="m3-font-label-medium px-5 py-3 whitespace-nowrap"
                             scope="col"
                         >
                             Management
                         </th>
                         <th
-                            class="px-5 py-3 text-xs font-medium whitespace-nowrap"
+                            class="m3-font-label-medium px-5 py-3 whitespace-nowrap"
                             scope="col"
                         >
                             OS
@@ -141,18 +141,18 @@
 
                                     <div class="min-w-0 text-left">
                                         <div
-                                            class="text-on-surface truncate text-sm font-medium"
+                                            class="m3-font-label-large text-on-surface truncate"
                                         >
                                             {group.source.label}
                                         </div>
                                         <div
-                                            class="text-on-surface-variant truncate font-mono text-xs font-normal"
+                                            class="text-on-surface-variant m3-font-label-small truncate font-mono"
                                         >
                                             {group.source.uncloudUrl}
                                         </div>
                                         {#if group.source.error}
                                             <div
-                                                class="text-error mt-1 text-xs font-normal"
+                                                class="text-error m3-font-body-small mt-1"
                                             >
                                                 {group.source.error}
                                             </div>
@@ -178,18 +178,18 @@
                                             aria-label={`Machine status: ${machine.state}`}
                                         >
                                             <Icon
-                                                icon={favoriteIcon}
+                                                icon={monitorHeartIcon}
                                                 size={20}
                                             />
                                         </div>
                                         <div class="min-w-0">
                                             <div
-                                                class="text-on-surface truncate text-sm font-medium"
+                                                class="m3-font-label-large text-on-surface truncate"
                                             >
                                                 {machine.name}
                                             </div>
                                             <div
-                                                class="text-on-surface-variant truncate font-mono text-xs"
+                                                class="text-on-surface-variant m3-font-label-small truncate font-mono"
                                             >
                                                 {machine.hostname ?? machine.id}
                                             </div>
@@ -198,7 +198,7 @@
                                 </td>
 
                                 <td
-                                    class="px-5 py-4 align-middle font-mono text-sm whitespace-nowrap"
+                                    class="m3-font-body-medium px-5 py-4 align-middle font-mono whitespace-nowrap"
                                 >
                                     <div
                                         class="truncate"
@@ -209,7 +209,7 @@
                                 </td>
 
                                 <td
-                                    class="px-5 py-4 align-middle font-mono text-sm whitespace-nowrap"
+                                    class="m3-font-body-medium px-5 py-4 align-middle font-mono whitespace-nowrap"
                                 >
                                     <div
                                         class="max-w-40 truncate"
@@ -221,11 +221,11 @@
                                 </td>
 
                                 <td class="px-5 py-4 align-middle">
-                                    <div class="text-on-surface text-sm">
+                                    <div class="m3-font-body-medium text-on-surface">
                                         {machine.osPrettyName ?? "Unknown OS"}
                                     </div>
                                     <div
-                                        class="text-on-surface-variant mt-1 max-w-48 truncate text-xs"
+                                        class="text-on-surface-variant m3-font-body-small mt-1 max-w-48 truncate"
                                         title={machine.kernelVersion ?? "—"}
                                     >
                                         Kernel {machine.kernelVersion ?? "—"}
@@ -237,7 +237,7 @@
                         {#if group.items.length === 0}
                             <tr>
                                 <td
-                                    class="text-on-surface-variant border-outline-variant border-t px-5 py-4 text-sm"
+                                    class="text-on-surface-variant m3-font-body-medium border-outline-variant border-t px-5 py-4"
                                     colspan="4"
                                 >
                                     No machines returned from this data source.

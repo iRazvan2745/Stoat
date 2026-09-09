@@ -799,6 +799,19 @@ func TestValidationAndErrorResponses(t *testing.T) {
 	assert.NotEmpty(t, decodeResponse[ErrorResponse](t, response).Error)
 }
 
+func TestComposeRequestSizeLimit(t *testing.T) {
+	server, fake := newTestServer(t)
+	compose := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{'x'}, maxComposeFileBytes+1))
+
+	response := doRequest(t, server, http.MethodPost, "/api/v1/services/deploy/compose", DeployComposeRequest{
+		Compose: compose,
+	}, "")
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, response.StatusCode)
+	assert.Contains(t, decodeResponse[ErrorResponse](t, response).Error, "4 MiB")
+	assert.Empty(t, fake.lastDeployComposeReq.Compose)
+}
+
 func TestGRPCStatusMapping(t *testing.T) {
 	tests := []struct {
 		code     codes.Code

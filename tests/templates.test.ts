@@ -163,7 +163,7 @@ describe("readTemplateVersion", () => {
         await expect(readTemplateVersion("../etc", "18")).rejects.toThrow("Invalid template");
     });
 
-    it("keeps secret placeholders until the service is created", async () => {
+    it("keeps secret placeholders until the resource is created", async () => {
         const version = await readTemplateVersion("postgresql", "18");
         const password = version.variables.find(
             (variable) => variable.name === "POSTGRES_PASSWORD",

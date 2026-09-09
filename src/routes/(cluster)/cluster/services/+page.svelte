@@ -13,9 +13,9 @@
 
 <div class="flex items-center justify-between gap-4 p-5">
     <div>
-        <h1 class="text-on-surface text-lg font-medium">Services</h1>
+        <h1 class="m3-font-headline-small text-on-surface">Services</h1>
 
-        <p class="text-on-surface-variant mt-0.5 text-sm">
+        <p class="m3-font-body-medium text-on-surface-variant mt-0.5">
             {services.current?.items.length ?? 0}
             {(services.current?.items.length ?? 0) === 1
                 ? "service"
@@ -31,7 +31,7 @@
             <LoadingIndicator aria-label="Loading services" />
         </div>
     {:else if services.error}
-        <div class="text-error p-6 text-sm">
+        <div class="text-error m3-font-body-medium p-6">
             {services.error.message}
         </div>
     {:else}
@@ -40,12 +40,12 @@
             <div
                 class="
           text-on-surface-variant
+          m3-font-label-medium
           bg-surface-container-high grid
           min-w-275
           grid-cols-[minmax(260px,1.4fr)_130px_240px_110px] items-center
           gap-4 px-5
-          py-3 text-xs
-          font-medium
+          py-3
         "
             >
                 <span>Service</span>
@@ -63,7 +63,8 @@
                 <div
                     class="
             text-on-surface-variant
-            px-5 py-10 text-center text-sm
+            m3-font-body-medium
+            px-5 py-10 text-center
           "
                 >
                     No services found.

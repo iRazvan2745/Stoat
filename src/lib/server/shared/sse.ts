@@ -143,6 +143,9 @@ export async function consumeSseJsonStream(
         }
     } finally {
         signal?.removeEventListener("abort", abort);
+        // A consumer callback can fail while the upstream response is still
+        // streaming. Releasing the lock alone does not close that connection.
+        await cancelReader(reader);
 
         try {
             reader.releaseLock();

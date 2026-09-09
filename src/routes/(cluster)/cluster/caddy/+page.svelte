@@ -1,7 +1,14 @@
 <script lang="ts">
     import contentCopyIcon from "@ktibow/iconset-material-symbols/content-copy-outline";
     import refreshIcon from "@ktibow/iconset-material-symbols/refresh";
-    import { Button, Card, Icon, LoadingIndicator, Snackbar } from "m3-svelte";
+    import {
+        Button,
+        Card,
+        Icon,
+        LoadingIndicator,
+        RadioAnim1,
+        Snackbar,
+    } from "m3-svelte";
     import { parseAsString, useQueryState } from "nuqs-svelte";
     import CodeMirror from "svelte-codemirror-editor";
 
@@ -57,9 +64,9 @@
 
 <div class="flex items-center justify-between gap-4 p-5">
     <div>
-        <h1 class="text-on-surface text-lg font-medium">Caddy</h1>
+        <h1 class="m3-font-headline-small text-on-surface">Caddy</h1>
 
-        <p class="text-on-surface-variant mt-0.5 text-sm">
+        <p class="m3-font-body-medium text-on-surface-variant mt-0.5">
             Select a machine to view its Caddyfile.
         </p>
     </div>
@@ -76,9 +83,9 @@
             <LoadingIndicator aria-label="Loading Caddy configurations" />
         </div>
     {:else if caddy.error}
-        <div class="text-error p-6 text-sm">{caddy.error.message}</div>
+        <div class="text-error m3-font-body-medium p-6">{caddy.error.message}</div>
     {:else if configs.length === 0}
-        <div class="text-on-surface-variant px-5 py-10 text-center text-sm">
+        <div class="text-on-surface-variant m3-font-body-medium px-5 py-10 text-center">
             No Caddy configurations are available.
         </div>
     {:else}
@@ -88,10 +95,10 @@
                     class="bg-surface-container-high text-on-surface-variant"
                 >
                     <tr>
-                        <th class="px-5 py-3 text-xs font-medium" scope="col">
+                        <th class="m3-font-label-medium px-5 py-3" scope="col">
                             Machine
                         </th>
-                        <th class="px-5 py-3 text-xs font-medium" scope="col">
+                        <th class="m3-font-label-medium px-5 py-3" scope="col">
                             Data source
                         </th>
                     </tr>
@@ -110,23 +117,25 @@
                                 <label
                                     class="text-on-surface flex cursor-pointer items-center gap-3"
                                 >
-                                    <input
-                                        class="machine-selector size-4"
-                                        type="radio"
-                                        name="caddy-machine"
-                                        value={configKey(item)}
-                                        checked={selectedConfig === item}
-                                        onchange={() => selectConfig(item)}
-                                        aria-label={`Show Caddyfile for ${item.config.machineName}`}
-                                    />
+                                    <RadioAnim1>
+                                        <input
+                                            type="radio"
+                                            name="caddy-machine"
+                                            value={configKey(item)}
+                                            checked={selectedConfig === item}
+                                            onchange={() =>
+                                                selectConfig(item)}
+                                            aria-label={`Show Caddyfile for ${item.config.machineName}`}
+                                        />
+                                    </RadioAnim1>
                                     <span class="min-w-0">
                                         <span
-                                            class="block truncate text-sm font-medium"
+                                            class="m3-font-label-large text-on-surface block truncate"
                                         >
                                             {item.config.machineName}
                                         </span>
                                         <span
-                                            class="text-on-surface-variant block truncate font-mono text-xs"
+                                            class="text-on-surface-variant m3-font-label-small block truncate font-mono"
                                         >
                                             {item.config.machineId}
                                         </span>
@@ -134,7 +143,7 @@
                                 </label>
                             </td>
                             <td
-                                class="text-on-surface-variant px-5 py-3 text-sm"
+                                class="text-on-surface-variant m3-font-body-medium px-5 py-3"
                             >
                                 {sourceLabel(item.dataSourceId)}
                             </td>
@@ -155,7 +164,7 @@
                         Caddyfile
                     </h2>
                     <p
-                        class="text-on-surface-variant mt-0.5 truncate font-mono text-xs"
+                        class="text-on-surface-variant m3-font-label-small mt-0.5 truncate font-mono"
                     >
                         {selectedConfig.config.machineName}
                         <span aria-hidden="true"> · </span>
@@ -247,10 +256,6 @@
 
     :global(#caddyfile-card.m3-container) {
         padding: 1rem;
-    }
-
-    .machine-selector {
-        accent-color: var(--m3c-primary);
     }
 
     .caddyfile-editor :global(.codemirror-wrapper),

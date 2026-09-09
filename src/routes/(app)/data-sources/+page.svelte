@@ -520,9 +520,11 @@
     const remove = async (): Promise<void> => {
         const id = deleting.current;
 
-        if (!id) {
+        if (!id || deletingSubmitting) {
             return;
         }
+
+        deletingSubmitting = true;
 
         try {
             await deleteDataSource(id);
@@ -536,6 +538,8 @@
                     ? error.message
                     : "Unable to delete data source"
             );
+        } finally {
+            deletingSubmitting = false;
         }
     };
 </script>
@@ -545,13 +549,13 @@
     onkeydown={closeActionsMenuOnEscape}
 />
 
-<main class="mx-auto w-full max-w-6xl px-6 py-10 max-sm:px-4 max-sm:py-6">
+<main class="mx-auto w-full max-w-l px-6 py-10 max-m:px-4 max-m:py-6">
     <header class="flex flex-wrap items-end justify-between gap-4">
         <div>
-            <h1 class="text-on-surface text-3xl font-medium tracking-tight">
+            <h1 class="m3-font-headline-medium text-on-surface">
                 Data sources
             </h1>
-            <p class="text-on-surface-variant mt-2 max-w-2xl text-sm">
+            <p class="text-on-surface-variant m3-font-body-medium mt-2 max-w-m">
                 Cluster connections select where services deploy. Git
                 repositories store Compose configuration and provide discovery;
                 assign one to each connection.
@@ -602,7 +606,7 @@
                     <LoadingIndicator aria-label="Loading data sources" />
                 </div>
             {:else if dataSources.error}
-                <div class="text-error p-6 text-sm">
+                <div class="text-error m3-font-body-medium p-6">
                     {dataSources.error.message}
                 </div>
             {:else}
@@ -696,7 +700,7 @@
                         </div>
                     {:else}
                         <div
-                            class="text-on-surface-variant px-5 py-10 text-center text-sm"
+                            class="text-on-surface-variant m3-font-body-medium px-5 py-10 text-center"
                         >
                             No data sources yet.
                         </div>
@@ -710,7 +714,7 @@
             headline="Add cluster connection"
         >
             <div
-                class="flex min-w-[min(30rem,calc(100vw-3rem))] flex-col gap-5 max-sm:min-w-0"
+                class="flex min-w-[min(30rem,calc(100vw-3rem))] flex-col gap-5 max-m:min-w-0"
             >
                 <div
                     class="bg-primary-container-subtle flex items-start gap-3 rounded-xl p-3.5"
@@ -720,11 +724,11 @@
                         ><Icon icon={cloudIcon} size={20} /></span
                     >
                     <div>
-                        <p class="text-on-surface text-sm font-medium">
+                        <p class="m3-font-label-large text-on-surface">
                             Connect an Uncloud cluster
                         </p>
                         <p
-                            class="text-on-surface-variant mt-1 text-xs leading-relaxed"
+                            class="text-on-surface-variant m3-font-body-small mt-1"
                         >
                             Assign a Git Source for Compose discovery.
                             Credentials are stored with the source and are never
@@ -733,14 +737,14 @@
                     </div>
                 </div>
                 <div class="flex flex-col gap-3">
-                    <span class="text-on-surface text-sm font-medium"
+                    <span class="m3-font-label-large text-on-surface"
                         >Git repository</span
                     >
                     {#if gitSources.loading}
                         <LoadingIndicator aria-label="Loading Git Sources" />
                     {:else if gitSourceOptions.length === 0}
                         <p
-                            class="text-on-surface-variant text-xs leading-relaxed"
+                            class="text-on-surface-variant m3-font-body-small"
                         >
                             Add a Git Source first, then assign it to this data
                             source.
@@ -761,7 +765,7 @@
                         />
                         {#if selectedGitSource}
                             <p
-                                class="text-on-surface-variant text-xs leading-relaxed"
+                                class="text-on-surface-variant m3-font-body-small"
                             >
                                 {authMethodLabel(selectedGitSource.authMethod)} ·
                                 {presentDataSource({
@@ -772,7 +776,7 @@
                     {/if}
                 </div>
                 <div class="flex flex-col gap-3">
-                    <span class="text-on-surface text-sm font-medium"
+                    <span class="m3-font-label-large text-on-surface"
                         >Uncloud</span
                     >
                     <TextFieldOutlined
@@ -804,7 +808,7 @@
         </Dialog>
     {:else}
         <div class="mt-6">
-            <p class="text-on-surface-variant mb-4 text-sm">
+            <p class="text-on-surface-variant m3-font-body-medium mb-4">
                 Sync pulls Git changes and publishes app edits as formatted
                 Compose. Every new commit deploys its services. Enable automatic
                 deployments from a repository’s actions menu to check every
@@ -815,7 +819,7 @@
                     <LoadingIndicator aria-label="Loading Git Sources" />
                 </div>
             {:else if gitSources.error}
-                <div class="text-error p-6 text-sm">
+                <div class="text-error m3-font-body-medium p-6">
                     {gitSources.error.message}
                 </div>
             {:else if (gitSources.current?.length ?? 0) === 0}
@@ -826,10 +830,10 @@
                         class="bg-secondary-container text-on-secondary-container grid size-10 place-items-center rounded-xl"
                         ><Icon icon={keyIcon} size={20} /></span
                     >
-                    <h3 class="text-on-surface mt-3 font-medium">
+                    <h3 class="m3-font-title-medium text-on-surface mt-3">
                         No Git Sources yet
                     </h3>
-                    <p class="text-on-surface-variant mt-1 max-w-md text-sm">
+                    <p class="text-on-surface-variant m3-font-body-medium mt-1 max-w-m">
                         Add a public repository or connect with an HTTPS token,
                         basic credentials, or an SSH private key.
                     </p>
@@ -874,12 +878,16 @@
                                             )}{/if}
                                     {/if}
                                 </span>
-                                {#each source.syncResult?.issues ?? [] as issue}
-                                    <span
-                                        class="text-error text-xs whitespace-normal"
-                                        role="status">{issue}</span
-                                    >
-                                {/each}
+                                {#if (source.syncResult?.issues ?? []).length > 0}
+                                    <span role="alert" class="flex flex-col gap-1">
+                                        {#each source.syncResult?.issues ?? [] as issue}
+                                            <span
+                                                class="text-error m3-font-body-small whitespace-normal"
+                                                >{issue}</span
+                                            >
+                                        {/each}
+                                    </span>
+                                {/if}
                             </span>
                             <span class="source-detail">
                                 <span class="source-auth">
@@ -1006,12 +1014,12 @@
         if (!syncingGitSourceId) resolvingGitSourceId = null;
     }}
 >
-    <p class="text-on-surface-variant text-sm">
+    <p class="text-on-surface-variant m3-font-body-medium">
         Choose which version to keep when the app and Git both changed. Unseen
         Git commits still receive deployments in order. Keeping app changes
         publishes them as a new commit after those commits.
     </p>
-    <p class="text-on-surface-variant mt-3 text-sm">
+    <p class="text-on-surface-variant m3-font-body-medium mt-3">
         Missing files or rewritten Git history must be restored in the
         repository first.
     </p>
@@ -1047,10 +1055,10 @@
     headline="Edit cluster connection"
 >
     <div
-        class="flex min-w-[min(30rem,calc(100vw-3rem))] flex-col gap-5 max-sm:min-w-0"
+        class="flex min-w-[min(30rem,calc(100vw-3rem))] flex-col gap-5 max-m:min-w-0"
     >
         <div class="flex flex-col gap-3">
-            <span class="text-on-surface text-sm font-medium"
+            <span class="m3-font-label-large text-on-surface"
                 >Git repository</span
             >
             <SelectOutlined
@@ -1059,7 +1067,7 @@
                 options={gitSourceOptions}
             />
             {#if editingSelectedGitSource}
-                <p class="text-on-surface-variant text-xs leading-relaxed">
+                <p class="text-on-surface-variant m3-font-body-small">
                     {authMethodLabel(editingSelectedGitSource.authMethod)} ·
                     {presentDataSource({ gitUrl: editingSelectedGitSource.url })
                         .gitRepository ?? "No repository URL"}
@@ -1067,7 +1075,7 @@
             {/if}
         </div>
         <div class="flex flex-col gap-3">
-            <span class="text-on-surface text-sm font-medium">Uncloud</span>
+            <span class="m3-font-label-large text-on-surface">Uncloud</span>
             <TextFieldOutlined
                 bind:value={query.editingUncloudUrl.current}
                 label="Cluster URL"
@@ -1109,15 +1117,19 @@
             Are you sure you want to delete this data source?
         </p>
 
-        <p class="text-on-surface-variant text-sm">
+        <p class="text-on-surface-variant m3-font-body-medium">
             This action cannot be undone.
         </p>
     </div>
 
     {#snippet buttons()}
-        <Button variant="text" onclick={() => deleting.set("")}>Cancel</Button>
+        <Button
+            variant="text"
+            disabled={deletingSubmitting}
+            onclick={() => deleting.set("")}>Cancel</Button
+        >
 
-        <Button onclick={remove}>Delete</Button>
+        <Button disabled={deletingSubmitting} onclick={remove}>Delete</Button>
     {/snippet}
 </Dialog>
 
@@ -1127,10 +1139,10 @@
     onclose={closeCreateGitSourceDialog}
 >
     <div
-        class="flex min-w-[min(30rem,calc(100vw-3rem))] flex-col gap-5 max-sm:min-w-0"
+        class="flex min-w-[min(30rem,calc(100vw-3rem))] flex-col gap-5 max-m:min-w-0"
     >
         <div class="flex flex-col gap-3">
-            <span class="text-on-surface text-sm font-medium">Repository</span>
+            <span class="m3-font-label-large text-on-surface">Repository</span>
             <TextFieldOutlined
                 bind:value={query.gitSourceName.current}
                 label="Name"
@@ -1145,7 +1157,7 @@
             />
         </div>
         <div class="flex flex-col gap-3">
-            <span class="text-on-surface text-sm font-medium"
+            <span class="m3-font-label-large text-on-surface"
                 >Authentication</span
             >
             <SelectOutlined
@@ -1198,7 +1210,7 @@
                     rows={3}
                 />
             {/if}
-            <p class="text-on-surface-variant text-xs leading-relaxed">
+            <p class="text-on-surface-variant m3-font-body-small">
                 Keep credentials out of the repository URL. Secret values are
                 write-only.
             </p>
@@ -1225,10 +1237,10 @@
     onclose={closeEditGitSourceDialog}
 >
     <div
-        class="flex min-w-[min(30rem,calc(100vw-3rem))] flex-col gap-5 max-sm:min-w-0"
+        class="flex min-w-[min(30rem,calc(100vw-3rem))] flex-col gap-5 max-m:min-w-0"
     >
         <div class="flex flex-col gap-3">
-            <span class="text-on-surface text-sm font-medium">Repository</span>
+            <span class="m3-font-label-large text-on-surface">Repository</span>
             <TextFieldOutlined
                 bind:value={query.editingGitSourceName.current}
                 label="Name"
@@ -1242,7 +1254,7 @@
             />
         </div>
         <div class="flex flex-col gap-3">
-            <span class="text-on-surface text-sm font-medium"
+            <span class="m3-font-label-large text-on-surface"
                 >Authentication</span
             >
             <SelectOutlined
@@ -1316,7 +1328,7 @@
     headline="Delete Git repository"
     onclose={() => deletingGitSource.set("")}
 >
-    <p class="text-on-surface-variant text-sm">
+    <p class="text-on-surface-variant m3-font-body-medium">
         This removes the repository configuration and its credentials. Assigned
         Git Sources must be reassigned first.
     </p>
@@ -1353,7 +1365,7 @@
         min-height: 4.5rem;
         padding: 0.75rem 0.875rem 0.75rem 1rem;
         border-bottom: 1px solid var(--m3c-outline-variant);
-        transition: background-color 150ms ease;
+        transition: background-color var(--m3-easing-fast);
     }
 
     .source-row:first-child {
@@ -1401,30 +1413,28 @@
     }
 
     .source-name {
+        @apply --m3-title-small;
         overflow: hidden;
         color: var(--m3c-on-surface);
-        font-size: 0.9375rem;
-        font-weight: 500;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
     .source-meta {
+        @apply --m3-body-small;
         overflow: hidden;
         margin-top: 0.125rem;
         color: var(--m3c-on-surface-variant);
-        font-size: 0.75rem;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
     .source-auth {
+        @apply --m3-label-medium;
         display: inline-flex;
         align-items: center;
         gap: 0.375rem;
         color: var(--m3c-on-surface);
-        font-size: 0.8125rem;
-        font-weight: 500;
     }
 
     @media (width < 44rem) {

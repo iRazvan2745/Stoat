@@ -22,7 +22,7 @@
         border-b px-5 py-3
       "
         >
-            <div class="text-on-surface font-medium">
+            <div class="m3-font-label-large text-on-surface">
                 {node.name}
             </div>
 

@@ -9,8 +9,8 @@ import {
     parseContainerLogEvent,
     resolveContainerLabel,
     trimContainerLogs,
-} from "#lib/domain/services/container-logs";
-import type { ContainerLogRecord } from "#lib/domain/services/container-logs";
+} from "#lib/domain/resources/container-logs";
+import type { ContainerLogRecord } from "#lib/domain/resources/container-logs";
 import { consumeSseJsonStream } from "#lib/server/shared/sse";
 
 const log = (
