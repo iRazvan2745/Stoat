@@ -2,6 +2,7 @@
     import { goto } from "$app/navigation";
     import addIcon from "@ktibow/iconset-material-symbols/add";
     import codeBlocksIcon from "@ktibow/iconset-material-symbols/code-blocks-outline";
+    import environmentIcon from "@ktibow/iconset-material-symbols/data-object";
     import deleteIcon from "@ktibow/iconset-material-symbols/delete";
     import moreVertIcon from "@ktibow/iconset-material-symbols/more-vert";
     import refreshIcon from "@ktibow/iconset-material-symbols/refresh";
@@ -28,8 +29,9 @@
         getWorkspace,
         listWorkspaces,
     } from "#lib/api/workspaces.remote";
+    import { getUserSettings, updateUserSettings } from "#lib/api/users.remote";
     import ResourceGroups from "#lib/components/resources/resource-groups.svelte";
-    import WorkspaceEnvironmentSection from "#lib/components/resources/workspace-environment-section.svelte";
+    import { showFolderResourceNames as shouldShowFolderResourceNames } from "#lib/domain/users/settings";
 
     import type { PageProps } from "./$types";
     import TemplatesDialog from "./templates-dialog.svelte";
@@ -40,6 +42,12 @@
     const workspace = getWorkspace(params.workspaceId);
     // svelte-ignore state_referenced_locally
     const resources = listResourcesInWorkspace(params.workspaceId);
+    // svelte-ignore state_referenced_locally
+    const userSettings = getUserSettings();
+    const showFolderResourceNames = $derived(
+        shouldShowFolderResourceNames(userSettings.current)
+    );
+    let savingViewOption = $state(false);
 
     let createDialogOpen = useQueryState(
         "createDialogOpen",
@@ -110,6 +118,28 @@
             );
         } finally {
             deletingWorkspace = false;
+        }
+    };
+
+    const toggleFolderResourceNames = async (): Promise<void> => {
+        if (savingViewOption) {
+            return;
+        }
+        savingViewOption = true;
+        const next = !showFolderResourceNames;
+        try {
+            await updateUserSettings({
+                settings: { showFolderResourceNames: next },
+            });
+            await userSettings.refresh();
+        } catch (error) {
+            snackbar(
+                error instanceof Error
+                    ? error.message
+                    : "Unable to save view setting. Try again."
+            );
+        } finally {
+            savingViewOption = false;
         }
     };
 </script>
@@ -196,6 +226,22 @@
                     label="Workspace actions"
                 >
                     <ExpressiveMenuItem
+                        leadingIcon={environmentIcon}
+                        label="Environment"
+                        onclick={() => {
+                            actionsMenuOpen = false;
+                            void goto(
+                                `/workspace/${params.workspaceId}/environment`
+                            );
+                        }}
+                    />
+                    <ExpressiveMenuItem
+                        label="Show resource names in folders"
+                        selected={showFolderResourceNames}
+                        disabled={savingViewOption}
+                        onclick={toggleFolderResourceNames}
+                    />
+                    <ExpressiveMenuItem
                         leadingIcon={deleteIcon}
                         label="Delete workspace"
                         onclick={() => {
@@ -208,8 +254,6 @@
         </div>
     </div>
 </div>
-
-<WorkspaceEnvironmentSection workspaceId={params.workspaceId} />
 
 <div id="resources-card">
     {#if resources.loading}
@@ -225,6 +269,7 @@
     {:else}
         <ResourceGroups
             resources={resources.current ?? []}
+            showFolderResourceNames={showFolderResourceNames}
             workspaceId={params.workspaceId}
         />
     {/if}

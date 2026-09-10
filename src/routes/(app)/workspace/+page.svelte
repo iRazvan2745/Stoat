@@ -161,10 +161,16 @@
                         variant="elevated"
                         onclick={() => goto(`/workspace/${wrk.id}`)}
                     >
-                        <div class="workspace-icon">
+                        <div
+                            class="bg-primary-container text-on-primary-container flex size-18 items-center justify-center rounded-md"
+                        >
                             <Icon icon={workspacesIcon} size={48} />
                         </div>
-                        <p class="workspace-name">{wrk.name}</p>
+                        <p
+                            class="m-0 overflow-hidden font-medium text-ellipsis"
+                        >
+                            {wrk.name}
+                        </p>
                     </Card>
                 </div>
             {/each}
@@ -192,7 +198,7 @@
                 {dataSources.error.message}
             </p>
         {:else}
-            <div class="data-source-picker">
+            <div class="data-source-picker relative">
                 <Button
                     variant="outlined"
                     aria-expanded={dataSourceMenuOpen}
@@ -201,7 +207,9 @@
                     onclick={() => (dataSourceMenuOpen = !dataSourceMenuOpen)}
                 >
                     <Icon icon={databaseIcon} size={18} />
-                    <span class="data-source-picker-label">
+                    <span
+                        class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+                    >
                         {selectedDataSourceLabel}
                     </span>
                     <Icon icon={expandMoreIcon} size={18} />
@@ -268,28 +276,6 @@
         border-radius: var(--m3-shape-large);
     }
 
-    .workspace-icon {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 4.5rem;
-        height: 4.5rem;
-        border-radius: var(--m3-shape-medium);
-        background-color: var(--m3c-primary-container);
-        color: var(--m3c-on-primary-container);
-    }
-
-    .workspace-name {
-        margin: 0;
-        font-weight: 500;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .data-source-picker {
-        position: relative;
-    }
-
     :global(.data-source-picker > .m3-container) {
         width: 100%;
         justify-content: space-between;
@@ -297,12 +283,5 @@
 
     :global(.data-source-picker > .m3-container.expressive-menu) {
         width: min(22rem, calc(100vw - 2rem));
-    }
-
-    .data-source-picker-label {
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
     }
 </style>

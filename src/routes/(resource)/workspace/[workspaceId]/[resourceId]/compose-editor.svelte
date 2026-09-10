@@ -211,13 +211,13 @@
     });
 </script>
 
-<div class="compose">
+<div class="compose flex h-full min-h-48 min-w-0 flex-col">
     <Card variant="elevated">
-        <div class="compose-header">
-            <h2 class="compose-title">Compose Editor</h2>
+        <div class="flex min-h-10 shrink-0 flex-wrap items-center justify-between gap-2">
+            <h2 class="m3-font-title-small text-on-surface m-0 min-w-0">Compose Editor</h2>
 
-            <div class="compose-header-actions">
-                <div class="compose-status" aria-live="polite">
+            <div class="flex shrink-0 items-center gap-1">
+                <div class="text-primary grid size-12 shrink-0 place-items-center" aria-live="polite">
                     {#if isSaving}
                         <LoadingIndicator
                             size={32}
@@ -239,7 +239,7 @@
         </div>
 
         <div
-            class="editor"
+            class="editor relative -mx-4 -mb-4 mt-2 min-h-0 flex-1 overflow-hidden rounded-b-md bg-transparent!"
             aria-busy={editorLoading || isSaving}
             aria-label="Compose YAML editor"
         >
@@ -262,7 +262,7 @@
             />
 
             {#if editorLoading}
-                <div class="editor-status" role="status">
+                <div class="absolute inset-0 z-10 flex items-center justify-center bg-transparent!" role="status">
                     <LoadingIndicator aria-label="Loading code editor" />
                 </div>
             {/if}
@@ -278,13 +278,13 @@
         onclose={() => previewOpen.set(false)}
     >
         {#if previewLoading}
-            <div class="preview-status">
+            <div class="flex min-h-48 items-center justify-center">
                 <LoadingIndicator aria-label="Formatting compose" />
             </div>
         {:else if previewError}
-            <p class="preview-error" role="alert">{previewError}</p>
+            <p class="m3-font-body-medium text-error m-0" role="alert">{previewError}</p>
         {:else}
-            <pre class="preview-yaml">{previewYaml}</pre>
+            <pre class="m3-font-body-small bg-surface-container text-on-surface m-0 max-h-[min(32rem,calc(100vh-16rem))] overflow-auto rounded-md p-4 font-mono whitespace-pre">{previewYaml}</pre>
         {/if}
 
         {#snippet buttons()}
@@ -294,14 +294,6 @@
 </div>
 
 <style>
-    .compose {
-        display: flex;
-        flex-direction: column;
-        min-width: 0;
-        min-height: 12rem;
-        height: 100%;
-    }
-
     .compose > :global(.m3-container) {
         display: flex;
         flex: 1;
@@ -310,78 +302,9 @@
         height: 100%;
     }
 
-    .compose-header {
-        display: flex;
-        flex-wrap: wrap;
-        flex-shrink: 0;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.5rem;
-        min-height: 2.5rem;
-    }
-
-    .compose-title {
-        @apply --m3-title-small;
-        min-width: 0;
-        margin: 0;
-        color: var(--m3c-on-surface);
-    }
-
-    .compose-header-actions {
-        display: flex;
-        flex-shrink: 0;
-        align-items: center;
-        gap: 0.25rem;
-    }
-
-    .compose-status {
-        display: grid;
-        flex-shrink: 0;
-        place-items: center;
-        width: 3rem;
-        height: 3rem;
-        color: var(--m3c-primary);
-    }
-
-    .preview-status {
-        display: flex;
-        min-height: 12rem;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .preview-error {
-        @apply --m3-body-medium;
-        margin: 0;
-        color: var(--m3c-error);
-    }
-
-    .preview-yaml {
-        @apply --m3-body-small;
-        margin: 0;
-        max-height: min(32rem, calc(100vh - 16rem));
-        overflow: auto;
-        padding: 1rem;
-        border-radius: var(--m3-shape-medium);
-        background-color: var(--m3c-surface-container);
-        color: var(--m3c-on-surface);
-        font-family: var(--m3-font-mono, ui-monospace, monospace);
-        white-space: pre;
-    }
-
     :global(#compose-preview-dialog.m3-container) {
         width: min(48rem, calc(100vw - 2rem));
         max-width: none;
-    }
-
-    .editor {
-        position: relative;
-        flex: 1;
-        min-height: 0;
-        margin: 0.5rem -1rem -1rem;
-        overflow: hidden;
-        border-radius: 0 0 var(--m3-shape-medium) var(--m3-shape-medium);
-        background-color: transparent !important;
     }
 
     .editor :global(.codemirror-wrapper),
@@ -393,15 +316,5 @@
     .editor :global(.cm-content ::selection) {
         color: var(--m3c-on-primary-container);
         background-color: var(--m3c-primary-container);
-    }
-
-    .editor-status {
-        position: absolute;
-        inset: 0;
-        z-index: 10;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background-color: transparent !important;
     }
 </style>

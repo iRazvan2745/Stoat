@@ -613,27 +613,27 @@
                 <Card variant="filled" id="data-sources-list">
                     {#each dataSources.current ?? [] as ds (ds.id)}
                         {@const presentation = presentDataSource(ds)}
-                        <div class="source-row">
-                            <span class="source-row-icon primary">
+                        <div class="grid min-h-18 grid-cols-[auto_minmax(0,1.2fr)_minmax(12rem,0.8fr)_auto] items-center gap-3.5 border-b border-outline-variant py-3 pr-3.5 pl-4 transition-colors first:rounded-t-2xl last:rounded-b-2xl last:border-b-0 only:rounded-2xl hover:bg-surface-container max-[44rem]:grid-cols-[auto_minmax(0,1fr)_auto] max-[44rem]:gap-x-3 max-[44rem]:gap-y-2.5 max-[44rem]:[&>:last-child]:col-start-3 max-[44rem]:[&>:last-child]:row-start-1 max-[44rem]:[&>:last-child]:row-span-2">
+                            <span class="bg-primary-container text-on-primary-container inline-flex size-9 items-center justify-center rounded-full">
                                 <Icon icon={cloudIcon} size={20} />
                             </span>
-                            <span class="source-copy">
-                                <span class="source-name">
+                            <span class="flex min-w-0 flex-col overflow-hidden">
+                                <span class="m3-font-title-small text-on-surface overflow-hidden text-ellipsis whitespace-nowrap">
                                     {connectionLabel(presentation.uncloudUrl)}
                                 </span>
                                 <span
-                                    class="source-meta"
+                                    class="m3-font-body-small text-on-surface-variant mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap"
                                     title={presentation.uncloudUrl}
                                 >
                                     {presentation.uncloudUrl}
                                 </span>
                             </span>
-                            <span class="source-copy source-assignment">
-                                <span class="source-name"
+                            <span class="flex min-w-0 flex-col overflow-hidden max-[44rem]:col-start-2">
+                                <span class="m3-font-title-small text-on-surface overflow-hidden text-ellipsis whitespace-nowrap"
                                     >{presentation.gitSource}</span
                                 >
                                 <span
-                                    class="source-meta"
+                                    class="m3-font-body-small text-on-surface-variant mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap"
                                     title={presentation.gitRepository ??
                                         "Not assigned"}
                                 >
@@ -854,16 +854,16 @@
                         {@const repositoryUrl =
                             presentDataSource({ gitUrl: source.url })
                                 .gitRepository ?? "No repository URL"}
-                        <div class="source-row">
-                            <span class="source-row-icon secondary">
+                        <div class="grid min-h-18 grid-cols-[auto_minmax(0,1.2fr)_minmax(12rem,0.8fr)_auto] items-center gap-3.5 border-b border-outline-variant py-3 pr-3.5 pl-4 transition-colors first:rounded-t-2xl last:rounded-b-2xl last:border-b-0 only:rounded-2xl hover:bg-surface-container max-[44rem]:grid-cols-[auto_minmax(0,1fr)_auto] max-[44rem]:gap-x-3 max-[44rem]:gap-y-2.5 max-[44rem]:[&>:last-child]:col-start-3 max-[44rem]:[&>:last-child]:row-start-1 max-[44rem]:[&>:last-child]:row-span-2">
+                            <span class="bg-secondary-container text-on-secondary-container inline-flex size-9 items-center justify-center rounded-full">
                                 <Icon icon={keyIcon} size={20} />
                             </span>
-                            <span class="source-copy">
-                                <span class="source-name">{source.name}</span>
-                                <span class="source-meta" title={repositoryUrl}>
+                            <span class="flex min-w-0 flex-col overflow-hidden">
+                                <span class="m3-font-title-small text-on-surface overflow-hidden text-ellipsis whitespace-nowrap">{source.name}</span>
+                                <span class="m3-font-body-small text-on-surface-variant mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap" title={repositoryUrl}>
                                     {repositoryUrl}
                                 </span>
-                                <span class="source-meta">
+                                <span class="m3-font-body-small text-on-surface-variant mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
                                     {source.syncEnabled
                                         ? "Auto deploy: every minute"
                                         : "Auto deploy paused"}
@@ -889,8 +889,8 @@
                                     </span>
                                 {/if}
                             </span>
-                            <span class="source-detail">
-                                <span class="source-auth">
+                            <span class="flex min-w-0 flex-col overflow-hidden max-[44rem]:col-start-2">
+                                <span class="m3-font-label-medium text-on-surface inline-flex items-center gap-1.5">
                                     <Icon
                                         icon={source.authMethod === "ssh"
                                             ? terminalIcon
@@ -901,7 +901,7 @@
                                     />
                                     {authMethodLabel(source.authMethod)}
                                 </span>
-                                <span class="source-meta">
+                                <span class="m3-font-body-small text-on-surface-variant mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
                                     {#if source.username}{source.username} ·
                                     {/if}{linkedCount}
                                     {linkedCount === 1
@@ -1355,102 +1355,5 @@
         padding: 0;
         border-radius: var(--m3-shape-large);
         background: var(--m3c-surface-container-low);
-    }
-
-    .source-row {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1.2fr) minmax(12rem, 0.8fr) auto;
-        align-items: center;
-        gap: 0.875rem;
-        min-height: 4.5rem;
-        padding: 0.75rem 0.875rem 0.75rem 1rem;
-        border-bottom: 1px solid var(--m3c-outline-variant);
-        transition: background-color var(--m3-easing-fast);
-    }
-
-    .source-row:first-child {
-        border-radius: var(--m3-shape-large) var(--m3-shape-large) 0 0;
-    }
-
-    .source-row:last-child {
-        border-bottom: 0;
-        border-radius: 0 0 var(--m3-shape-large) var(--m3-shape-large);
-    }
-
-    .source-row:only-child {
-        border-radius: var(--m3-shape-large);
-    }
-
-    .source-row:hover {
-        background: var(--m3c-surface-container);
-    }
-
-    .source-row-icon {
-        display: inline-flex;
-        width: 2.25rem;
-        height: 2.25rem;
-        align-items: center;
-        justify-content: center;
-        border-radius: var(--m3-shape-full);
-    }
-
-    .source-row-icon.primary {
-        color: var(--m3c-on-primary-container);
-        background: var(--m3c-primary-container);
-    }
-
-    .source-row-icon.secondary {
-        color: var(--m3c-on-secondary-container);
-        background: var(--m3c-secondary-container);
-    }
-
-    .source-copy,
-    .source-detail {
-        display: flex;
-        min-width: 0;
-        overflow: hidden;
-        flex-direction: column;
-    }
-
-    .source-name {
-        @apply --m3-title-small;
-        overflow: hidden;
-        color: var(--m3c-on-surface);
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .source-meta {
-        @apply --m3-body-small;
-        overflow: hidden;
-        margin-top: 0.125rem;
-        color: var(--m3c-on-surface-variant);
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .source-auth {
-        @apply --m3-label-medium;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.375rem;
-        color: var(--m3c-on-surface);
-    }
-
-    @media (width < 44rem) {
-        .source-row {
-            grid-template-columns: auto minmax(0, 1fr) auto;
-            gap: 0.625rem 0.75rem;
-        }
-
-        .source-assignment,
-        .source-detail {
-            grid-column: 2;
-        }
-
-        .source-row > :last-child {
-            grid-column: 3;
-            grid-row: 1 / 3;
-        }
     }
 </style>

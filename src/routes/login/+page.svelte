@@ -96,7 +96,7 @@
 </svelte:head>
 
 <div class="flex min-h-svh items-center justify-center p-4">
-    <div class="login-card">
+    <div class="login-card w-[min(24rem,100%)]">
         <Card variant="elevated">
             <div class="flex flex-col items-center text-center">
                 <img
@@ -106,8 +106,8 @@
                     height="80"
                     class="size-20 rounded-xl object-cover"
                 />
-                <h1 class="headline">Stoat</h1>
-                <p class="supporting">
+                <h1 class="m3-font-headline-medium text-on-surface mt-4">Stoat</h1>
+                <p class="m3-font-body-medium text-on-surface-variant mt-1">
                     {isRegister
                         ? "Create an account to get started"
                         : "Sign in to continue"}
@@ -183,7 +183,7 @@
                 </div>
 
                 {#if errorMessage}
-                    <p class="error" role="alert">{errorMessage}</p>
+                    <p class="m3-font-body-small text-error" role="alert">{errorMessage}</p>
                 {/if}
 
                 <div class="submit">
@@ -206,25 +206,9 @@
 </div>
 
 <style>
-    .login-card {
-        width: min(24rem, 100%);
-    }
-
     .login-card > :global(.m3-container) {
         gap: 1.5rem;
         padding: 2rem;
-    }
-
-    .headline {
-        @apply --m3-headline-medium;
-        margin-top: 1rem;
-        color: var(--m3c-on-surface);
-    }
-
-    .supporting {
-        @apply --m3-body-medium;
-        margin-top: 0.25rem;
-        color: var(--m3c-on-surface-variant);
     }
 
     .tabs :global(.m3-container) {
@@ -236,10 +220,5 @@
     .submit :global(.m3-container) {
         width: 100%;
         min-width: 0;
-    }
-
-    .error {
-        @apply --m3-body-small;
-        color: var(--m3c-error);
     }
 </style>

@@ -4,7 +4,6 @@
     import folderOffIcon from "@ktibow/iconset-material-symbols/folder-off";
     import folderIcon from "@ktibow/iconset-material-symbols/folder-outline";
     import moreVertIcon from "@ktibow/iconset-material-symbols/more-vert";
-    import tuneIcon from "@ktibow/iconset-material-symbols/tune";
     import {
         Button,
         Chip,
@@ -16,12 +15,7 @@
         snackbar,
     } from "m3-svelte";
 
-    import {
-        updateResourceGroup,
-        updateResourceGroupName,
-        updateResourcePosition,
-    } from "#lib/api/resource-groups.remote";
-    import { getUserSettings, updateUserSettings } from "#lib/api/users.remote";
+    import { updateResourceGroup, updateResourceGroupName, updateResourcePosition } from "#lib/api/resource-groups.remote";
     import ResourceIcon from "#lib/components/resources/resource-icon.svelte";
     import {
         toResourceFlow,
@@ -38,14 +32,13 @@
     }
     let {
         resources,
+        showFolderResourceNames = true,
         workspaceId,
-    }: { resources: Resource[]; workspaceId: string } = $props();
-
-    // svelte-ignore state_referenced_locally
-    const userSettings = getUserSettings();
-    const showFolderResourceNames = $derived(
-        userSettings.current?.showFolderResourceNames !== false
-    );
+    }: {
+        resources: Resource[];
+        showFolderResourceNames?: boolean;
+        workspaceId: string;
+    } = $props();
     const flow = $derived(toResourceFlow(resources));
     type GroupItem = Extract<ResourceFlowItem<Resource>, { kind: "group" }>;
     let folderDialogOpen = $state(false);
@@ -263,30 +256,6 @@
         }
     };
 
-    let viewOptionsOpen = $state(false);
-    let savingViewOption = $state(false);
-    const toggleFolderResourceNames = async (): Promise<void> => {
-        if (savingViewOption) {
-            return;
-        }
-        savingViewOption = true;
-        viewOptionsOpen = false;
-        const next = !showFolderResourceNames;
-        try {
-            await updateUserSettings({
-                settings: { showFolderResourceNames: next },
-            });
-            await userSettings.refresh();
-        } catch (error) {
-            snackbar(
-                error instanceof Error
-                    ? error.message
-                    : "Unable to save view setting. Try again."
-            );
-        } finally {
-            savingViewOption = false;
-        }
-    };
     const startDrag = (event: DragEvent, resource: Resource): void => {
         dragging = resource;
         event.dataTransfer?.setData("text/plain", resource.id);
@@ -385,7 +354,7 @@
 
 {#snippet resourceCard(resource: Resource)}
     <li
-        class="resource-card"
+        class="resource-card bg-surface-container-low flex min-w-0 cursor-grab items-center overflow-hidden rounded-md transition-colors"
         draggable="true"
         class:dragging={dragging?.id === resource.id}
         class:drop-target={dropTarget?.kind === "before" &&
@@ -397,11 +366,11 @@
         ondrop={(event) => void drop(event)}
     >
         <a
-            class="resource-link m3-layer"
+            class="resource-link m3-layer text-on-surface flex min-h-18 min-w-0 flex-1 items-center gap-4 py-2 pr-2 pl-4 no-underline"
             draggable="false"
             href={`/workspace/${workspaceId}/${resource.id}`}
         >
-            <span class="resource-icon"
+            <span class="text-on-surface bg-surface-container-highest grid size-10 shrink-0 place-items-center rounded-full"
                 ><ResourceIcon
                     icon={resource.icon}
                     type={resource.type}
@@ -409,10 +378,10 @@
                     alt=""
                 /></span
             >
-            <span class="resource-text"
-                ><span class="resource-name"
+            <span class="grid min-w-0"
+                ><span class="m3-font-body-large [overflow-wrap:anywhere]"
                     >{resource.name ?? "Untitled"}</span
-                ><span class="resource-slug">{resource.slug ?? ""}</span
+                ><span class="m3-font-body-medium text-on-surface-variant [overflow-wrap:anywhere]">{resource.slug ?? ""}</span
                 ></span
             >
         </a>
@@ -430,7 +399,7 @@
 
 {#snippet resourceIconTile(resource: Resource)}
     <li
-        class="resource-tile"
+        class="resource-tile grid cursor-grab rounded-md transition-colors"
         draggable="true"
         class:dragging={dragging?.id === resource.id}
         class:drop-target={dropTarget?.kind === "before" &&
@@ -442,14 +411,18 @@
         ondrop={(event) => void drop(event)}
     >
         <a
-            class="resource-tile-link m3-layer"
-            class:with-name={showFolderResourceNames}
+            class={[
+                "resource-tile-link m3-layer grid place-items-center rounded-md text-inherit no-underline",
+                showFolderResourceNames
+                    ? "h-auto w-full gap-1 px-1 py-2"
+                    : "size-12",
+            ]}
             draggable="false"
             href={`/workspace/${workspaceId}/${resource.id}`}
             title={resource.name ?? "Untitled"}
             aria-label={resource.name ?? "Untitled"}
         >
-            <span class="resource-icon"
+            <span class="text-on-surface bg-surface-container-highest grid size-10 shrink-0 place-items-center rounded-full"
                 ><ResourceIcon
                     icon={resource.icon}
                     type={resource.type}
@@ -458,7 +431,7 @@
                 /></span
             >
             {#if showFolderResourceNames}
-                <span class="resource-tile-name"
+                <span class="m3-font-label-medium text-on-surface max-w-full text-center [overflow-wrap:anywhere]"
                     >{resource.name ?? "Untitled"}</span
                 >
             {/if}
@@ -467,7 +440,7 @@
 {/snippet}
 
 {#snippet groupMenu(name: string)}
-    <div class="group-menu">
+    <div class="relative flex shrink-0">
         <Button
             variant="text"
             size="xs"
@@ -506,44 +479,14 @@
     </div>
 {/snippet}
 
-<div class="view-options">
-    <div class="view-options-anchor">
-        <Button
-            variant="text"
-            size="xs"
-            aria-label="View options"
-            aria-expanded={viewOptionsOpen}
-            aria-haspopup="menu"
-            style={viewOptionsOpen
-                ? "anchor-name: --m3-menu-anchor"
-                : undefined}
-            onclick={() => {
-                viewOptionsOpen = !viewOptionsOpen;
-            }}
-        >
-            <Icon icon={tuneIcon} />
-        </Button>
-        {#if viewOptionsOpen}
-            <ExpressiveMenu anchored x="end" y="down" label="View options">
-                <ExpressiveMenuItem
-                    label="Show resource names in folders"
-                    selected={showFolderResourceNames}
-                    disabled={savingViewOption}
-                    onclick={toggleFolderResourceNames}
-                />
-            </ExpressiveMenu>
-        {/if}
-    </div>
-</div>
-
-<ul class="resource-groups">
+<ul class="m-0 list-none p-4 columns-[300px] [column-gap:8px]">
     {#each flow as item (item.kind === "group"
         ? `group:${item.name}`
         : `resource:${item.resource.id}`)}
         {#if item.kind === "group"}
-            <li class="group-item">
+            <li class="mb-2 block w-full min-w-0 break-inside-avoid">
                 <section
-                    class="group-box"
+                    class="group-box bg-surface-container flex min-w-0 flex-col gap-2 rounded-xl p-4 transition-colors"
                     data-folder={item.name}
                     role="group"
                     class:drop-target={dropTarget?.kind === "group" &&
@@ -553,18 +496,18 @@
                     ondragleave={dragLeave}
                     ondrop={(event) => void drop(event)}
                 >
-                    <div class="group-header">
-                        <span class="group-folder" aria-hidden="true"
+                    <div class="flex min-h-12 items-center gap-2">
+                        <span class="bg-surface-container-high text-on-surface-variant grid size-10 shrink-0 place-items-center rounded-full" aria-hidden="true"
                             ><Icon icon={folderIcon} size={20} /></span
                         >
-                        <h2 title={item.name}>{item.name}</h2>
-                        <span class="count"
+                        <h2 class="m3-font-title-medium text-on-surface m-0 min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap" title={item.name}>{item.name}</h2>
+                        <span class="m3-font-label-medium text-on-surface-variant bg-surface-container-high shrink-0 rounded-full px-4 py-2 whitespace-nowrap"
                             >{item.resources.length}
                             {item.resources.length === 1
                                 ? "resource"
                                 : "resources"}</span
                         >
-                        <div class="group-actions">
+                        <div class="group-actions ms-auto flex shrink-0">
                             <Button
                                 variant="text"
                                 size="xs"
@@ -578,8 +521,12 @@
                         </div>
                     </div>
                     <ul
-                        class="resource-grid"
-                        class:with-names={showFolderResourceNames}
+                        class={[
+                            "resource-grid m-0 list-none gap-2 p-0",
+                            showFolderResourceNames
+                                ? "flex flex-col"
+                                : "grid [grid-template-columns:repeat(auto-fill,48px)]",
+                        ]}
                     >
                         {#each item.resources as resource (resource.id)}
                             {#if showFolderResourceNames}
@@ -597,7 +544,7 @@
     {/each}
     {#if dragging && dragging.groupName !== null}
         <li
-            class="ungroup-drop-zone"
+            class="ungroup-drop-zone m3-font-body-medium text-on-surface-variant outline-outline-variant mb-2 grid min-h-24 w-full min-w-0 place-items-center rounded-xl break-inside-avoid outline-2 outline-dashed outline-offset-[-2px] transition-colors"
             class:drop-target={dropTarget?.kind === "ungroup"}
             ondragover={dragOverUngroup}
             ondragleave={dragLeave}
@@ -625,14 +572,14 @@
     }}
 >
     {#if dialogItem}
-        <ul class="dialog-list" aria-label={`Resources in ${dialogItem.name}`}>
+        <ul class="dialog-list m-0 grid list-none gap-2 p-0" aria-label={`Resources in ${dialogItem.name}`}>
             {#each dialogItem.resources as resource (resource.id)}
-                <li>
+                <li class="bg-surface-container flex min-w-0 items-center overflow-hidden rounded-md">
                     <a
-                        class="dialog-row m3-layer"
+                        class="dialog-row m3-layer text-on-surface flex min-h-18 min-w-0 flex-1 items-center gap-4 py-2 pr-2 pl-4 no-underline"
                         href={`/workspace/${workspaceId}/${resource.id}`}
                     >
-                        <span class="resource-icon"
+                        <span class="text-on-surface bg-surface-container-highest grid size-10 shrink-0 place-items-center rounded-full"
                             ><ResourceIcon
                                 icon={resource.icon}
                                 type={resource.type}
@@ -640,10 +587,10 @@
                                 alt=""
                             /></span
                         >
-                        <span class="resource-text"
-                            ><span class="resource-name"
+                        <span class="grid min-w-0"
+                            ><span class="m3-font-body-large [overflow-wrap:anywhere]"
                                 >{resource.name ?? "Untitled"}</span
-                            ><span class="resource-slug"
+                            ><span class="m3-font-body-medium text-on-surface-variant [overflow-wrap:anywhere]"
                                 >{resource.slug ?? ""}</span
                             ></span
                         >
@@ -672,13 +619,13 @@
 >
     <form
         id="resource-group-form"
-        class="group-form"
+        class="flex flex-col gap-4"
         onsubmit={(event) => {
             event.preventDefault();
             void save();
         }}
     >
-        <p>
+        <p class="m3-font-body-medium text-on-surface-variant m-0">
             {selectedResource
                 ? `Organize ${selectedResource.name ?? "this resource"} with related resources. Choose an existing group or enter a new name.`
                 : "Give this group a descriptive name."}
@@ -693,7 +640,7 @@
             aria-describedby={errorMessage ? "resource-group-error" : undefined}
         />
         {#if selectedResource && flow.some((item) => item.kind === "group")}
-            <div class="group-choices" role="group" aria-label="Existing groups">
+            <div class="group-choices flex max-h-48 flex-wrap gap-2 overflow-y-auto" role="group" aria-label="Existing groups">
                 {#each flow as item (item.kind === "group" ? item.name : item.resource.id)}
                     {#if item.kind === "group"}
                         <Chip
@@ -710,13 +657,13 @@
                 {/each}
             </div>
         {/if}
-        {#if merging}<p>
+        {#if merging}<p class="m3-font-body-medium text-on-surface-variant m-0">
                 Resources will be combined with the existing “{name.trim()}”
                 group.
             </p>{/if}
         {#if errorMessage}<p
                 id="resource-group-error"
-                class="error"
+                class="m3-font-body-medium text-error m-0"
                 role="alert"
             >
                 {errorMessage}
@@ -746,11 +693,11 @@
 </Dialog>
 
 <Dialog bind:open={removeOpen} headline="Ungroup resources?">
-    <p>
+    <p class="m3-font-body-medium text-on-surface-variant m-0">
         All resources in “{originalName}” will move to Ungrouped. The group will
         disappear. Your resources will keep running.
     </p>
-    {#if errorMessage}<p class="error" role="alert">{errorMessage}</p>{/if}
+    {#if errorMessage}<p class="m3-font-body-medium text-error m-0" role="alert">{errorMessage}</p>{/if}
     {#snippet buttons()}
         <Button
             variant="text"
@@ -766,70 +713,8 @@
 </Dialog>
 
 <style>
-    .view-options {
-        display: flex;
-        justify-content: flex-end;
-        padding: 8px 16px 0;
-    }
-    .view-options-anchor {
-        position: relative;
-        display: flex;
-    }
-    .view-options-anchor :global(button) {
-        min-width: 48px;
-        min-height: 48px;
-    }
-    .resource-groups {
-        list-style: none;
-        margin: 0;
-        padding: 16px;
-        columns: 300px;
-        column-gap: 8px;
-    }
-    .resource-groups > * {
-        break-inside: avoid;
-        width: 100%;
-        min-width: 0;
-        margin-bottom: 8px;
-    }
-    .group-item {
-        display: block;
-    }
-    .group-box {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        padding: 16px;
-        background: var(--m3c-surface-container);
-        border-radius: var(--m3-shape-extra-large);
-        min-width: 0;
-        transition:
-            background-color var(--m3-easing-fast),
-            outline-color var(--m3-easing-fast);
-    }
-    .resource-grid {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        display: grid;
-        grid-template-columns: repeat(auto-fill, 48px);
-        gap: 8px;
-    }
-    .resource-grid.with-names {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-    .resource-tile {
-        display: grid;
-        cursor: grab;
-        border-radius: var(--m3-shape-medium);
-        transition:
-            background-color var(--m3-easing-fast),
-            opacity var(--m3-easing-fast),
-            outline-color var(--m3-easing-fast);
-    }
-    .resource-tile.dragging {
+    .resource-tile.dragging,
+    .resource-card.dragging {
         opacity: 0.4;
     }
     .resource-tile.drop-target {
@@ -839,71 +724,6 @@
     }
     .resource-tile-link {
         @apply --m3-focus-inward;
-        display: grid;
-        place-items: center;
-        width: 48px;
-        height: 48px;
-        border-radius: var(--m3-shape-medium);
-        text-decoration: none;
-        color: inherit;
-    }
-    .resource-tile-link.with-name {
-        width: 100%;
-        height: auto;
-        padding: 8px 4px;
-        gap: 4px;
-    }
-    .resource-tile-name {
-        @apply --m3-label-medium;
-        color: var(--m3c-on-surface);
-        text-align: center;
-        overflow-wrap: anywhere;
-        max-width: 100%;
-    }
-    .group-header {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        min-height: 48px;
-    }
-    .group-folder {
-        display: grid;
-        place-items: center;
-        width: 40px;
-        height: 40px;
-        border-radius: var(--m3-shape-full);
-        background: var(--m3c-surface-container-high);
-        color: var(--m3c-on-surface-variant);
-        flex-shrink: 0;
-    }
-    h2 {
-        @apply --m3-title-medium;
-        color: var(--m3c-on-surface);
-        margin: 0;
-        flex: 1;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    .count {
-        @apply --m3-label-medium;
-        color: var(--m3c-on-surface-variant);
-        white-space: nowrap;
-        padding: 8px 16px;
-        border-radius: var(--m3-shape-full);
-        background: var(--m3c-surface-container-high);
-        flex-shrink: 0;
-    }
-    .group-menu {
-        position: relative;
-        display: flex;
-        flex-shrink: 0;
-    }
-    .group-actions {
-        display: flex;
-        flex-shrink: 0;
-        margin-inline-start: auto;
     }
     :global(#folder-dialog.m3-container) {
         width: min(30rem, calc(100vw - 2rem));
@@ -913,55 +733,15 @@
     :global(#folder-dialog.m3-container[open]) {
         animation: none;
     }
-    .dialog-list {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        display: grid;
-        gap: 8px;
-    }
-    .dialog-list > li {
-        display: flex;
-        align-items: center;
-        min-width: 0;
-        background: var(--m3c-surface-container);
-        border-radius: var(--m3-shape-medium);
-        overflow: hidden;
-    }
     .dialog-row {
         @apply --m3-focus-inward;
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        min-height: 72px;
-        padding: 8px 8px 8px 16px;
-        text-decoration: none;
-        color: var(--m3c-on-surface);
-        flex: 1;
-        min-width: 0;
     }
     .dialog-list > li > :global(button) {
         min-width: 48px;
         min-height: 48px;
     }
-    .resource-card {
-        display: flex;
-        align-items: center;
-        min-width: 0;
-        background: var(--m3c-surface-container-low);
-        border-radius: var(--m3-shape-medium);
-        overflow: hidden;
-        cursor: grab;
-        transition:
-            background-color var(--m3-easing-fast),
-            opacity var(--m3-easing-fast),
-            outline-color var(--m3-easing-fast);
-    }
     .group-box .resource-card {
         background: var(--m3c-surface-container-high);
-    }
-    .resource-card.dragging {
-        opacity: 0.4;
     }
     .group-box.drop-target,
     .resource-card.drop-target,
@@ -990,75 +770,12 @@
             var(--m3c-surface-container-high)
         );
     }
-    .ungroup-drop-zone {
-        @apply --m3-body-medium;
-        display: grid;
-        place-items: center;
-        min-height: 96px;
-        border-radius: var(--m3-shape-extra-large);
-        outline: 2px dashed var(--m3c-outline-variant);
-        outline-offset: -2px;
-        color: var(--m3c-on-surface-variant);
-        transition:
-            background-color var(--m3-easing-fast),
-            outline-color var(--m3-easing-fast),
-            color var(--m3-easing-fast);
-    }
     .ungroup-drop-zone.drop-target {
         color: var(--m3c-primary);
         background: color-mix(in srgb, var(--m3c-primary) 8%, transparent);
     }
     .resource-link {
         @apply --m3-focus-inward;
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        min-height: 72px;
-        padding: 8px 8px 8px 16px;
-        text-decoration: none;
-        color: var(--m3c-on-surface);
-        flex: 1;
-        min-width: 0;
-    }
-    .resource-text {
-        display: grid;
-        min-width: 0;
-    }
-    .resource-name {
-        @apply --m3-body-large;
-        overflow-wrap: anywhere;
-    }
-    .resource-slug {
-        @apply --m3-body-medium;
-        color: var(--m3c-on-surface-variant);
-        overflow-wrap: anywhere;
-    }
-    .resource-icon {
-        flex-shrink: 0;
-        display: grid;
-        place-items: center;
-        width: 40px;
-        height: 40px;
-        border-radius: var(--m3-shape-full);
-        background: var(--m3c-surface-container-highest);
-        color: var(--m3c-on-surface);
-    }
-    .group-form {
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-    }
-    p {
-        @apply --m3-body-medium;
-        color: var(--m3c-on-surface-variant);
-        margin: 0;
-    }
-    .group-choices {
-        max-height: 192px;
-        overflow-y: auto;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
     }
     .group-choices :global(button) {
         max-width: 100%;
@@ -1071,8 +788,5 @@
     .group-actions :global(button) {
         min-width: 48px;
         min-height: 48px;
-    }
-    .error {
-        color: var(--m3c-error);
     }
 </style>

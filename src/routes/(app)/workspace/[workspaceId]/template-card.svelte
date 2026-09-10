@@ -50,12 +50,12 @@
             </div>
         {/if}
 
-        <h3 class="name text-on-surface m-0">
+        <h3 class="m3-font-title-medium text-on-surface m-0">
             {template.name}
         </h3>
     </div>
 
-    <p class="description text-on-surface-variant m-0 line-clamp-3 flex-1">
+    <p class="m3-font-body-medium text-on-surface-variant m-0 line-clamp-3 flex-1">
         {template.description}
     </p>
 
@@ -63,7 +63,7 @@
         <ul class="m-0 flex list-none flex-wrap gap-1.5 p-0">
             {#each template.tags as tag (tag)}
                 <li
-                    class="tag bg-secondary-container text-on-secondary-container rounded-full px-[0.55rem] py-[0.2rem]"
+                    class="m3-font-label-small bg-secondary-container text-on-secondary-container rounded-full px-[0.55rem] py-[0.2rem]"
                 >
                     {tag}
                 </li>
@@ -81,19 +81,6 @@
 
 <style>
     .template-card {
-        color: var(--m3c-on-surface);
         @apply --m3-focus-inward;
-    }
-
-    .name {
-        @apply --m3-title-medium;
-    }
-
-    .description {
-        @apply --m3-body-medium;
-    }
-
-    .tag {
-        @apply --m3-label-small;
     }
 </style>

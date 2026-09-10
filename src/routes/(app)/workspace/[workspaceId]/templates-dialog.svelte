@@ -118,7 +118,7 @@
             </p>
         {:else}
             <div class="flex flex-col gap-4">
-                <div class="template-grid">
+                <div class="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(15.5rem,1fr))]">
                     {#each templates as template (template.appId)}
                         <TemplateCard
                             {template}
@@ -191,11 +191,5 @@
         width: min(68rem, calc(100vw - 2rem));
         max-width: none;
         max-height: min(48rem, calc(100vh - 4rem));
-    }
-
-    .template-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(15.5rem, 1fr));
-        gap: 0.75rem;
     }
 </style>

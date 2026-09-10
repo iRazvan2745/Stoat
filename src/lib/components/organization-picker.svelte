@@ -196,27 +196,39 @@
         onclick={openCreateDialog}
     />
 {:else}
-    <div bind:this={root} class="organization-picker">
+    <div bind:this={root} class="relative">
         <button
             type="button"
-            class="organization-trigger m3-layer"
+            class="organization-trigger m3-layer flex min-h-12 w-[min(15rem,100%)] cursor-pointer items-center gap-2.5 overflow-hidden rounded-full border-0 bg-surface-container-high py-1 pr-2.5 pl-1 text-left font-inherit text-on-surface transition-colors hover:bg-secondary-container hover:text-on-secondary-container aria-expanded:bg-secondary-container aria-expanded:text-on-secondary-container"
             style="anchor-name: --m3-menu-anchor"
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             aria-label={`Organization: ${activeOrganization?.name ?? "Stoat"}`}
             onclick={() => (menuOpen = !menuOpen)}
         >
-            <span class="organization-avatar" aria-hidden="true">
+            <span
+                class="m3-font-title-small bg-primary-container text-on-primary-container grid size-10 shrink-0 grow-0 basis-10 place-items-center overflow-hidden rounded-md"
+                aria-hidden="true"
+            >
                 {#if activeOrganization?.logo}
-                    <img src={activeOrganization.logo} alt="" />
+                    <img
+                        src={activeOrganization.logo}
+                        alt=""
+                        class="h-full w-full object-cover"
+                    />
                 {:else}
                     {organizationInitial}
                 {/if}
             </span>
 
-            <span class="organization-copy">
-                <span class="organization-label">Organization</span>
-                <span class="organization-name">
+            <span class="flex min-w-0 flex-1 flex-col overflow-hidden">
+                <span
+                    class="m3-font-label-small text-on-surface-variant"
+                    >Organization</span
+                >
+                <span
+                    class="m3-font-title-small overflow-hidden text-ellipsis whitespace-nowrap"
+                >
                     {activeOrganization?.name ?? "Stoat"}
                 </span>
             </span>
@@ -257,8 +269,11 @@
 {/if}
 
 <Dialog bind:open={createDialogOpen} headline="Create organization">
-    <form class="create-form" onsubmit={handleCreateSubmit}>
-        <p>
+    <form
+        class="flex w-[min(24rem,calc(100vw-4rem))] flex-col gap-5"
+        onsubmit={handleCreateSubmit}
+    >
+        <p class="m3-font-body-medium text-on-surface-variant">
             Organizations keep workspaces and data sources separated for each
             team.
         </p>
@@ -291,88 +306,12 @@
 <Snackbar />
 
 <style>
-    .organization-picker {
-        position: relative;
-    }
-
     .organization-trigger {
         @apply --m3-focus-inward;
-        display: flex;
-        width: min(15rem, 100%);
-        min-height: 48px;
-        align-items: center;
-        gap: 10px;
-        overflow: hidden;
-        border: 0;
-        border-radius: var(--m3-shape-full);
-        background: var(--m3c-surface-container-high);
-        color: var(--m3c-on-surface);
-        cursor: pointer;
-        font: inherit;
-        padding: 4px 10px 4px 4px;
-        text-align: left;
-        transition: background-color var(--m3-easing-fast);
-    }
-
-    .organization-trigger:hover,
-    .organization-trigger[aria-expanded="true"] {
-        background: var(--m3c-secondary-container);
-        color: var(--m3c-on-secondary-container);
-    }
-
-    .organization-avatar {
-        @apply --m3-title-small;
-        display: grid;
-        width: 40px;
-        height: 40px;
-        flex: 0 0 40px;
-        place-items: center;
-        overflow: hidden;
-        border-radius: var(--m3-shape-medium);
-        background: var(--m3c-primary-container);
-        color: var(--m3c-on-primary-container);
-    }
-
-    .organization-avatar img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-
-    .organization-copy {
-        display: flex;
-        min-width: 0;
-        flex: 1;
-        flex-direction: column;
-        overflow: hidden;
-    }
-
-    .organization-label {
-        @apply --m3-label-small;
-        color: var(--m3c-on-surface-variant);
-    }
-
-    .organization-name {
-        @apply --m3-title-small;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
     }
 
     :global(.organization-menu > .m3-container.expressive-menu.anchored) {
         max-height: min(28rem, calc(100svh - 2rem));
-    }
-
-    .create-form {
-        display: flex;
-        width: min(24rem, calc(100vw - 4rem));
-        flex-direction: column;
-        gap: 20px;
-    }
-
-    .create-form p {
-        @apply --m3-body-medium;
-        color: var(--m3c-on-surface-variant);
     }
 
     .name-field :global(.m3-container) {

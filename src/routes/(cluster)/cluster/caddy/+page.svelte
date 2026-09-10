@@ -190,7 +190,7 @@
                 </p>
             {:else if selectedCaddyfile}
                 <div
-                    class="caddyfile-editor bg-surface-container-low mt-4 max-h-[70vh] overflow-auto rounded-lg border border-[var(--m3c-outline-variant)]"
+                    class="bg-surface-container-low mt-4 max-h-[70vh] overflow-auto rounded-lg border border-[var(--m3c-outline-variant)] [&_.cm-editor]:h-auto [&_.cm-editor]:min-h-0 [&_.cm-editor]:[color-scheme:inherit] [&_.cm-scroller]:h-auto! [&_.cm-scroller]:overflow-visible! [&_.codemirror-wrapper]:h-auto [&_.codemirror-wrapper]:min-h-0 [&_.codemirror-wrapper]:[color-scheme:inherit]"
                     aria-label={`Caddyfile for ${selectedConfig.config.machineName}`}
                 >
                     {#key configKey(selectedConfig)}
@@ -256,17 +256,5 @@
 
     :global(#caddyfile-card.m3-container) {
         padding: 1rem;
-    }
-
-    .caddyfile-editor :global(.codemirror-wrapper),
-    .caddyfile-editor :global(.cm-editor) {
-        height: auto;
-        min-height: 0;
-        color-scheme: inherit;
-    }
-
-    .caddyfile-editor :global(.cm-scroller) {
-        height: auto !important;
-        overflow: visible !important;
     }
 </style>
