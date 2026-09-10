@@ -15,6 +15,8 @@ Every recognized resource present in a commit gets a deployment with that commit
 
 Git versions Compose and non-secret app metadata. App-managed environment values remain outside Git and are captured in each private deployment snapshot. They are applied only when preparing the deployment payload.
 
+Compose `configs:` `file:` references are resolved from resource files. The app database is the source of truth for those files (managed on the resource **Files** page); Git siblings next to the Compose file are the fallback mirror. A first sync imports missing siblings into the app without overwriting existing rows, and app changes are published back as sibling files unless the resource opts out with the **Mirror to Git** toggle. Only the single Compose file is sent to the cluster — file content is inlined as `content:` at deploy time, and config names are prefixed like services and volumes.
+
 ## Repository structure
 
 New app resources use:

@@ -4,6 +4,7 @@
     import logsIcon from "@ktibow/iconset-material-symbols/article-outline";
     import dashboardIcon from "@ktibow/iconset-material-symbols/dashboard";
     import environmentOutlineIcon from "@ktibow/iconset-material-symbols/data-object";
+    import filesIcon from "@ktibow/iconset-material-symbols/description-outline";
     import ingressesIcon from "@ktibow/iconset-material-symbols/language";
     import deploymentsIcon from "@ktibow/iconset-material-symbols/rocket-launch-outline";
     import settingsIcon from "@ktibow/iconset-material-symbols/settings-outline";
@@ -47,6 +48,12 @@
                 label="Environment"
                 id="environment-rail-button"
                 icon={environmentOutlineIcon}
+            />
+            <NavigationRailItem
+                href={hrefRoute + "files"}
+                label="Files"
+                id="files-rail-button"
+                icon={filesIcon}
             />
             <NavigationRailItem
                 href={hrefRoute + "ingresses"}

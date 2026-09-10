@@ -1,5 +1,7 @@
 // oxlint-disable func-style
-import YAML, { isMap, isScalar, isSeq } from "yaml";
+import nodePath from "node:path";
+
+import YAML, { isAlias, isMap, isScalar, isSeq } from "yaml";
 import type { YAMLMap, YAMLSeq } from "yaml";
 
 import type { EnvironmentVariable } from "#lib/domain/environment";
@@ -115,6 +117,109 @@ const prefixTopLevelVolumes = (volumes: unknown, rename: Rename): void => {
     }
 
     for (const pair of volumes.items) {
+        if (!isScalar(pair.key) || typeof pair.key.value !== "string") {
+            continue;
+        }
+
+        pair.key.value = rename(pair.key.value);
+    }
+};
+
+const prefixServiceFragment = (service: YAMLMap, rename: Rename): void => {
+    prefixServiceVolumes(service, rename);
+    prefixServiceConfigs(service, rename);
+    prefixDependsOn(service, rename);
+    prefixCaddyUpstreams(service, rename);
+};
+
+/**
+ * Prefix service-style references inside YAML anchors merged into services
+ * (e.g. `x-copyparty: &copyparty` + `<<: *copyparty`). Anchors are resolved
+ * precisely through their aliases so unrelated `x-*` extensions are untouched.
+ */
+const prefixMergedAnchors = (
+    doc: ReturnType<typeof YAML.parseDocument>,
+    serviceMap: YAMLMap,
+    rename: Rename,
+): void => {
+    const seen = new Set<string>();
+    const collectMergeAliases = (node: unknown): void => {
+        if (isAlias(node)) {
+            if (seen.has(node.source)) {
+                return;
+            }
+            seen.add(node.source);
+            const target = node.resolve(doc);
+            if (isMap(target)) {
+                prefixServiceFragment(target, rename);
+                collectMergeAliases(target.get("<<", true));
+            }
+            return;
+        }
+        if (isSeq(node)) {
+            for (const item of node.items) {
+                collectMergeAliases(item);
+            }
+        }
+    };
+    for (const pair of serviceMap.items) {
+        if (isMap(pair.value)) {
+            collectMergeAliases(pair.value.get("<<", true));
+        }
+    }
+};
+
+const prefixServiceConfigs = (service: YAMLMap, rename: Rename): void => {
+    const configs = service.get("configs", true);
+
+    if (configs === undefined || configs === null) {
+        return;
+    }
+
+    if (isSeq(configs)) {
+        for (const item of configs.items) {
+            if (isScalar(item) && typeof item.value === "string") {
+                item.value = rename(item.value);
+                continue;
+            }
+
+            if (isMap(item)) {
+                const source = item.get("source", true);
+
+                if (isScalar(source) && typeof source.value === "string") {
+                    source.value = rename(source.value);
+                }
+                continue;
+            }
+
+            throw new Error("Invalid configs entry");
+        }
+        return;
+    }
+
+    if (isScalar(configs) && typeof configs.value === "string") {
+        configs.value = rename(configs.value);
+        return;
+    }
+
+    if (isMap(configs)) {
+        const source = configs.get("source", true);
+
+        if (isScalar(source) && typeof source.value === "string") {
+            source.value = rename(source.value);
+        }
+        return;
+    }
+
+    throw new Error("Invalid configs entry");
+};
+
+const prefixTopLevelConfigs = (configs: unknown, rename: Rename): void => {
+    if (!isMap(configs)) {
+        return;
+    }
+
+    for (const pair of configs.items) {
         if (!isScalar(pair.key) || typeof pair.key.value !== "string") {
             continue;
         }
@@ -288,13 +393,13 @@ function transformComposeNames(compose: string, rename: Rename): FormattedCompos
         serviceNames.push(serviceName);
 
         if (isMap(pair.value)) {
-            prefixServiceVolumes(pair.value, rename);
-            prefixDependsOn(pair.value, rename);
-            prefixCaddyUpstreams(pair.value, rename);
+            prefixServiceFragment(pair.value, rename);
         }
     }
 
+    prefixMergedAnchors(doc, serviceMap, rename);
     prefixTopLevelVolumes(doc.get("volumes", true), rename);
+    prefixTopLevelConfigs(doc.get("configs", true), rename);
 
     return {
         serviceCount: serviceNames.length,
@@ -381,6 +486,245 @@ export function inlineEnvironmentVariables(
 
         overlayEnvironment(service, variables);
     }
+
+    return doc.toString();
+}
+
+export const MAX_CONFIG_FILE_BYTES = 262_144;
+
+/** Strip leading `./` segments so compose `file: ./party.conf` resolves to `party.conf`. */
+export function normalizeConfigFilePath(p: string): string {
+    let normalized = p;
+
+    while (normalized.startsWith("./")) {
+        normalized = normalized.slice(2);
+    }
+
+    return normalized;
+}
+
+export function isUnsafeConfigPath(p: string): boolean {
+    if (p === "") {
+        return true;
+    }
+
+    if (p.includes("\\")) {
+        return true;
+    }
+
+    if (nodePath.posix.isAbsolute(p)) {
+        return true;
+    }
+
+    const normalized = normalizeConfigFilePath(p);
+
+    if (normalized === "") {
+        return true;
+    }
+
+    for (const segment of normalized.split("/")) {
+        if (segment === "" || segment === "." || segment === ".." || segment === ".git") {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+export interface ComposeConfigReference {
+    config: string;
+    file: string | null;
+    hasContent: boolean;
+    hasExternal: boolean;
+}
+
+export function listComposeConfigReferences(compose: string): ComposeConfigReference[] {
+    const doc = YAML.parseDocument(compose);
+
+    if (doc.errors.length > 0) {
+        throw new Error("Invalid compose YAML");
+    }
+
+    const topConfigs = doc.get("configs", true);
+
+    if (!isMap(topConfigs)) {
+        return [];
+    }
+
+    const references: ComposeConfigReference[] = [];
+
+    for (const pair of topConfigs.items) {
+        if (!isScalar(pair.key) || typeof pair.key.value !== "string") {
+            continue;
+        }
+
+        const config = pair.key.value;
+        const { value } = pair;
+
+        if (!isMap(value)) {
+            references.push({
+                config,
+                file: null,
+                hasContent: false,
+                hasExternal: false,
+            });
+            continue;
+        }
+
+        references.push({
+            config,
+            file: yamlString(value.get("file", true)) ?? null,
+            hasContent: value.has("content"),
+            hasExternal: value.get("external") === true,
+        });
+    }
+
+    return references;
+}
+
+const isExternalConfig = (entry: YAMLMap): boolean => entry.get("external") === true;
+
+const inlineFileConfig = (
+    name: string,
+    entry: YAMLMap,
+    filePath: string,
+    resolveFile: (relPath: string) => string | null,
+    composePath: string,
+): void => {
+    if (isUnsafeConfigPath(filePath)) {
+        throw new Error(`Config '${name}' has an unsafe file path '${filePath}'`);
+    }
+
+    const normalizedPath = normalizeConfigFilePath(filePath);
+    const text = resolveFile(normalizedPath);
+
+    if (text === null || text === undefined) {
+        throw new Error(
+            `Config '${name}' uses file: ${filePath}, but it was not found next to ${composePath}. Add it via the resource Files page or commit it next to the compose file in Git.`,
+        );
+    }
+
+    if (text.includes("\0")) {
+        throw new Error(`Config '${name}' looks binary and cannot be inlined`);
+    }
+
+    if (new TextEncoder().encode(text).length > MAX_CONFIG_FILE_BYTES) {
+        throw new Error(`Config '${name}' exceeds 256 KiB`);
+    }
+
+    entry.delete("file");
+    entry.set("content", text);
+};
+
+const inlineSingleConfig = (
+    name: string,
+    entry: unknown,
+    resolveFile: (relPath: string) => string | null,
+    composePath: string,
+): void => {
+    if (!isMap(entry)) {
+        throw new Error(`Config '${name}' must be a mapping`);
+    }
+
+    if (entry.has("content") || isExternalConfig(entry) || entry.has("environment")) {
+        return;
+    }
+
+    const filePath = yamlString(entry.get("file", true));
+
+    if (filePath !== undefined) {
+        inlineFileConfig(name, entry, filePath, resolveFile, composePath);
+        return;
+    }
+
+    throw new Error(
+        `Config '${name}' must declare file:, content:, environment:, or external: true`,
+    );
+};
+
+const checkServiceConfigEntry = (item: unknown, topConfigs: YAMLMap): void => {
+    if (isScalar(item) && typeof item.value === "string") {
+        if (!topConfigs.has(item.value)) {
+            throw new Error(
+                `Config '${item.value}' is referenced by a service but has no top-level configs entry`,
+            );
+        }
+        return;
+    }
+
+    if (isMap(item)) {
+        const source = yamlString(item.get("source", true));
+
+        if (source !== undefined && !topConfigs.has(source)) {
+            throw new Error(
+                `Config '${source}' is referenced by a service but has no top-level configs entry`,
+            );
+        }
+        return;
+    }
+
+    throw new Error("Invalid configs entry");
+};
+
+const validateServiceConfigReferences = (serviceMap: YAMLMap, topConfigs: YAMLMap): void => {
+    for (const pair of serviceMap.items) {
+        const service = pair.value;
+
+        if (!isMap(service)) {
+            continue;
+        }
+
+        const serviceConfigs = service.get("configs", true);
+
+        if (serviceConfigs === undefined || serviceConfigs === null) {
+            continue;
+        }
+
+        if (isSeq(serviceConfigs)) {
+            for (const item of serviceConfigs.items) {
+                checkServiceConfigEntry(item, topConfigs);
+            }
+            continue;
+        }
+
+        checkServiceConfigEntry(serviceConfigs, topConfigs);
+    }
+};
+
+export function inlineComposeConfigs(
+    compose: string,
+    resolveFile: (relPath: string) => string | null,
+    options?: { composePath?: string },
+): string {
+    const doc = YAML.parseDocument(compose);
+
+    if (doc.errors.length > 0) {
+        throw new Error("Invalid compose YAML");
+    }
+
+    const serviceMap = doc.get("services", true);
+
+    if (!isMap(serviceMap)) {
+        return compose;
+    }
+
+    const topConfigs = doc.get("configs", true);
+
+    if (!isMap(topConfigs)) {
+        return compose;
+    }
+
+    const composePath = options?.composePath ?? "compose.yaml";
+
+    for (const pair of topConfigs.items) {
+        if (!isScalar(pair.key) || typeof pair.key.value !== "string") {
+            throw new Error("Invalid config name");
+        }
+
+        inlineSingleConfig(pair.key.value, pair.value, resolveFile, composePath);
+    }
+
+    validateServiceConfigReferences(serviceMap, topConfigs);
 
     return doc.toString();
 }

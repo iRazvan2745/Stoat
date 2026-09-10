@@ -1,4 +1,5 @@
 import { getLatestSuccessfulDeployment, listDeployments } from "#lib/api/deployments.remote";
+import { listResourceFiles } from "#lib/api/resource-files.remote";
 import {
     getPostgresConnection,
     getResource,
@@ -15,6 +16,7 @@ type RefreshableResourceQuery =
     | ReturnType<typeof getResource>
     | ReturnType<typeof listEnvironmentVariables>
     | ReturnType<typeof listResourceContainers>
+    | ReturnType<typeof listResourceFiles>
     | ReturnType<typeof listResourceIngresses>
     | ReturnType<typeof listResourcesInWorkspace>;
 
@@ -32,6 +34,7 @@ const getResourceQueries = (
         getResource(resourceId),
         listEnvironmentVariables(resourceId),
         listResourceContainers(resourceId),
+        listResourceFiles(resourceId),
         listResourceIngresses(resourceId),
     ];
 

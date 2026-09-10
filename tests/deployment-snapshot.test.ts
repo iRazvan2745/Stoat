@@ -7,7 +7,7 @@ import type { DeploymentSnapshot } from "../src/lib/server/deployments/deploymen
 vi.mock("#lib/db", () => ({ db: {} }));
 
 it("serializes enqueue data before later configuration edits", () => {
-    const record: Omit<DeploymentSnapshot, "environment"> = {
+    const record: Omit<DeploymentSnapshot, "environment" | "resourceFiles"> = {
         git: {
             authMethod: "token",
             id: "git-old",

@@ -324,6 +324,40 @@ export const workspaceEnvironmentVariablesRelations = relations(
     }),
 );
 
+export const resourceFiles = pgTable(
+    "resource_files",
+    {
+        id: text("id")
+            .primaryKey()
+            .$defaultFn(() => crypto.randomUUID()),
+        resourceId: text("resource_id")
+            .notNull()
+            .references(() => resources.id, { onDelete: "restrict" }),
+        path: text("path").notNull(),
+        content: text("content").notNull(),
+        createdAt: timestamp("created_at", { withTimezone: true })
+            .notNull()
+            .$defaultFn(() => new Date()),
+        updatedAt: timestamp("updated_at", { withTimezone: true })
+            .notNull()
+            .$defaultFn(() => new Date())
+            .$onUpdate(() => new Date()),
+    },
+    (table) => [
+        index("resource_files_resource_id_path_idx").on(table.resourceId, table.path),
+        uniqueIndex("resource_files_resource_id_path_uidx").on(table.resourceId, table.path),
+    ],
+);
+
+export const resourceFilesRelations = relations(resourceFiles, ({ one }) => ({
+    resource: one(resources, {
+        fields: [resourceFiles.resourceId],
+        references: [resources.id],
+    }),
+}));
+
+export type ResourceFileRow = typeof resourceFiles.$inferSelect;
+
 export const userSettings = pgTable("user_settings", {
     userId: text("user_id")
         .primaryKey()

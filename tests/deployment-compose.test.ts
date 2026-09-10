@@ -3,7 +3,12 @@ import { describe, expect, it } from "vite-plus/test";
 import {
     applyEnvironmentVariables,
     formatComposeFile,
+    inlineComposeConfigs,
     inlineEnvironmentVariables,
+    isUnsafeConfigPath,
+    listComposeConfigReferences,
+    MAX_CONFIG_FILE_BYTES,
+    unformatComposeFile,
 } from "#lib/server/deployments/deployment-compose";
 
 describe("formatComposeFile", () => {
@@ -283,5 +288,440 @@ describe("inlineEnvironmentVariables", () => {
 
         expect(yaml).toContain("FOO: bar");
         expect(yaml).not.toContain("env_file");
+    });
+});
+
+describe("formatComposeFile configs", () => {
+    it("prefixes top-level configs and short/long service refs", () => {
+        const formatted = formatComposeFile(
+            `services:
+  web:
+    image: nginx
+    configs:
+      - myconfig
+      - source: longconfig
+        target: /etc/long.conf
+configs:
+  myconfig:
+    file: ./my.txt
+  longconfig:
+    content: hello
+`,
+            "app-abc12",
+        );
+
+        expect(formatted.yaml).toMatch(/^ {2}app-abc12-myconfig:/mu);
+        expect(formatted.yaml).toMatch(/^ {2}app-abc12-longconfig:/mu);
+        expect(formatted.yaml).toContain("- app-abc12-myconfig");
+        expect(formatted.yaml).toContain("source: app-abc12-longconfig");
+        expect(formatted.yaml).not.toMatch(/^ {2}myconfig:/mu);
+    });
+
+    it("leaves configs unchanged when no prefix is given", () => {
+        const formatted = formatComposeFile(
+            `services:
+  web:
+    image: nginx
+    configs:
+      - myconfig
+      - source: longconfig
+        target: /etc/long.conf
+configs:
+  myconfig:
+    file: ./my.txt
+  longconfig:
+    content: hello
+`,
+        );
+
+        expect(formatted.yaml).toContain("- myconfig");
+        expect(formatted.yaml).toContain("source: longconfig");
+        expect(formatted.yaml).toMatch(/^ {2}myconfig:/mu);
+        expect(formatted.yaml).toMatch(/^ {2}longconfig:/mu);
+    });
+
+    it("rejects invalid service configs entries", () => {
+        expect(() =>
+            formatComposeFile(
+                `services:
+  web:
+    image: nginx
+    configs:
+      - 123
+configs:
+  myconfig:
+    content: hi
+`,
+                "app-abc12",
+            ),
+        ).toThrow("Invalid configs entry");
+    });
+
+    it("prefixes configs inside anchors merged into services, exactly once", () => {
+        const formatted = formatComposeFile(
+            `x-base: &base
+  image: nginx
+  configs:
+    - source: app_config
+      target: /etc/app.conf
+  volumes:
+    - app_data:/data
+  depends_on:
+    - db
+services:
+  web:
+    <<: *base
+  worker:
+    <<: *base
+  db:
+    image: postgres
+configs:
+  app_config:
+    content: hi
+volumes:
+  app_data:
+`,
+            "app-abc12",
+        );
+
+        expect(formatted.yaml).toContain("source: app-abc12-app_config");
+        expect(formatted.yaml).not.toContain("source: app_config");
+        expect(formatted.yaml).toContain("app-abc12-app_data:/data");
+        expect(formatted.yaml).toContain("- app-abc12-db");
+        expect(formatted.yaml).not.toMatch(/app-abc12-app-abc12/u);
+        // Unformatting restores the anchor body as well.
+        expect(unformatComposeFile(formatted.yaml, "app-abc12")).toContain("source: app_config");
+    });
+
+    it("leaves unrelated x-* extensions untouched", () => {
+        const formatted = formatComposeFile(
+            `x-ports:
+  - 3000/https
+x-custom:
+  configs: not-a-compose-list
+services:
+  web:
+    image: nginx
+`,
+            "app-abc12",
+        );
+
+        expect(formatted.yaml).toContain("- 3000/https");
+        expect(formatted.yaml).toContain("configs: not-a-compose-list");
+    });
+});
+
+describe("isUnsafeConfigPath", () => {
+    it("rejects empty, absolute, backslash, dot segments, and .git", () => {
+        expect(isUnsafeConfigPath("")).toBe(true);
+        expect(isUnsafeConfigPath("/abs/path")).toBe(true);
+        expect(isUnsafeConfigPath("a\\b")).toBe(true);
+        expect(isUnsafeConfigPath("../a")).toBe(true);
+        expect(isUnsafeConfigPath("a/../b")).toBe(true);
+        expect(isUnsafeConfigPath("a/./b")).toBe(true);
+        expect(isUnsafeConfigPath("a//b")).toBe(true);
+        expect(isUnsafeConfigPath(".git")).toBe(true);
+        expect(isUnsafeConfigPath("a/.git/b")).toBe(true);
+        expect(isUnsafeConfigPath(".")).toBe(true);
+        expect(isUnsafeConfigPath("..")).toBe(true);
+    });
+
+    it("allows plain relative paths", () => {
+        expect(isUnsafeConfigPath("my.txt")).toBe(false);
+        expect(isUnsafeConfigPath("./a")).toBe(false);
+        expect(isUnsafeConfigPath("./party.conf")).toBe(false);
+        expect(isUnsafeConfigPath("dir/my.txt")).toBe(false);
+        expect(isUnsafeConfigPath("a/.gitignore")).toBe(false);
+    });
+});
+
+describe("listComposeConfigReferences", () => {
+    it("lists file, content, and external flags", () => {
+        const refs = listComposeConfigReferences(
+            `services:
+  web:
+    image: nginx
+configs:
+  from_file:
+    file: ./a.txt
+  from_content:
+    content: hello
+  from_external:
+    external: true
+`,
+        );
+
+        expect(refs).toEqual([
+            {
+                config: "from_file",
+                file: "./a.txt",
+                hasContent: false,
+                hasExternal: false,
+            },
+            {
+                config: "from_content",
+                file: null,
+                hasContent: true,
+                hasExternal: false,
+            },
+            {
+                config: "from_external",
+                file: null,
+                hasContent: false,
+                hasExternal: true,
+            },
+        ]);
+    });
+
+    it("returns [] when there are no top-level configs", () => {
+        expect(
+            listComposeConfigReferences(`services:
+  web:
+    image: nginx
+`),
+        ).toEqual([]);
+    });
+
+    it("returns [] when configs is not a map", () => {
+        expect(
+            listComposeConfigReferences(`services:
+  web:
+    image: nginx
+configs:
+  - a
+`),
+        ).toEqual([]);
+    });
+
+    it("rejects invalid YAML", () => {
+        expect(() => listComposeConfigReferences("configs: [")).toThrow("Invalid compose YAML");
+    });
+});
+
+describe("inlineComposeConfigs", () => {
+    it("inlines file: into content:", () => {
+        const out = inlineComposeConfigs(
+            `services:
+  web:
+    image: nginx
+    configs:
+      - myconfig
+configs:
+  myconfig:
+    file: hello.txt
+`,
+            (p) => (p === "hello.txt" ? "hello world" : null),
+        );
+
+        expect(out).toContain("content:");
+        expect(out).toContain("hello world");
+        expect(out).not.toContain("file:");
+    });
+
+    it("resolves ./prefixed paths against the normalized key", () => {
+        const seen: string[] = [];
+        const out = inlineComposeConfigs(
+            `services:
+  web:
+    image: nginx
+    configs:
+      - myconfig
+configs:
+  myconfig:
+    file: ./party.conf
+`,
+            (p) => {
+                seen.push(p);
+                return p === "party.conf" ? "party content" : null;
+            },
+        );
+
+        expect(seen).toEqual(["party.conf"]);
+        expect(out).toContain("party content");
+        expect(out).not.toContain("file:");
+    });
+
+    it("passes through content, external, and environment", () => {
+        const out = inlineComposeConfigs(
+            `services:
+  web:
+    image: nginx
+configs:
+  keep_content:
+    content: hi
+  keep_external:
+    external: true
+  keep_env:
+    environment:
+      FOO: bar
+`,
+            () => {
+                throw new Error("should not resolve");
+            },
+        );
+
+        expect(out).toContain("content: hi");
+        expect(out).toContain("external: true");
+        expect(out).toContain("FOO: bar");
+    });
+
+    it("throws a helpful error when the file is missing", () => {
+        expect(() =>
+            inlineComposeConfigs(
+                `services:
+  web:
+    image: nginx
+configs:
+  myconfig:
+    file: missing.txt
+`,
+                () => null,
+            ),
+        ).toThrow("Files page");
+    });
+
+    it("uses the custom compose path in the missing-file error", () => {
+        expect(() =>
+            inlineComposeConfigs(
+                `services:
+  web:
+    image: nginx
+configs:
+  myconfig:
+    file: missing.txt
+`,
+                () => null,
+                { composePath: "docker-compose.yml" },
+            ),
+        ).toThrow("docker-compose.yml");
+    });
+
+    it("rejects unsafe paths", () => {
+        expect(() =>
+            inlineComposeConfigs(
+                `services:
+  web:
+    image: nginx
+configs:
+  myconfig:
+    file: ../secret.txt
+`,
+                () => "x",
+            ),
+        ).toThrow("unsafe file path");
+    });
+
+    it("rejects binary content", () => {
+        expect(() =>
+            inlineComposeConfigs(
+                `services:
+  web:
+    image: nginx
+configs:
+  myconfig:
+    file: bin.dat
+`,
+                () => "a\0b",
+            ),
+        ).toThrow("looks binary");
+    });
+
+    it("rejects oversize content", () => {
+        const big = "a".repeat(MAX_CONFIG_FILE_BYTES + 1);
+        expect(MAX_CONFIG_FILE_BYTES).toBe(262_144);
+        expect(() =>
+            inlineComposeConfigs(
+                `services:
+  web:
+    image: nginx
+configs:
+  myconfig:
+    file: big.txt
+`,
+                () => big,
+            ),
+        ).toThrow("exceeds 256 KiB");
+    });
+
+    it("rejects service references without a top-level entry", () => {
+        expect(() =>
+            inlineComposeConfigs(
+                `services:
+  web:
+    image: nginx
+    configs:
+      - ghost
+configs:
+  real:
+    content: hi
+`,
+                () => null,
+            ),
+        ).toThrow("has no top-level configs entry");
+    });
+
+    it("rejects long-syntax references without a top-level entry", () => {
+        expect(() =>
+            inlineComposeConfigs(
+                `services:
+  web:
+    image: nginx
+    configs:
+      - source: ghost
+        target: /etc/ghost
+configs:
+  real:
+    content: hi
+`,
+                () => null,
+            ),
+        ).toThrow("has no top-level configs entry");
+    });
+
+    it("rejects configs without file/content/environment/external", () => {
+        expect(() =>
+            inlineComposeConfigs(
+                `services:
+  web:
+    image: nginx
+configs:
+  myconfig:
+    name: custom
+`,
+                () => null,
+            ),
+        ).toThrow("must declare file:");
+    });
+
+    it("returns compose unchanged when there are no top-level configs", () => {
+        const input = `services:
+  web:
+    image: nginx
+`;
+        expect(inlineComposeConfigs(input, () => null)).toBe(input);
+    });
+
+    it("preserves anchors and merge keys", () => {
+        const input = `x-copyparty: &copyparty
+  image: copyparty/ac:latest
+  configs:
+    - source: appcfg
+      target: /cfg.conf
+services:
+  a:
+    <<: *copyparty
+  b:
+    <<: *copyparty
+configs:
+  appcfg:
+    file: app.conf
+`;
+        const out = inlineComposeConfigs(input, (p) => (p === "app.conf" ? "cfg-body" : null));
+
+        expect(out).toContain("&copyparty");
+        expect(out).toContain("*copyparty");
+        expect(out).toContain("<<:");
+        expect(out).toContain("cfg-body");
+        expect(out).not.toContain("file: app.conf");
     });
 });

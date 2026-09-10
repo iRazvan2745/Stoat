@@ -5,6 +5,7 @@ import {
     dataSource,
     environmentVariables,
     gitSource,
+    resourceFiles,
     resources,
     workspace,
     workspaceEnvironmentVariables,
@@ -12,10 +13,18 @@ import {
 import { mergeEnvironmentVariables } from "#lib/domain/environment";
 import { parseResourceSettings } from "#lib/domain/resources/settings";
 
+/** A config file carried in a deployment snapshot (DB source of truth or Git fallback). */
+export interface SnapshotConfigFile {
+    content: string;
+    path: string;
+}
+
 /** Server-only: contains environment secrets and destination credentials. */
 export interface DeploymentSnapshot {
     gitCommit?: string;
     gitCompose?: string;
+    /** Sibling files read from the deployed Git commit (fallback when DB has no row). */
+    gitFiles?: SnapshotConfigFile[];
     gitValidationError?: string;
     // Keep this payload JSON-native. The queue encodes it as JSON, so database
     // timestamps from full Drizzle rows would make enqueue fail (and are not
@@ -55,21 +64,28 @@ export interface DeploymentSnapshot {
         "dataSourceId" | "id" | "name" | "organizationId" | "slug"
     >;
     environment: { name: string; value: string }[];
+    /** DB resource files: the source of truth for compose `configs:` content. */
+    resourceFiles: SnapshotConfigFile[];
 }
 
-type DeploymentSnapshotRecord = Omit<DeploymentSnapshot, "environment">;
+type DeploymentSnapshotRecord = Omit<DeploymentSnapshot, "environment" | "resourceFiles">;
 
 /** Copy the rows captured in one transaction into a queue-safe snapshot. */
 export const createDeploymentSnapshot = (
     record: DeploymentSnapshotRecord,
     environment: DeploymentSnapshot["environment"],
+    files: readonly SnapshotConfigFile[] = [],
 ): DeploymentSnapshot => ({
     environment: environment.map(({ name, value }) => ({ name, value })),
     git: { ...record.git },
+    ...(record.gitFiles
+        ? { gitFiles: record.gitFiles.map(({ content, path }) => ({ content, path })) }
+        : {}),
     resource: {
         ...record.resource,
         settings: parseResourceSettings(record.resource.settings),
     },
+    resourceFiles: files.map(({ content, path }) => ({ content, path })),
     source: { ...record.source },
     workspace: { ...record.workspace },
 });
@@ -142,9 +158,18 @@ export const captureDeploymentSnapshot = async (resourceId: string): Promise<Dep
                 .from(workspaceEnvironmentVariables)
                 .where(eq(workspaceEnvironmentVariables.workspaceId, record.workspace.id))
                 .orderBy(asc(workspaceEnvironmentVariables.name));
+            const files = await tx
+                .select({
+                    content: resourceFiles.content,
+                    path: resourceFiles.path,
+                })
+                .from(resourceFiles)
+                .where(eq(resourceFiles.resourceId, resourceId))
+                .orderBy(asc(resourceFiles.path));
             return createDeploymentSnapshot(
                 record,
                 mergeEnvironmentVariables(workspaceVars, resourceVars),
+                files,
             );
         },
         { accessMode: "read only", isolationLevel: "repeatable read" },

@@ -3,11 +3,13 @@ import * as v from "valibot";
 export interface ResourceSettings {
     sourcePath?: string;
     shouldPrefix?: boolean;
+    syncFilesToGit?: boolean;
 }
 
 export const ResourceSettingsSchema = v.object({
     shouldPrefix: v.optional(v.boolean()),
     sourcePath: v.optional(v.string()),
+    syncFilesToGit: v.optional(v.boolean()),
 });
 
 export function parseResourceSettings(value: unknown): ResourceSettings {
@@ -19,15 +21,27 @@ export function parseResourceSettings(value: unknown): ResourceSettings {
     delete settings.prefix;
 
     if (settings.shouldPrefix === false) {
-        return settings as ResourceSettings;
+        // keep explicit off
+    } else {
+        delete settings.shouldPrefix;
     }
 
-    delete settings.shouldPrefix;
+    // Absent means sync to git; only an explicit off is stored.
+    if (settings.syncFilesToGit === false) {
+        // keep explicit off
+    } else {
+        delete settings.syncFilesToGit;
+    }
+
     return settings as ResourceSettings;
 }
 
 export function shouldPrefixResources(settings?: ResourceSettings | null): boolean {
     return settings?.shouldPrefix !== false;
+}
+
+export function shouldSyncResourceFilesToGit(settings?: ResourceSettings | null): boolean {
+    return settings?.syncFilesToGit !== false;
 }
 
 export function mergeResourceSettings(current: unknown, patch: ResourceSettings): ResourceSettings {
@@ -38,6 +52,14 @@ export function mergeResourceSettings(current: unknown, patch: ResourceSettings)
             next.shouldPrefix = false;
         } else {
             delete next.shouldPrefix;
+        }
+    }
+
+    if ("syncFilesToGit" in patch) {
+        if (patch.syncFilesToGit === false) {
+            next.syncFilesToGit = false;
+        } else {
+            delete next.syncFilesToGit;
         }
     }
 

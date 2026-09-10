@@ -9,7 +9,9 @@ import { serializeEnvFile } from "#lib/domain/environment";
 import { workspacePath } from "#lib/server/data-sources/paths";
 import {
     formatComposeFile,
+    inlineComposeConfigs,
     inlineEnvironmentVariables,
+    listComposeConfigReferences,
 } from "#lib/server/deployments/deployment-compose";
 import { consumeDeployStream } from "#lib/server/deployments/deployment-stream";
 import { resourceComposePrefix } from "#lib/server/resources/resources";
@@ -91,7 +93,33 @@ export async function prepareDeployment(
         snapshot.gitCompose ?? resource.value,
         snapshot.gitCompose === undefined ? resourceComposePrefix(resource) : undefined,
     );
-    const deployCompose = inlineEnvironmentVariables(formatted.yaml, environment);
+    let deployCompose = inlineEnvironmentVariables(formatted.yaml, environment);
+    // Inline compose `configs:` `file:` content: only the single compose file
+    // is sent to Uncloud, so referenced siblings must travel inside it. DB
+    // files are the source of truth; Git commit siblings are the fallback.
+    const configReferences = listComposeConfigReferences(deployCompose);
+    if (configReferences.length > 0) {
+        const available = new Map<string, string>();
+        for (const file of snapshot.resourceFiles ?? []) available.set(file.path, file.content);
+        for (const file of snapshot.gitFiles ?? []) {
+            if (!available.has(file.path)) available.set(file.path, file.content);
+        }
+        const names = [...available.keys()].join(", ") || "none";
+        deployCompose = inlineComposeConfigs(
+            deployCompose,
+            (relativePath) => {
+                const hit = available.get(relativePath) ?? null;
+                if (hit === null) {
+                    throw new Error(
+                        `Config uses file: ${relativePath}, but it was not found next to ${resourceSlug}/compose.yaml (available: ${names}). Add it via the resource Files page or commit it next to the compose file in Git.`,
+                    );
+                }
+                return hit;
+            },
+            { composePath: `${resourceSlug}/compose.yaml` },
+        );
+        await log("debug", `Inlined ${configReferences.length} configs (${names || "none"})`);
+    }
     const repoPath = workspacePath(wrk.id);
     const resourcePath = path.join(wrk.slug, resourceSlug);
     const dataResourceDir = path.join(repoPath, resourcePath);

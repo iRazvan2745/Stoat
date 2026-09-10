@@ -28,6 +28,10 @@ import {
     deleteEnvironmentVariablesForResource,
     replaceEnvironmentVariables,
 } from "#lib/server/resources/resource-environment";
+import {
+    copyResourceFiles,
+    deleteResourceFilesForResource,
+} from "#lib/server/resources/resource-files";
 import { uniqueSlug } from "#lib/server/shared/slugs";
 import { readTemplateIconValue, readTemplateVersion } from "#lib/server/templates";
 
@@ -153,13 +157,24 @@ export async function copyResource(resourceId: string, targetWorkspaceId: string
         throw new Error("Choose a different workspace for the copy");
     }
 
-    return await createResource({
+    const copied = await createResource({
         name: resource.name ?? "Copied resource",
         type: "compose",
         value: resource.value ?? "",
         variables: [],
         workspaceId: targetWorkspaceId,
     });
+
+    try {
+        // Resource files are the source of truth for configuration, so the
+        // copy brings them along to the new resource.
+        await copyResourceFiles(resourceId, copied.id);
+    } catch (error) {
+        await db.delete(resources).where(eq(resources.id, copied.id));
+        throw error;
+    }
+
+    return copied;
 }
 
 export async function moveResource(resourceId: string, targetWorkspaceId: string) {
@@ -231,7 +246,11 @@ export async function moveResource(resourceId: string, targetWorkspaceId: string
     try {
         const [updated] = await db
             .update(resources)
-            .set({ groupName: null, sortOrder: null, workspaceId: targetWorkspace.id })
+            .set({
+                groupName: null,
+                sortOrder: null,
+                workspaceId: targetWorkspace.id,
+            })
             .where(
                 and(
                     eq(resources.id, resourceId),
@@ -315,6 +334,7 @@ export async function deleteResource(id: string) {
     }
 
     await deleteEnvironmentVariablesForResource(id);
+    await deleteResourceFilesForResource(id);
 
     const op = await db.delete(resources).where(eq(resources.id, id)).returning();
 

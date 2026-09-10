@@ -10,11 +10,22 @@ import type { SimpleGit } from "simple-git";
 import { db } from "#lib/db";
 import { dataSource, deployments, gitSource, resources, workspace } from "#lib/db/schema";
 import type { GitResourceSyncState, GitSyncResult } from "#lib/domain/git-sync";
+import {
+    parseResourceSettings,
+    shouldSyncResourceFilesToGit,
+} from "#lib/domain/resources/settings";
 import { repositoryName } from "#lib/server/data-sources/discovery";
 import { gitSourcePath } from "#lib/server/data-sources/paths";
-import { formatComposeFile } from "#lib/server/deployments/deployment-compose";
+import {
+    formatComposeFile,
+    listComposeConfigReferences,
+    normalizeConfigFilePath,
+} from "#lib/server/deployments/deployment-compose";
 import { captureDeploymentSnapshot } from "#lib/server/deployments/deployment-snapshot";
-import type { DeploymentSnapshot } from "#lib/server/deployments/deployment-snapshot";
+import type {
+    DeploymentSnapshot,
+    SnapshotConfigFile,
+} from "#lib/server/deployments/deployment-snapshot";
 import { enqueueDeployment } from "#lib/server/deployments/deployments";
 import {
     canonicalComposePath,
@@ -29,10 +40,15 @@ import {
     headCommit,
     pendingCommits,
     readCommitComposeFiles,
+    readCommitSiblingFiles,
     validateRepositoryFilePath,
     writeRepositoryFile,
 } from "#lib/server/git-sources/repository";
-import type { RepositoryComposeFile } from "#lib/server/git-sources/repository";
+import type {
+    RepositoryComposeFile,
+    RepositorySiblingFile,
+} from "#lib/server/git-sources/repository";
+import { createResourceFile, listResourceFiles } from "#lib/server/resources/resource-files";
 import { withGitRepo } from "#lib/server/shared/git";
 import { gitAuthenticationFromSource } from "#lib/server/shared/git-auth";
 import { withGitSourceLock } from "#lib/server/shared/git-lock";
@@ -58,6 +74,49 @@ const messageOf = (error: unknown): string =>
     error instanceof GitSyncError
         ? error.message
         : "Unable to synchronize this file; check its Compose configuration and deployment queue";
+
+/** Normalized `configs:` `file:` targets referenced by a compose file. Empty on invalid YAML. */
+const referencedSiblingPaths = (compose: string): string[] => {
+    try {
+        return listComposeConfigReferences(compose)
+            .map((reference) => reference.file)
+            .filter((file): file is string => file !== null)
+            .map((file) => normalizeConfigFilePath(file))
+            .filter((file) => file !== "");
+    } catch {
+        return [];
+    }
+};
+
+const toSnapshotFiles = (siblings: readonly RepositorySiblingFile[]): SnapshotConfigFile[] =>
+    siblings.map((sibling) => ({ content: sibling.content, path: sibling.path }));
+
+/**
+ * Best-effort import of Git sibling files into the DB. The DB is the source
+ * of truth afterwards: existing rows are never overwritten, so a file deleted
+ * in the app stays deleted once its removal is mirrored to Git.
+ */
+const importMissingResourceFiles = async (
+    resourceId: string,
+    siblings: readonly RepositorySiblingFile[],
+): Promise<void> => {
+    if (siblings.length === 0) return;
+    let known: Set<string>;
+    try {
+        known = new Set((await listResourceFiles(resourceId)).map((file) => file.path));
+    } catch {
+        return;
+    }
+    for (const sibling of siblings) {
+        if (known.has(sibling.path)) continue;
+        try {
+            await createResourceFile(resourceId, sibling);
+            known.add(sibling.path);
+        } catch {
+            // Oversize/invalid siblings stay Git-only; deploys use the git fallback.
+        }
+    }
+};
 const addIssue = (context: SyncContext, message: string): void => {
     if (!context.result.issues.includes(message)) context.result.issues.push(message);
 };
@@ -329,6 +388,7 @@ const deployCommitResource = async (
     commit: string,
     gitCompose: string,
     gitValidationError?: string,
+    gitFiles: readonly SnapshotConfigFile[] = [],
 ): Promise<void> => {
     const snapshot = await captureDeploymentSnapshot(resource.id);
     snapshot.resource = {
@@ -343,6 +403,7 @@ const deployCommitResource = async (
     snapshot.gitCommit = commit;
     snapshot.gitCompose = gitCompose;
     snapshot.gitValidationError = gitValidationError;
+    if (gitFiles.length > 0) snapshot.gitFiles = [...gitFiles];
     const deploymentId = commitDeploymentId(context.source.id, resource.id, commit);
     const [existing] = await db
         .select({ id: deployments.id })
@@ -394,11 +455,29 @@ const processCommit = async (context: SyncContext, commit: string): Promise<bool
                 throw new GitSyncError("Multiple Compose files map to this resource");
             seen.add(row.resource.id);
             const prepared = await updateFromCommit(context, row, file);
+            const siblingPaths = referencedSiblingPaths(file.compose);
+            let siblings: RepositorySiblingFile[] = [];
+            if (siblingPaths.length > 0) {
+                try {
+                    siblings = await readCommitSiblingFiles(
+                        context.repo,
+                        commit,
+                        file.path,
+                        siblingPaths,
+                        context.cache,
+                    );
+                } catch {
+                    siblings = [];
+                }
+                await importMissingResourceFiles(row.resource.id, siblings);
+            }
             await deployCommitResource(
                 context,
                 prepared.resource,
                 commit,
                 readGitCompose(file.compose).formatted,
+                undefined,
+                toSnapshotFiles(siblings),
             );
         } catch (error) {
             if (error instanceof GitComposeError && matched) {
@@ -456,7 +535,7 @@ const publishAppChanges = async (
     const linked = await listLinkedResources(context.source.id);
     const head = await headCommit(context.repo);
     const files = head ? await readCommitComposeFiles(context.repo, head, context.cache) : [];
-    const writes: { path: string; compose: string }[] = [];
+    const writes: { path: string; compose: string; resourceId: string }[] = [];
     const removals: string[] = [];
     for (const row of linked) {
         if (requestedResourceId && row.resource.id !== requestedResourceId) continue;
@@ -490,14 +569,89 @@ const publishAppChanges = async (
         }
         if (writes.some((file) => file.path === targetPath))
             throw new GitSyncError(`Multiple resources map to ${targetPath}`);
-        writes.push({ compose, path: targetPath });
+        writes.push({ compose, path: targetPath, resourceId: row.resource.id });
+    }
+    // Mirror DB config files next to each compose file (Git is the fallback
+    // mirror; the DB is the source of truth). Skipped per-resource via the
+    // syncFilesToGit setting. Only files owned by linked resources are
+    // touched; unrelated repository content is never staged.
+    const fileWrites: { path: string; content: string }[] = [];
+    const fileRemovals: string[] = [];
+    const fileTracked = new Set<string>();
+    for (const row of linked) {
+        if (requestedResourceId && row.resource.id !== requestedResourceId) continue;
+        if (!row.resource.value) continue;
+        if (!shouldSyncResourceFilesToGit(parseResourceSettings(row.resource.settings))) continue;
+        const targetComposePath =
+            writes.find((entry) => entry.resourceId === row.resource.id)?.path ??
+            pathFor(row, context.source.id);
+        const directory = path.posix.dirname(targetComposePath);
+        let references: string[];
+        try {
+            references = referencedSiblingPaths(exportGitCompose(row.resource, row.workspace));
+        } catch {
+            continue;
+        }
+        let dbFiles: { path: string; content: string }[];
+        try {
+            dbFiles = await listResourceFiles(row.resource.id);
+        } catch {
+            continue;
+        }
+        const dbByPath = new Map(dbFiles.map((file) => [file.path, file.content]));
+        for (const [filePath, content] of dbByPath) {
+            const target = path.posix.normalize(path.posix.join(directory, filePath));
+            if (fileWrites.some((file) => file.path === target)) {
+                throw new GitSyncError(`Multiple resources map to ${target}`);
+            }
+            fileWrites.push({ content, path: target });
+        }
+        for (const reference of references) {
+            if (!dbByPath.has(reference)) {
+                fileRemovals.push(path.posix.normalize(path.posix.join(directory, reference)));
+            }
+        }
     }
     // Complete validation before writing any file. Never stage unrelated repository content.
     for (const file of writes) await validateRepositoryFilePath(context.root, file.path);
+    for (const file of fileWrites) await validateRepositoryFilePath(context.root, file.path);
+    for (const removal of fileRemovals) await validateRepositoryFilePath(context.root, removal);
+    // Skip unchanged siblings so file-only no-ops stay clean.
+    const changedFileWrites: { path: string; content: string }[] = [];
+    for (const file of fileWrites) {
+        let current: string | null = null;
+        try {
+            current = await fs.readFile(path.join(context.root, file.path), "utf8");
+        } catch {
+            current = null;
+        }
+        if (current !== file.content) changedFileWrites.push(file);
+    }
+    if (changedFileWrites.length > 0 || fileRemovals.length > 0) {
+        const candidates = [...changedFileWrites.map((file) => file.path), ...fileRemovals];
+        const tracked = await context.repo.raw(["ls-files", "-z", "--", ...candidates]);
+        for (const trackedPath of tracked.split("\0")) {
+            if (trackedPath) fileTracked.add(trackedPath);
+        }
+    }
     try {
         for (const file of writes) await writeRepositoryFile(context.root, file.path, file.compose);
+        for (const file of changedFileWrites)
+            await writeRepositoryFile(context.root, file.path, file.content);
         if (removals.length > 0)
             await context.repo.raw(["--literal-pathspecs", "rm", "--", ...removals]);
+        if (fileRemovals.length > 0) {
+            for (const removal of fileRemovals) {
+                await fs.rm(path.join(context.root, removal), { force: true });
+            }
+            await context.repo.raw([
+                "--literal-pathspecs",
+                "rm",
+                "--ignore-unmatch",
+                "--",
+                ...fileRemovals,
+            ]);
+        }
         if (writes.length > 0) {
             await commitRepositoryFiles(
                 context.repo,
@@ -506,13 +660,33 @@ const publishAppChanges = async (
             );
             context.result.exported += writes.length;
         }
+        if (changedFileWrites.length > 0 || fileRemovals.length > 0) {
+            const staged = await context.repo.diff(["--cached", "--name-only"]);
+            if (staged.trim()) {
+                await commitRepositoryFiles(
+                    context.repo,
+                    changedFileWrites.map((file) => file.path),
+                    "Sync resource files from Stoat",
+                );
+                context.result.exported +=
+                    changedFileWrites.length +
+                    fileRemovals.filter((removal) => fileTracked.has(removal)).length;
+            }
+        }
     } catch (error) {
         // Before commit, restore only files this operation owns. After commit, keep
         // the commit so the next sync can retry its push without losing history.
         if ((await headCommit(context.repo)) === head) {
-            const touched = [...writes.map((file) => file.path), ...removals];
-            const existingPaths = touched.filter((relativePath) =>
-                files.some((file) => file.path === relativePath),
+            const touched = [
+                ...writes.map((file) => file.path),
+                ...removals,
+                ...changedFileWrites.map((file) => file.path),
+                ...fileRemovals,
+            ];
+            const existingPaths = touched.filter(
+                (relativePath) =>
+                    files.some((file) => file.path === relativePath) ||
+                    fileTracked.has(relativePath),
             );
             const addedPaths = touched.filter(
                 (relativePath) => !existingPaths.includes(relativePath),
