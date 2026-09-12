@@ -19,7 +19,11 @@ export interface Deployment {
 
 export type DeploymentPhase = "finished" | "pending" | "queued" | "started";
 
-export type DeploymentDisplayStatus = "cancelled" | "deployed" | "failed" | DeploymentPhase;
+export type DeploymentDisplayStatus =
+    | "cancelled"
+    | "deployed"
+    | "failed"
+    | DeploymentPhase;
 
 const dateFormatter = new Intl.DateTimeFormat("en", {
     day: "numeric",
@@ -52,7 +56,7 @@ export function getPhase(deployment: Deployment): DeploymentPhase {
 
 export function getDisplayStatus(
     deployment: Deployment,
-    selectedLogs?: Iterable<DeploymentFailureLog> | null,
+    selectedLogs?: Iterable<DeploymentFailureLog> | null
 ): DeploymentDisplayStatus {
     if (deployment.outcome === "cancelled") {
         return "cancelled";
@@ -77,7 +81,7 @@ export function getDisplayStatus(
 
 export function isDeploymentActive(
     deployment: Deployment,
-    selectedLogs?: Iterable<DeploymentFailureLog> | null,
+    selectedLogs?: Iterable<DeploymentFailureLog> | null
 ): boolean {
     return (
         getPhase(deployment) !== "finished" &&
@@ -161,7 +165,10 @@ export function getDuration(deployment: Deployment): string | null {
 
     const seconds = Math.max(
         0,
-        Math.round((deployment.finishedAt.getTime() - deployment.startedAt.getTime()) / 1000),
+        Math.round(
+            (deployment.finishedAt.getTime() - deployment.startedAt.getTime()) /
+                1000
+        )
     );
 
     if (seconds < 60) {
@@ -172,7 +179,9 @@ export function getDuration(deployment: Deployment): string | null {
     const remainingSeconds = seconds % 60;
 
     if (minutes < 60) {
-        return remainingSeconds ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
+        return remainingSeconds
+            ? `${minutes}m ${remainingSeconds}s`
+            : `${minutes}m`;
     }
 
     const hours = Math.floor(minutes / 60);

@@ -18,11 +18,16 @@ const pollGitSources = async (): Promise<void> => {
             .from(gitSource)
             .where(eq(gitSource.syncEnabled, true));
         for (const source of sources) {
-            if (disposed) return;
+            if (disposed) {
+                return;
+            }
             try {
                 await syncGitSource(source.id);
             } catch {
-                evlog.error({ action: "git.sync_failed", gitSourceId: source.id });
+                evlog.error({
+                    action: "git.sync_failed",
+                    gitSourceId: source.id,
+                });
             }
         }
     } catch {
@@ -38,12 +43,16 @@ const pollGitSources = async (): Promise<void> => {
 };
 
 export const ensureGitSyncWorker = (): void => {
-    if (started) return;
+    if (started) {
+        return;
+    }
     started = true;
     void pollGitSources();
 };
 
-const { hot } = import.meta as { hot?: { dispose: (callback: () => void) => void } };
+const { hot } = import.meta as {
+    hot?: { dispose: (callback: () => void) => void };
+};
 hot?.dispose(() => {
     disposed = true;
     clearTimeout(timer);

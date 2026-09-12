@@ -19,13 +19,13 @@ export type OrganizationService = Service & {
 };
 
 const loadDataSourceServices = async (
-    source: OrganizationDataSourceConnection,
+    source: OrganizationDataSourceConnection
 ): Promise<ClusterListResult<OrganizationService>> => {
     const result = await loadClusterItems("services", () =>
         createUncloudClient({
             uncloudToken: source.uncloudToken,
             uncloudUrl: source.uncloudUrl,
-        }).GET("/api/v1/services"),
+        }).GET("/api/v1/services")
     );
 
     return {
@@ -42,19 +42,24 @@ export const listServices = query(
         const session = requireSession();
         const organizationId = await getOrganizationIdForUser(
             session.user.id,
-            session.session.activeOrganizationId,
+            session.session.activeOrganizationId
         );
 
         if (!organizationId) {
             kitError(403, "No organization membership");
         }
 
-        const sources = await listDataSourceConnectionsForOrganization(organizationId);
-        const results = await Promise.all(sources.map((source) => loadDataSourceServices(source)));
+        const sources =
+            await listDataSourceConnectionsForOrganization(organizationId);
+        const results = await Promise.all(
+            sources.map((source) => loadDataSourceServices(source))
+        );
         const items = results.flatMap((result) => result.items);
         const error =
-            items.length === 0 ? (results.find((result) => result.error)?.error ?? null) : null;
+            items.length === 0
+                ? (results.find((result) => result.error)?.error ?? null)
+                : null;
 
         return { error, items };
-    }),
+    })
 );

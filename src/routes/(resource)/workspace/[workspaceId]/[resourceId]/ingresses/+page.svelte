@@ -111,7 +111,8 @@
         composeService = route.editableComposeService ?? "";
         containerPort = String(route.containerPort);
         hostname = route.editableHostname ?? "";
-        protocol = route.protocol;
+        const { protocol: routeProtocol } = route;
+        protocol = routeProtocol;
         publishedPort = String(
             route.editablePublishedPort ?? route.publishedPort ?? ""
         );
@@ -175,8 +176,8 @@
 
         try {
             await deleteResourceIngress({
-                routeId,
                 resourceId: params.resourceId,
+                routeId,
             });
             deletingRoute = undefined;
             snackbar("Route deleted from Compose");
@@ -360,7 +361,12 @@
     <FlowNode {id}>
         <span class="flex items-center gap-2">
             {#if svc}
-                <ResourceIcon icon={svc.icon} type={svc.type} size={18} alt="" />
+                <ResourceIcon
+                    icon={svc.icon}
+                    type={svc.type}
+                    size={18}
+                    alt=""
+                />
             {:else}
                 <span class="text-on-surface-variant flex">
                     <Icon icon={dnsIcon} size={18} />

@@ -58,10 +58,15 @@ const isBlockedInheritedEnv = (name: string): boolean => {
         return true;
     }
 
-    return normalized.startsWith("GIT_CONFIG_KEY_") || normalized.startsWith("GIT_CONFIG_VALUE_");
+    return (
+        normalized.startsWith("GIT_CONFIG_KEY_") ||
+        normalized.startsWith("GIT_CONFIG_VALUE_")
+    );
 };
 
-const mergeGitChildEnvironment = (env: Record<string, string>): Record<string, string> => {
+const mergeGitChildEnvironment = (
+    env: Record<string, string>
+): Record<string, string> => {
     const inherited: Record<string, string> = {};
 
     for (const [name, value] of Object.entries(process.env)) {
@@ -77,10 +82,15 @@ const mergeGitChildEnvironment = (env: Record<string, string>): Record<string, s
 
 const gitUnsafeOptions = (env: Record<string, string>) => ({
     ...(env.GIT_CONFIG_COUNT ? { allowUnsafeConfigEnvCount: true } : {}),
-    ...(env.GIT_SSH || env.GIT_SSH_COMMAND ? { allowUnsafeSshCommand: true } : {}),
+    ...(env.GIT_SSH || env.GIT_SSH_COMMAND
+        ? { allowUnsafeSshCommand: true }
+        : {}),
 });
 
-const createGitClient = (baseDir?: string, env?: Record<string, string>): SimpleGit => {
+const createGitClient = (
+    baseDir?: string,
+    env?: Record<string, string>
+): SimpleGit => {
     const client = simpleGit({
         timeout: { block: 60_000 },
         ...(baseDir ? { baseDir } : {}),
@@ -141,7 +151,9 @@ const getRepoWithEnvironment = async ({
             "--format=%(refname)",
             "refs/remotes/origin",
         ]);
-        if (branches.trim()) await repo.pull(["--ff-only"]);
+        if (branches.trim()) {
+            await repo.pull(["--ff-only"]);
+        }
     }
     evlog.info({
         action: "git.repository_pulled",
@@ -156,7 +168,10 @@ const getRepoWithEnvironment = async ({
  * For authenticated work use withGitRepo so temporary SSH files are removed
  * once all clone, pull, and push operations have completed.
  */
-export const getRepo = async ({ repoPath, repoUrl }: GitRepositoryOptions): Promise<SimpleGit> =>
+export const getRepo = async ({
+    repoPath,
+    repoUrl,
+}: GitRepositoryOptions): Promise<SimpleGit> =>
     await getRepoWithEnvironment({
         repoPath,
         repoUrl: removeGitUrlCredentials(repoUrl),
@@ -169,7 +184,7 @@ export const getRepo = async ({ repoPath, repoUrl }: GitRepositoryOptions): Prom
  */
 export const withGitRepo = async <Result>(
     { authentication, repoPath, repoUrl }: AuthenticatedGitRepositoryOptions,
-    operation: (repo: SimpleGit) => Promise<Result>,
+    operation: (repo: SimpleGit) => Promise<Result>
 ): Promise<Result> => {
     const runtime = await createGitAuthenticationEnvironment(authentication);
     const authenticatedUrl = gitUrlForAuthentication(repoUrl, authentication);

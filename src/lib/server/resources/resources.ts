@@ -5,7 +5,7 @@ import path from "node:path";
 import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "#lib/db";
-import { resources, workspace } from "#lib/db/schema";
+import { dataSource, resources, workspace } from "#lib/db/schema";
 import type { EnvironmentVariable } from "#lib/domain/environment";
 import { normalizeResourceIcon } from "#lib/domain/resources/icon";
 import { normalizeResourceName } from "#lib/domain/resources/identity";
@@ -15,8 +15,14 @@ import {
     parseResourceSettings,
     shouldPrefixResources,
 } from "#lib/domain/resources/settings";
-import { expandTemplateSecrets, expandTemplateVariables } from "#lib/domain/templates";
-import { createWorkspaceFolder, workspacePath } from "#lib/server/data-sources/paths";
+import {
+    expandTemplateSecrets,
+    expandTemplateVariables,
+} from "#lib/domain/templates";
+import {
+    createWorkspaceFolder,
+    workspacePath,
+} from "#lib/server/data-sources/paths";
 import { formatComposeFile } from "#lib/server/deployments/deployment-compose";
 import {
     addComposeIngressRoute,
@@ -33,7 +39,10 @@ import {
     deleteResourceFilesForResource,
 } from "#lib/server/resources/resource-files";
 import { uniqueSlug } from "#lib/server/shared/slugs";
-import { readTemplateIconValue, readTemplateVersion } from "#lib/server/templates";
+import {
+    readTemplateIconValue,
+    readTemplateVersion,
+} from "#lib/server/templates";
 
 export interface CreateResourceInput {
     icon?: string;
@@ -48,6 +57,20 @@ export async function getResource(id: string) {
     const [op] = await db.select().from(resources).where(eq(resources.id, id));
 
     return op;
+}
+
+export async function getGitSourceIdForResource(id: string) {
+    const [record] = await db
+        .select({
+            gitSourceId: dataSource.gitSourceId,
+            gitSync: resources.gitSync,
+        })
+        .from(resources)
+        .innerJoin(workspace, eq(workspace.id, resources.workspaceId))
+        .innerJoin(dataSource, eq(dataSource.id, workspace.dataSourceId))
+        .where(eq(resources.id, id));
+
+    return record?.gitSourceId ?? record?.gitSync?.sourceId ?? null;
 }
 
 export async function listResourcesInWorkspace(workspaceId: string) {
@@ -108,7 +131,7 @@ export async function createResource({
         await createWorkspaceFolder(
             workspacePath(workspaceId),
             workspaceRecord.slug,
-            created.slug ?? slug,
+            created.slug ?? slug
         );
 
         if (variables.length > 0) {
@@ -137,7 +160,9 @@ export async function createResourceFromTemplate({
     const template = await readTemplateVersion(appId, version);
 
     return await createResource({
-        icon: (await readTemplateIconValue(appId, template.manifest.icon)) ?? undefined,
+        icon:
+            (await readTemplateIconValue(appId, template.manifest.icon)) ??
+            undefined,
         name,
         type: template.manifest.type,
         value: expandTemplateSecrets(template.compose),
@@ -146,7 +171,10 @@ export async function createResourceFromTemplate({
     });
 }
 
-export async function copyResource(resourceId: string, targetWorkspaceId: string) {
+export async function copyResource(
+    resourceId: string,
+    targetWorkspaceId: string
+) {
     const resource = await getResource(resourceId);
 
     if (!resource) {
@@ -177,7 +205,10 @@ export async function copyResource(resourceId: string, targetWorkspaceId: string
     return copied;
 }
 
-export async function moveResource(resourceId: string, targetWorkspaceId: string) {
+export async function moveResource(
+    resourceId: string,
+    targetWorkspaceId: string
+) {
     const [record] = await db
         .select({
             resource: resources,
@@ -207,23 +238,25 @@ export async function moveResource(resourceId: string, targetWorkspaceId: string
         .where(
             and(
                 eq(workspace.id, targetWorkspaceId),
-                eq(workspace.dataSourceId, record.sourceDataSourceId),
-            ),
+                eq(workspace.dataSourceId, record.sourceDataSourceId)
+            )
         );
 
     if (!targetWorkspace) {
-        throw new Error("Resources can only move between workspaces using the same data source");
+        throw new Error(
+            "Resources can only move between workspaces using the same data source"
+        );
     }
 
     const resourceFolder = record.resource.slug ?? record.resource.id;
     const sourceFolder = path.join(
         workspacePath(record.sourceWorkspaceId),
         record.sourceWorkspaceSlug,
-        resourceFolder,
+        resourceFolder
     );
     const targetParent = await createWorkspaceFolder(
         workspacePath(targetWorkspace.id),
-        targetWorkspace.slug,
+        targetWorkspace.slug
     );
     const targetFolder = path.join(targetParent, resourceFolder);
 
@@ -234,7 +267,9 @@ export async function moveResource(resourceId: string, targetWorkspaceId: string
         movedExistingFolder = true;
     } catch (error) {
         const sourceFolderMissing =
-            error instanceof Error && "code" in error && error.code === "ENOENT";
+            error instanceof Error &&
+            "code" in error &&
+            error.code === "ENOENT";
 
         if (!sourceFolderMissing) {
             throw error;
@@ -254,8 +289,8 @@ export async function moveResource(resourceId: string, targetWorkspaceId: string
             .where(
                 and(
                     eq(resources.id, resourceId),
-                    eq(resources.workspaceId, record.sourceWorkspaceId),
-                ),
+                    eq(resources.workspaceId, record.sourceWorkspaceId)
+                )
             )
             .returning();
 
@@ -265,11 +300,9 @@ export async function moveResource(resourceId: string, targetWorkspaceId: string
 
         return updated;
     } catch (error) {
-        if (movedExistingFolder) {
-            await fs.rename(targetFolder, sourceFolder);
-        } else {
-            await fs.rm(targetFolder, { force: true, recursive: true });
-        }
+        await (movedExistingFolder
+            ? fs.rename(targetFolder, sourceFolder)
+            : fs.rm(targetFolder, { force: true, recursive: true }));
         throw error;
     }
 }
@@ -282,7 +315,10 @@ export async function updateResourceCompose(id: string, compose: string) {
         .returning();
 }
 
-const updateIngressCompose = async (resourceId: string, update: (compose: string) => string) => {
+const updateIngressCompose = async (
+    resourceId: string,
+    update: (compose: string) => string
+) => {
     const resource = await getResource(resourceId);
 
     if (!resource) {
@@ -303,31 +339,45 @@ const updateIngressCompose = async (resourceId: string, update: (compose: string
     return updated;
 };
 
-export const createResourceIngress = async (resourceId: string, route: ComposeIngressRouteInput) =>
-    await updateIngressCompose(resourceId, (compose) => addComposeIngressRoute(compose, route));
+export const createResourceIngress = async (
+    resourceId: string,
+    route: ComposeIngressRouteInput
+) =>
+    await updateIngressCompose(resourceId, (compose) =>
+        addComposeIngressRoute(compose, route)
+    );
 
 export const updateResourceIngress = async (
     resourceId: string,
     routeId: string,
-    route: ComposeIngressRouteInput,
+    route: ComposeIngressRouteInput
 ) =>
     await updateIngressCompose(resourceId, (compose) =>
-        updateComposeIngressRoute(compose, routeId, route),
+        updateComposeIngressRoute(compose, routeId, route)
     );
 
-export const deleteResourceIngress = async (resourceId: string, routeId: string) =>
+export const deleteResourceIngress = async (
+    resourceId: string,
+    routeId: string
+) =>
     await updateIngressCompose(resourceId, (compose) =>
-        deleteComposeIngressRoute(compose, routeId),
+        deleteComposeIngressRoute(compose, routeId)
     );
 
 export async function deleteResource(id: string) {
-    const [resource] = await db.select().from(resources).where(eq(resources.id, id));
+    const [resource] = await db
+        .select()
+        .from(resources)
+        .where(eq(resources.id, id));
 
     if (!resource) {
         throw new Error("Resource not found");
     }
 
-    const [wrk] = await db.select().from(workspace).where(eq(workspace.id, resource.workspaceId));
+    const [wrk] = await db
+        .select()
+        .from(workspace)
+        .where(eq(workspace.id, resource.workspaceId));
 
     if (!wrk) {
         throw new Error("Workspace not found");
@@ -336,21 +386,34 @@ export async function deleteResource(id: string) {
     await deleteEnvironmentVariablesForResource(id);
     await deleteResourceFilesForResource(id);
 
-    const op = await db.delete(resources).where(eq(resources.id, id)).returning();
+    const op = await db
+        .delete(resources)
+        .where(eq(resources.id, id))
+        .returning();
 
-    await fs.rm(path.join(workspacePath(wrk.id), wrk.slug, resource.slug ?? resource.id), {
-        force: true,
-        recursive: true,
-    });
+    await fs.rm(
+        path.join(
+            workspacePath(wrk.id),
+            wrk.slug,
+            resource.slug ?? resource.id
+        ),
+        {
+            force: true,
+            recursive: true,
+        }
+    );
 
     return op;
 }
 
 export async function updateResourceIdentity(
     resourceId: string,
-    patch: { icon?: string | null; name?: string },
+    patch: { icon?: string | null; name?: string }
 ) {
-    const [resource] = await db.select().from(resources).where(eq(resources.id, resourceId));
+    const [resource] = await db
+        .select()
+        .from(resources)
+        .where(eq(resources.id, resourceId));
 
     if (!resource) {
         throw new Error("Resource not found");
@@ -383,8 +446,14 @@ export async function updateResourceIdentity(
     return updated;
 }
 
-export async function updateResourceSettings(resourceId: string, settings: ResourceSettings) {
-    const [resource] = await db.select().from(resources).where(eq(resources.id, resourceId));
+export async function updateResourceSettings(
+    resourceId: string,
+    settings: ResourceSettings
+) {
+    const [resource] = await db
+        .select()
+        .from(resources)
+        .where(eq(resources.id, resourceId));
 
     if (!resource) {
         throw new Error("Resource not found");
@@ -427,7 +496,10 @@ export async function getFormattedResourceCompose(resourceId: string) {
     return formatComposeFile(resource.value, resourceComposePrefix(resource));
 }
 
-export async function previewResourceCompose(resourceId: string, compose: string) {
+export async function previewResourceCompose(
+    resourceId: string,
+    compose: string
+) {
     const resource = await getResource(resourceId);
 
     if (!resource) {

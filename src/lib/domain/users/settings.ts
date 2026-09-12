@@ -17,11 +17,16 @@ export function parseUserSettings(value: unknown): UserSettings {
 
 // Resource names inside folders are shown unless the user turned them off;
 // the field is only stored when it differs from that default.
-export function showFolderResourceNames(settings?: UserSettings | null): boolean {
+export function showFolderResourceNames(
+    settings?: UserSettings | null
+): boolean {
     return settings?.showFolderResourceNames !== false;
 }
 
-export function mergeUserSettings(current: unknown, patch: UserSettings): UserSettings {
+export function mergeUserSettings(
+    current: unknown,
+    patch: UserSettings
+): UserSettings {
     const next = parseUserSettings(current);
 
     if ("showFolderResourceNames" in patch) {

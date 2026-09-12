@@ -25,12 +25,19 @@ interface RouteReference {
 }
 
 const isEditableProtocol = (
-    protocol: ResourceIngressProtocol,
+    protocol: ResourceIngressProtocol
 ): protocol is ComposeIngressRouteInput["protocol"] =>
-    EDITABLE_PROTOCOLS.includes(protocol as ComposeIngressRouteInput["protocol"]);
+    EDITABLE_PROTOCOLS.includes(
+        protocol as ComposeIngressRouteInput["protocol"]
+    );
 
 const routeId = (reference: RouteReference): string =>
-    JSON.stringify(["x-ports", reference.serviceName, reference.index, reference.spec]);
+    JSON.stringify([
+        "x-ports",
+        reference.serviceName,
+        reference.index,
+        reference.spec,
+    ]);
 
 const parseRouteId = (id: string): RouteReference => {
     let value: unknown;
@@ -81,7 +88,10 @@ const serviceMap = (services: YAMLMap, serviceName: string): YAMLMap => {
     return service;
 };
 
-const xPortsSequence = (service: YAMLMap, create: boolean): YAMLSeq | undefined => {
+const xPortsSequence = (
+    service: YAMLMap,
+    create: boolean
+): YAMLSeq | undefined => {
     const current = service.get("x-ports", true);
 
     if (current === undefined && create) {
@@ -133,14 +143,17 @@ const routeSpec = (route: ComposeIngressRouteInput): string => {
     return `${prefix}${portSpec}/${route.protocol}`;
 };
 
-const routeSequence = (services: YAMLMap, reference: RouteReference): YAMLSeq => {
+const routeSequence = (
+    services: YAMLMap,
+    reference: RouteReference
+): YAMLSeq => {
     const service = serviceMap(services, reference.serviceName);
     const sequence = xPortsSequence(service, false);
     const item = sequence?.items[reference.index];
 
     if (!sequence || !isScalar(item) || String(item.value) !== reference.spec) {
         throw new Error(
-            "This ingress route changed since the page was loaded. Refresh and try again.",
+            "This ingress route changed since the page was loaded. Refresh and try again."
         );
     }
 
@@ -151,18 +164,24 @@ export const listComposeServiceNames = (compose: string): string[] => {
     const { services } = composeDocument(compose);
 
     return services.items.flatMap((pair) =>
-        isScalar(pair.key) && typeof pair.key.value === "string" ? [pair.key.value] : [],
+        isScalar(pair.key) && typeof pair.key.value === "string"
+            ? [pair.key.value]
+            : []
     );
 };
 
 export const listEditableComposeIngressRoutes = (
-    compose: string,
+    compose: string
 ): EditableComposeIngressRoute[] => {
     const { services } = composeDocument(compose);
     const routes: EditableComposeIngressRoute[] = [];
 
     for (const pair of services.items) {
-        if (!isScalar(pair.key) || typeof pair.key.value !== "string" || !isMap(pair.value)) {
+        if (
+            !isScalar(pair.key) ||
+            typeof pair.key.value !== "string" ||
+            !isMap(pair.value)
+        ) {
             continue;
         }
 
@@ -190,8 +209,12 @@ export const listEditableComposeIngressRoutes = (
                 containerPort: port.containerPort,
                 id: routeId({ index, serviceName: composeService, spec }),
                 protocol: port.protocol,
-                ...(port.hostname === undefined ? {} : { hostname: port.hostname }),
-                ...(port.publishedPort === undefined ? {} : { publishedPort: port.publishedPort }),
+                ...(port.hostname === undefined
+                    ? {}
+                    : { hostname: port.hostname }),
+                ...(port.publishedPort === undefined
+                    ? {}
+                    : { publishedPort: port.publishedPort }),
             });
         }
     }
@@ -201,7 +224,7 @@ export const listEditableComposeIngressRoutes = (
 
 export const addComposeIngressRoute = (
     compose: string,
-    route: ComposeIngressRouteInput,
+    route: ComposeIngressRouteInput
 ): string => {
     const { document, services } = composeDocument(compose);
     const service = serviceMap(services, route.composeService);
@@ -218,7 +241,7 @@ export const addComposeIngressRoute = (
 export const updateComposeIngressRoute = (
     compose: string,
     id: string,
-    route: ComposeIngressRouteInput,
+    route: ComposeIngressRouteInput
 ): string => {
     const reference = parseRouteId(id);
     const { document, services } = composeDocument(compose);
@@ -233,7 +256,10 @@ export const updateComposeIngressRoute = (
             serviceMap(services, reference.serviceName).delete("x-ports");
         }
 
-        const target = xPortsSequence(serviceMap(services, route.composeService), true);
+        const target = xPortsSequence(
+            serviceMap(services, route.composeService),
+            true
+        );
 
         if (!target) {
             throw new Error("Unable to create the target x-ports list");
@@ -245,7 +271,10 @@ export const updateComposeIngressRoute = (
     return document.toString();
 };
 
-export const deleteComposeIngressRoute = (compose: string, id: string): string => {
+export const deleteComposeIngressRoute = (
+    compose: string,
+    id: string
+): string => {
     const reference = parseRouteId(id);
     const { document, services } = composeDocument(compose);
     const service = serviceMap(services, reference.serviceName);

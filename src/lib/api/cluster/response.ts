@@ -10,7 +10,9 @@ interface ClusterListResponse<Item> {
     response: Response;
 }
 
-export const getHttpErrorMessage = async (response: Response): Promise<string> => {
+export const getHttpErrorMessage = async (
+    response: Response
+): Promise<string> => {
     try {
         const payload: unknown = await response.clone().json();
 
@@ -31,11 +33,13 @@ export const getHttpErrorMessage = async (response: Response): Promise<string> =
 };
 
 const getErrorMessage = (error: unknown, resourceName: string): string =>
-    error instanceof Error && error.message ? error.message : `Unable to load ${resourceName}.`;
+    error instanceof Error && error.message
+        ? error.message
+        : `Unable to load ${resourceName}.`;
 
 export const loadClusterItems = async <Item>(
     resourceName: string,
-    request: () => Promise<ClusterListResponse<Item>>,
+    request: () => Promise<ClusterListResponse<Item>>
 ): Promise<ClusterListResult<Item>> => {
     try {
         const { data, response } = await request();
@@ -64,9 +68,12 @@ export const loadClusterItems = async <Item>(
 
         return { error: null, items: data.items };
     } catch (error) {
-        getRemoteLogger()?.error(error instanceof Error ? error : String(error), {
-            cluster: { resource: resourceName },
-        });
+        getRemoteLogger()?.error(
+            error instanceof Error ? error : String(error),
+            {
+                cluster: { resource: resourceName },
+            }
+        );
         return { error: getErrorMessage(error, resourceName), items: [] };
     }
 };

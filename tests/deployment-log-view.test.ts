@@ -9,7 +9,8 @@ import {
 } from "../src/routes/(resource)/workspace/[workspaceId]/[resourceId]/deployments/deployment-log-view.ts";
 
 const log = (
-    partial: Partial<DeploymentLogRecord> & Pick<DeploymentLogRecord, "id" | "message">,
+    partial: Partial<DeploymentLogRecord> &
+        Pick<DeploymentLogRecord, "id" | "message">
 ): DeploymentLogRecord => ({
     createdAt: new Date("2026-08-19T12:17:34.000Z"),
     stream: "stdout",
@@ -18,7 +19,9 @@ const log = (
 
 describe("getChangeSummary", () => {
     it("parses a git-style change line", () => {
-        expect(getChangeSummary("Changes: 3, insertions: 12, deletions: 4")).toEqual({
+        expect(
+            getChangeSummary("Changes: 3, insertions: 12, deletions: 4")
+        ).toEqual({
             changes: 3,
             deletions: 4,
             insertions: 12,
@@ -32,11 +35,15 @@ describe("getChangeSummary", () => {
 
 describe("getEmptyLogFilterMessage", () => {
     it("explains missing errors, hidden debug output, and empty output", () => {
-        expect(getEmptyLogFilterMessage("stderr", 0, false)).toBe("No errors in this deployment.");
-        expect(getEmptyLogFilterMessage("all", 4, false)).toBe(
-            "No output to show. Enable debug logs to see internal details.",
+        expect(getEmptyLogFilterMessage("stderr", 0, false)).toBe(
+            "No errors in this deployment."
         );
-        expect(getEmptyLogFilterMessage("stdout", 0, false)).toBe("No output in this deployment.");
+        expect(getEmptyLogFilterMessage("all", 4, false)).toBe(
+            "No output to show. Enable debug logs to see internal details."
+        );
+        expect(getEmptyLogFilterMessage("stdout", 0, false)).toBe(
+            "No output in this deployment."
+        );
     });
 });
 
@@ -46,15 +53,17 @@ describe("buildDeploymentLogView", () => {
             [
                 log({
                     id: 1,
-                    message: "Preparing deployment for service Nginx (nginx-f7gzq)",
+                    message:
+                        "Preparing deployment for service Nginx (nginx-f7gzq)",
                 }),
                 log({
                     id: 2,
-                    message: "Wrote compose file to /tmp/infra/svc/compose.yaml",
+                    message:
+                        "Wrote compose file to /tmp/infra/svc/compose.yaml",
                 }),
                 log({ id: 3, message: "Deploy error: boom", stream: "stderr" }),
             ],
-            { logFilter: "all", showDebugLogs: false },
+            { logFilter: "all", showDebugLogs: false }
         );
 
         expect(view).toMatchObject({
@@ -71,14 +80,16 @@ describe("buildDeploymentLogView", () => {
             [
                 log({
                     id: 1,
-                    message: "Preparing deployment for service Nginx (nginx-f7gzq)",
+                    message:
+                        "Preparing deployment for service Nginx (nginx-f7gzq)",
                 }),
                 log({
                     id: 2,
-                    message: "Wrote compose file to /tmp/infra/svc/compose.yaml",
+                    message:
+                        "Wrote compose file to /tmp/infra/svc/compose.yaml",
                 }),
             ],
-            { logFilter: "all", showDebugLogs: true },
+            { logFilter: "all", showDebugLogs: true }
         );
 
         expect(view.allCount).toBe(2);

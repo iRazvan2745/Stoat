@@ -62,7 +62,9 @@
         parseResourceSettings(svc?.settings)
     );
     const deployedShouldPrefix = latestDeployment
-        ? shouldPrefixResources(parseResourceSettings(latestDeployment.settings))
+        ? shouldPrefixResources(
+              parseResourceSettings(latestDeployment.settings)
+          )
         : undefined;
     let shouldPrefix = $state(initialShouldPrefix);
     let lastSavedPrefix = $state(initialShouldPrefix);
@@ -305,11 +307,13 @@
             </p>
         </header>
 
-        <div class="flex max-w-m flex-col gap-6">
+        <div class="max-w-m flex flex-col gap-6">
             <section class="flex flex-col gap-3">
                 <h2 class="m3-font-title-small text-on-surface">Resource</h2>
 
-                <div class="identity-row flex min-w-0 flex-col items-start gap-3 m:flex-row">
+                <div
+                    class="identity-row m:flex-row flex min-w-0 flex-col items-start gap-3"
+                >
                     <div class="relative shrink-0">
                         <button
                             type="button"
@@ -458,7 +462,12 @@
         <div
             class="bg-surface-container-high text-on-surface grid size-20 place-items-center overflow-hidden rounded-lg"
         >
-            <ResourceIcon icon={uploadDraft} type={svc?.type} size={56} alt="" />
+            <ResourceIcon
+                icon={uploadDraft}
+                type={svc?.type}
+                size={56}
+                alt=""
+            />
         </div>
 
         <p class="m3-font-body-small text-on-surface-variant">

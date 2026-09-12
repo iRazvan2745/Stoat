@@ -14,7 +14,7 @@ export interface DeploymentLogBatch<Log extends { id: number }> {
 export const createDeploymentLogBatch = <Log extends { id: number }>(
     logs: Log[],
     afterId: number,
-    terminal: boolean,
+    terminal: boolean
 ): DeploymentLogBatch<Log> => ({
     done: terminal && logs.length < DEPLOYMENT_LOG_BATCH_SIZE,
     hasMore: logs.length === DEPLOYMENT_LOG_BATCH_SIZE,
@@ -29,11 +29,9 @@ interface LogStreamSource<Log extends { id: number }> {
 }
 
 // Read terminal state before draining so the final transaction logs are visible.
-export const streamLogBatches = async function* streamLogBatches<Log extends { id: number }>({
-    isTerminal,
-    read,
-    signal,
-}: LogStreamSource<Log>): AsyncGenerator<Log[]> {
+export const streamLogBatches = async function* streamLogBatches<
+    Log extends { id: number },
+>({ isTerminal, read, signal }: LogStreamSource<Log>): AsyncGenerator<Log[]> {
     let lastId = 0;
     let emitted = false;
 

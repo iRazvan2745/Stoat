@@ -6,7 +6,7 @@ export const variables = defineEnvVars({
         description: "Whether to allow signup. Set to `true` to allow signup.",
         schema: v.pipe(
             v.optional(v.string(), "false"),
-            v.transform((value) => value === "true"),
+            v.transform((value) => value === "true")
         ),
     },
     APP_SECRET: {
@@ -18,7 +18,8 @@ export const variables = defineEnvVars({
     },
     DATABASE_URL: { description: "The database connection string." },
     DATA_DIR: {
-        description: "Optional root directory for local-development data sources.",
+        description:
+            "Optional root directory for local-development data sources.",
         schema: v.optional(v.string()),
     },
 });

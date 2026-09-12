@@ -24,12 +24,12 @@
         createResource,
         listResourcesInWorkspace,
     } from "#lib/api/resources.remote";
+    import { getUserSettings, updateUserSettings } from "#lib/api/users.remote";
     import {
         deleteWorkspace,
         getWorkspace,
         listWorkspaces,
     } from "#lib/api/workspaces.remote";
-    import { getUserSettings, updateUserSettings } from "#lib/api/users.remote";
     import ResourceGroups from "#lib/components/resources/resource-groups.svelte";
     import { showFolderResourceNames as shouldShowFolderResourceNames } from "#lib/domain/users/settings";
 
@@ -261,15 +261,19 @@
             <LoadingIndicator aria-label="Loading resources" />
         </div>
     {:else if resources.error}
-        <div class="text-error m3-font-body-medium p-6">{resources.error.message}</div>
+        <div class="text-error m3-font-body-medium p-6">
+            {resources.error.message}
+        </div>
     {:else if (resources.current?.length ?? 0) === 0}
-        <div class="text-on-surface-variant m3-font-body-medium px-5 py-10 text-center">
+        <div
+            class="text-on-surface-variant m3-font-body-medium px-5 py-10 text-center"
+        >
             No resources yet. Add a compose file or start from a template.
         </div>
     {:else}
         <ResourceGroups
             resources={resources.current ?? []}
-            showFolderResourceNames={showFolderResourceNames}
+            {showFolderResourceNames}
             workspaceId={params.workspaceId}
         />
     {/if}

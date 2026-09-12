@@ -33,7 +33,9 @@ export const load: LayoutServerLoad = async ({ locals, params }) => {
     }
 
     return {
-        gravatarUrl: session.user.image ? null : await getGravatarUrl(session.user.email),
+        gravatarUrl: session.user.image
+            ? null
+            : await getGravatarUrl(session.user.email),
         session,
     };
 };

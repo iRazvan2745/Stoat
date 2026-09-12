@@ -11,7 +11,9 @@ export const load: LayoutServerLoad = async ({ locals, params }) => {
         redirect(303, "/login");
     }
 
-    if (!(await hasAccessToThisWorkspace(session.user.id, params.workspaceId))) {
+    if (
+        !(await hasAccessToThisWorkspace(session.user.id, params.workspaceId))
+    ) {
         error(403, "Forbidden");
     }
 

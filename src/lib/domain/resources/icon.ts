@@ -56,7 +56,9 @@ const isSafeHttpUrl = (value: string): boolean => {
 const isSafeRelativeUrl = (value: string): boolean =>
     value.startsWith("/") && !value.startsWith("//");
 
-export function resourceIconSrc(icon: string | null | undefined): string | null {
+export function resourceIconSrc(
+    icon: string | null | undefined
+): string | null {
     const trimmed = icon?.trim();
 
     if (!trimmed) {
@@ -82,12 +84,17 @@ export function resourceIconSrc(icon: string | null | undefined): string | null 
 
 export function resolveResourceIcon(
     icon: string | null | undefined,
-    type?: string | null,
+    type?: string | null
 ): string | null {
-    return resourceIconSrc(icon) ?? (type === "postgresql" ? POSTGRES_FALLBACK_ICON : null);
+    return (
+        resourceIconSrc(icon) ??
+        (type === "postgresql" ? POSTGRES_FALLBACK_ICON : null)
+    );
 }
 
-export function normalizeResourceIcon(icon: string | null | undefined): string | null {
+export function normalizeResourceIcon(
+    icon: string | null | undefined
+): string | null {
     const trimmed = icon?.trim() ?? "";
 
     if (!trimmed) {
@@ -135,7 +142,9 @@ const bytesToBase64 = (bytes: Uint8Array): string => {
     let binary = "";
 
     for (let index = 0; index < bytes.length; index += BASE64_CHUNK_SIZE) {
-        binary += String.fromCodePoint(...bytes.subarray(index, index + BASE64_CHUNK_SIZE));
+        binary += String.fromCodePoint(
+            ...bytes.subarray(index, index + BASE64_CHUNK_SIZE)
+        );
     }
 
     return btoa(binary);

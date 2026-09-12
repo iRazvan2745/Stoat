@@ -44,7 +44,7 @@ const getErrorMessage = (error: unknown, label: string): string =>
         : `Unable to load Caddy configurations from ${label}.`;
 
 const loadDataSourceCaddyConfigs = async (
-    source: OrganizationDataSourceConnection,
+    source: OrganizationDataSourceConnection
 ): Promise<{
     dataSource: OrganizationCaddyDataSourceStatus;
     items: OrganizationCaddyConfig[];
@@ -118,12 +118,15 @@ const loadDataSourceCaddyConfigs = async (
             })),
         };
     } catch (error) {
-        getRemoteLogger()?.error(error instanceof Error ? error : String(error), {
-            cluster: {
-                dataSourceId: source.id,
-                resource: "caddy-configs",
-            },
-        });
+        getRemoteLogger()?.error(
+            error instanceof Error ? error : String(error),
+            {
+                cluster: {
+                    dataSourceId: source.id,
+                    resource: "caddy-configs",
+                },
+            }
+        );
         return {
             dataSource: {
                 ...baseDataSource,
@@ -145,22 +148,23 @@ export const listOrganizationCaddyConfigs = query(
             const session = requireSession();
             const organizationId = await getOrganizationIdForUser(
                 session.user.id,
-                session.session.activeOrganizationId,
+                session.session.activeOrganizationId
             );
 
             if (!organizationId) {
                 kitError(403, "No organization membership");
             }
 
-            const sources = await listDataSourceConnectionsForOrganization(organizationId);
+            const sources =
+                await listDataSourceConnectionsForOrganization(organizationId);
             const results = await Promise.all(
-                sources.map((source) => loadDataSourceCaddyConfigs(source)),
+                sources.map((source) => loadDataSourceCaddyConfigs(source))
             );
 
             return {
                 dataSources: results.map((result) => result.dataSource),
                 items: results.flatMap((result) => result.items),
             };
-        },
-    ),
+        }
+    )
 );

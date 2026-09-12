@@ -49,7 +49,10 @@ export const gitSource = pgTable(
         // Nullable only for the migration-created local source used by legacy
         // data sources that did not have a Git repository configured.
         url: text("url"),
-        authMethod: text("auth_method").$type<GitAuthMethod>().notNull().default("none"),
+        authMethod: text("auth_method")
+            .$type<GitAuthMethod>()
+            .notNull()
+            .default("none"),
         username: text("username"),
         password: text("password"),
         token: text("token"),
@@ -67,7 +70,9 @@ export const gitSource = pgTable(
             .$defaultFn(() => new Date())
             .$onUpdate(() => new Date()),
     },
-    (table) => [index("git_source_organization_id_idx").on(table.organizationId)],
+    (table) => [
+        index("git_source_organization_id_idx").on(table.organizationId),
+    ]
 );
 
 export const dataSource = pgTable(
@@ -92,7 +97,9 @@ export const dataSource = pgTable(
             .$defaultFn(() => new Date())
             .$onUpdate(() => new Date()),
     },
-    (table) => [index("data_source_organization_id_idx").on(table.organizationId)],
+    (table) => [
+        index("data_source_organization_id_idx").on(table.organizationId),
+    ]
 );
 
 export const workspace = pgTable(
@@ -119,11 +126,14 @@ export const workspace = pgTable(
     },
     (table) => [
         // Discovery looks up workspaces by data source (and name).
-        index("workspace_data_source_id_idx").on(table.dataSourceId, table.name),
+        index("workspace_data_source_id_idx").on(
+            table.dataSourceId,
+            table.name
+        ),
         index("workspace_organization_id_idx").on(table.organizationId),
         // uniqueSlug() already assumes global uniqueness; enforce it.
         uniqueIndex("workspace_slug_idx").on(table.slug),
-    ],
+    ]
 );
 
 export const resources = pgTable(
@@ -145,7 +155,10 @@ export const resources = pgTable(
         slug: text("slug"),
         icon: text("icon"),
         value: text("value"),
-        settings: jsonb("settings").$type<ResourceSettings>().notNull().default({}),
+        settings: jsonb("settings")
+            .$type<ResourceSettings>()
+            .notNull()
+            .default({}),
         createdAt: timestamp("created_at", { withTimezone: true })
             .notNull()
             .$defaultFn(() => new Date()),
@@ -158,7 +171,7 @@ export const resources = pgTable(
         index("resources_workspace_id_idx").on(table.workspaceId),
         // uniqueSlug() already assumes global uniqueness; NULLs are allowed.
         uniqueIndex("resources_slug_idx").on(table.slug),
-    ],
+    ]
 );
 
 export const dataSourceRelations = relations(dataSource, ({ many, one }) => ({
@@ -179,19 +192,6 @@ export const gitSourceRelations = relations(gitSource, ({ many, one }) => ({
         fields: [gitSource.organizationId],
         references: [organization.id],
     }),
-}));
-
-export const workspaceRelations = relations(workspace, ({ many, one }) => ({
-    dataSource: one(dataSource, {
-        fields: [workspace.dataSourceId],
-        references: [dataSource.id],
-    }),
-    organization: one(organization, {
-        fields: [workspace.organizationId],
-        references: [organization.id],
-    }),
-    resources: many(resources),
-    workspaceEnvironmentVariables: many(workspaceEnvironmentVariables),
 }));
 
 export const resourcesRelations = relations(resources, ({ one }) => ({
@@ -227,7 +227,10 @@ export const deployments = pgTable(
         outcome: text("outcome"),
         jobId: text("job_id"),
         gitCommit: text("git_commit"),
-        settings: jsonb("settings").$type<ResourceSettings>().notNull().default({}),
+        settings: jsonb("settings")
+            .$type<ResourceSettings>()
+            .notNull()
+            .default({}),
     },
     (table) => [
         // Deployment list per resource, ordered by createdAt/id (scanned
@@ -236,9 +239,9 @@ export const deployments = pgTable(
         index("deployments_resource_id_created_at_idx").on(
             table.resourceId,
             table.createdAt,
-            table.id,
+            table.id
         ),
-    ],
+    ]
 );
 
 export const deploymentLogs = pgTable(
@@ -258,7 +261,12 @@ export const deploymentLogs = pgTable(
             .notNull()
             .$defaultFn(() => new Date()),
     },
-    (table) => [index("deployment_logs_deployment_id_id_idx").on(table.deploymentId, table.id)],
+    (table) => [
+        index("deployment_logs_deployment_id_id_idx").on(
+            table.deploymentId,
+            table.id
+        ),
+    ]
 );
 
 export const environmentVariables = pgTable(
@@ -282,8 +290,11 @@ export const environmentVariables = pgTable(
     },
     (table) => [
         // Serves both the per-resource filter and the ORDER BY name.
-        index("environment_variables_resource_id_name_idx").on(table.resourceId, table.name),
-    ],
+        index("environment_variables_resource_id_name_idx").on(
+            table.resourceId,
+            table.name
+        ),
+    ]
 );
 
 export const workspaceEnvironmentVariables = pgTable(
@@ -309,10 +320,23 @@ export const workspaceEnvironmentVariables = pgTable(
         // Serves both the per-workspace filter and the ORDER BY name.
         index("workspace_environment_variables_workspace_id_name_idx").on(
             table.workspaceId,
-            table.name,
+            table.name
         ),
-    ],
+    ]
 );
+
+export const workspaceRelations = relations(workspace, ({ many, one }) => ({
+    dataSource: one(dataSource, {
+        fields: [workspace.dataSourceId],
+        references: [dataSource.id],
+    }),
+    organization: one(organization, {
+        fields: [workspace.organizationId],
+        references: [organization.id],
+    }),
+    resources: many(resources),
+    workspaceEnvironmentVariables: many(workspaceEnvironmentVariables),
+}));
 
 export const workspaceEnvironmentVariablesRelations = relations(
     workspaceEnvironmentVariables,
@@ -321,7 +345,7 @@ export const workspaceEnvironmentVariablesRelations = relations(
             fields: [workspaceEnvironmentVariables.workspaceId],
             references: [workspace.id],
         }),
-    }),
+    })
 );
 
 export const resourceFiles = pgTable(
@@ -344,9 +368,15 @@ export const resourceFiles = pgTable(
             .$onUpdate(() => new Date()),
     },
     (table) => [
-        index("resource_files_resource_id_path_idx").on(table.resourceId, table.path),
-        uniqueIndex("resource_files_resource_id_path_uidx").on(table.resourceId, table.path),
-    ],
+        index("resource_files_resource_id_path_idx").on(
+            table.resourceId,
+            table.path
+        ),
+        uniqueIndex("resource_files_resource_id_path_uidx").on(
+            table.resourceId,
+            table.path
+        ),
+    ]
 );
 
 export const resourceFilesRelations = relations(resourceFiles, ({ one }) => ({

@@ -1,7 +1,10 @@
 import { getResourceDataSource } from "#lib/server/data-sources/data-sources";
 import type { FormattedCompose } from "#lib/server/deployments/deployment-compose";
 import { formatComposeFile } from "#lib/server/deployments/deployment-compose";
-import { getResource, resourceComposePrefix } from "#lib/server/resources/resources";
+import {
+    getResource,
+    resourceComposePrefix,
+} from "#lib/server/resources/resources";
 // oxlint-disable func-style
 import { createUncloudClient } from "#lib/server/uncloud";
 
@@ -38,7 +41,10 @@ const readInspect = (value: unknown): DockerContainerInspect => {
     }
 
     const state = isRecord(value.State) ? value.State : undefined;
-    const health = state && isRecord(state.Health) ? readString(state.Health.Status) : undefined;
+    const health =
+        state && isRecord(state.Health)
+            ? readString(state.Health.Status)
+            : undefined;
     const status = readString(state?.Status) ?? "unknown";
     const config = isRecord(value.Config) ? value.Config : undefined;
 
@@ -51,11 +57,13 @@ const readInspect = (value: unknown): DockerContainerInspect => {
 };
 
 const getErrorMessage = (error: unknown): string =>
-    error instanceof Error && error.message ? error.message : "Unable to load containers.";
+    error instanceof Error && error.message
+        ? error.message
+        : "Unable to load containers.";
 
 const inspectUncloudService = async (
     client: ReturnType<typeof createUncloudClient>,
-    id: string,
+    id: string
 ): Promise<{ error: string | null; service: UncloudService | null }> => {
     try {
         const { data, response } = await client.GET("/api/v1/services/{id}", {
@@ -89,7 +97,9 @@ const inspectUncloudService = async (
 const toContainerInfo = (service: UncloudService): ResourceContainerInfo[] =>
     service.containers.map((container) => {
         const inspect = readInspect(container.container);
-        const id = inspect.id ?? `${container.machineId}-${inspect.name ?? service.name}`;
+        const id =
+            inspect.id ??
+            `${container.machineId}-${inspect.name ?? service.name}`;
 
         return {
             id,
@@ -103,7 +113,7 @@ const toContainerInfo = (service: UncloudService): ResourceContainerInfo[] =>
     });
 
 export async function listResourceContainers(
-    resourceId: string,
+    resourceId: string
 ): Promise<{ error: string | null; items: ResourceContainerInfo[] }> {
     try {
         const resource = await getResource(resourceId);
@@ -119,7 +129,10 @@ export async function listResourceContainers(
         let formatted: FormattedCompose;
 
         try {
-            formatted = formatComposeFile(resource.value, resourceComposePrefix(resource));
+            formatted = formatComposeFile(
+                resource.value,
+                resourceComposePrefix(resource)
+            );
         } catch {
             return { error: null, items: [] };
         }
@@ -130,9 +143,11 @@ export async function listResourceContainers(
             return { error: null, items: [] };
         }
 
-        const client = createUncloudClient(await getResourceDataSource(resourceId));
+        const client = createUncloudClient(
+            await getResourceDataSource(resourceId)
+        );
         const inspections = await Promise.all(
-            serviceNames.map((id) => inspectUncloudService(client, id)),
+            serviceNames.map((id) => inspectUncloudService(client, id))
         );
 
         const items: ResourceContainerInfo[] = [];

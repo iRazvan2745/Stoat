@@ -17,11 +17,18 @@ it("parses junk into empty settings and keeps known fields", () => {
 it("defaults to showing names and only stores deviations from the default", () => {
     expect(showFolderResourceNames({})).toBe(true);
     expect(showFolderResourceNames(null)).toBe(true);
-    expect(showFolderResourceNames({ showFolderResourceNames: false })).toBe(false);
+    expect(showFolderResourceNames({ showFolderResourceNames: false })).toBe(
+        false
+    );
 
-    expect(mergeUserSettings({}, { showFolderResourceNames: true })).toEqual({});
+    expect(mergeUserSettings({}, { showFolderResourceNames: true })).toEqual(
+        {}
+    );
     expect(
-        mergeUserSettings({ showFolderResourceNames: false }, { showFolderResourceNames: true }),
+        mergeUserSettings(
+            { showFolderResourceNames: false },
+            { showFolderResourceNames: true }
+        )
     ).toEqual({});
     expect(mergeUserSettings({}, { showFolderResourceNames: false })).toEqual({
         showFolderResourceNames: false,

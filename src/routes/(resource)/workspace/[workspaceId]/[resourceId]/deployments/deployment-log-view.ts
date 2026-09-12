@@ -1,5 +1,8 @@
 // oxlint-disable func-style no-use-before-define
-import type { DeploymentLogEntry, DeploymentLogRecord } from "#lib/domain/deployments/logs";
+import type {
+    DeploymentLogEntry,
+    DeploymentLogRecord,
+} from "#lib/domain/deployments/logs";
 import {
     buildDeploymentLogEntries,
     insertLogSectionHeaders,
@@ -45,7 +48,7 @@ export function getChangeSummary(message: string): ChangeSummary | null {
 export function getEmptyLogFilterMessage(
     logFilter: LogFilter,
     debugCount: number,
-    showDebugLogs: boolean,
+    showDebugLogs: boolean
 ): string {
     if (logFilter === "stderr") {
         return "No errors in this deployment.";
@@ -60,7 +63,7 @@ export function getEmptyLogFilterMessage(
 
 export function buildDeploymentLogView(
     logs: DeploymentLogRecord[],
-    options: { logFilter: LogFilter; showDebugLogs: boolean },
+    options: { logFilter: LogFilter; showDebugLogs: boolean }
 ): DeploymentLogView {
     const { logFilter, showDebugLogs } = options;
     const debugCount = logs.filter(isDebugDeploymentLog).length;
@@ -68,10 +71,14 @@ export function buildDeploymentLogView(
     const builtLogEntries = buildDeploymentLogEntries(streamFilteredLogs);
     const filteredLogEntries = showDebugLogs
         ? builtLogEntries
-        : builtLogEntries.filter((entry) => entry.kind !== "text" || !entry.debug);
+        : builtLogEntries.filter(
+              (entry) => entry.kind !== "text" || !entry.debug
+          );
 
     return {
-        allCount: logs.filter((log) => showDebugLogs || !isDebugDeploymentLog(log)).length,
+        allCount: logs.filter(
+            (log) => showDebugLogs || !isDebugDeploymentLog(log)
+        ).length,
         debugCount,
         filteredLogEntries,
         stderrCount: logs.filter((log) => log.stream === "stderr").length,
@@ -89,7 +96,7 @@ export function buildDeploymentLogView(
 
 function filterLogsByStream(
     logs: DeploymentLogRecord[],
-    logFilter: LogFilter,
+    logFilter: LogFilter
 ): DeploymentLogRecord[] {
     if (logFilter === "all") {
         return logs;

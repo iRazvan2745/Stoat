@@ -103,7 +103,7 @@
     };
 </script>
 
-<section class="flex max-w-m flex-col gap-3 pt-2">
+<section class="max-w-m flex flex-col gap-3 pt-2">
     <h2 class="m3-font-title-small text-on-surface">Advanced</h2>
 
     <div class="flex flex-col gap-4">

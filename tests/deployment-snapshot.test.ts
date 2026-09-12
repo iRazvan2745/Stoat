@@ -51,8 +51,10 @@ it("serializes enqueue data before later configuration edits", () => {
     const environment: DeploymentSnapshot["environment"] = [variable];
 
     const snapshot = createDeploymentSnapshot(record, environment);
-    const encoded = Schema.encodeSync(Schema.toCodecJson(Schema.Unknown))(snapshot);
-    const queued = JSON.parse(JSON.stringify(encoded)) as DeploymentSnapshot;
+    const encoded = Schema.encodeSync(Schema.toCodecJson(Schema.Unknown))(
+        snapshot
+    );
+    const queued = structuredClone(encoded) as unknown as DeploymentSnapshot;
 
     record.git.url = "https://new.example/repository.git";
     record.resource.value = "services:\n  new:\n    image: new:2\n";
@@ -61,7 +63,9 @@ it("serializes enqueue data before later configuration edits", () => {
     variable.value = "new-target";
 
     expect(queued.resource.value).toContain("old:1");
-    expect(queued.environment).toEqual([{ name: "DEPLOY_TARGET", value: "old-target" }]);
+    expect(queued.environment).toEqual([
+        { name: "DEPLOY_TARGET", value: "old-target" },
+    ]);
     expect(queued.source).toMatchObject({
         uncloudToken: "old-uncloud-token",
         uncloudUrl: "https://old.uncloud.example",

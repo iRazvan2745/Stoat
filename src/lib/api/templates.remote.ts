@@ -8,5 +8,5 @@ export const listTemplates = query(
     withRemoteLogging("templates.listTemplates", "query", async () => {
         requireSession();
         return await listTemplateRecords();
-    }),
+    })
 );

@@ -2,7 +2,7 @@ export const UNCLOUD_REQUEST_TIMEOUT_MS = 5000;
 
 export async function fetchUncloud(
     request: Request,
-    timeoutMs = UNCLOUD_REQUEST_TIMEOUT_MS,
+    timeoutMs = UNCLOUD_REQUEST_TIMEOUT_MS
 ): Promise<Response> {
     const timeout = AbortSignal.timeout(timeoutMs);
     const signal = AbortSignal.any([request.signal, timeout]);
@@ -26,7 +26,7 @@ export async function fetchUncloud(
  */
 export async function fetchUncloudStream(
     request: Request,
-    headersTimeoutMs = UNCLOUD_REQUEST_TIMEOUT_MS,
+    headersTimeoutMs = UNCLOUD_REQUEST_TIMEOUT_MS
 ): Promise<Response> {
     const timeoutController = new AbortController();
     const timer = setTimeout(() => timeoutController.abort(), headersTimeoutMs);

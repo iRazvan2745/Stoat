@@ -26,7 +26,7 @@ not-a-real-key-for-unit-tests
 
 const withLocalGitRepo = async <Result>(
     authentication: Parameters<typeof withGitRepo>[0]["authentication"],
-    operation: (repo: SimpleGit) => Promise<Result>,
+    operation: (repo: SimpleGit) => Promise<Result>
 ): Promise<Result> => {
     const root = await mkdtemp(path.join(tmpdir(), "stoat-git-auth-"));
     const remote = path.join(root, "remote.git");
@@ -52,7 +52,7 @@ const withLocalGitRepo = async <Result>(
                 repoPath: local,
                 repoUrl: remote,
             },
-            operation,
+            operation
         );
     } finally {
         await rm(root, { force: true, recursive: true });
@@ -69,14 +69,14 @@ describe("Git authentication validation", () => {
                 method: "token",
                 token: "ghp_secret",
                 username: "x",
-            }),
+            })
         ).toEqual({ method: "token", token: "ghp_secret", username: "x" });
         expect(
             validateGitAuthentication({
                 method: "basic",
                 password: "secret",
                 username: "deploy",
-            }),
+            })
         ).toEqual({ method: "basic", password: "secret", username: "deploy" });
         expect(
             validateGitAuthentication({
@@ -84,7 +84,7 @@ describe("Git authentication validation", () => {
                 method: "ssh",
                 privateKey,
                 username: "git",
-            }),
+            })
         ).toEqual({
             knownHosts: "git.example ssh-ed25519 AAAA...",
             method: "ssh",
@@ -94,19 +94,21 @@ describe("Git authentication validation", () => {
     });
 
     it("rejects incomplete or mismatched credential modes", () => {
-        expect(() => validateGitAuthentication({ method: "token" })).toThrow("requires a token");
-        expect(() => validateGitAuthentication({ method: "basic", password: "secret" })).toThrow(
-            "username and password",
+        expect(() => validateGitAuthentication({ method: "token" })).toThrow(
+            "requires a token"
         );
+        expect(() =>
+            validateGitAuthentication({ method: "basic", password: "secret" })
+        ).toThrow("username and password");
         expect(() =>
             validateGitAuthentication({
                 method: "ssh",
                 privateKey: "not-a-key",
-            }),
+            })
         ).toThrow("private key");
-        expect(() => validateGitAuthentication({ method: "https", token: "secret" })).toThrow(
-            "specify token or basic mode",
-        );
+        expect(() =>
+            validateGitAuthentication({ method: "https", token: "secret" })
+        ).toThrow("specify token or basic mode");
     });
 });
 
@@ -114,23 +116,35 @@ describe("Git URL handling", () => {
     it("removes embedded credentials and sensitive query values", () => {
         expect(
             removeGitUrlCredentials(
-                "https://deploy:secret@git.example.com/team/repo.git?token=leak&ref=main#fragment",
-            ),
+                "https://deploy:secret@git.example.com/team/repo.git?token=leak&ref=main#fragment"
+            )
         ).toBe("https://git.example.com/team/repo.git?ref=main");
-        expect(removeGitUrlCredentials("git@git.example.com:team/repo.git")).toBe(
-            "git@git.example.com:team/repo.git",
-        );
-        expect(removeGitUrlCredentials("deploy:secret@git.example.com:team/repo.git")).toBe(
-            "git.example.com:team/repo.git",
-        );
+        expect(
+            removeGitUrlCredentials("git@git.example.com:team/repo.git")
+        ).toBe("git@git.example.com:team/repo.git");
+        expect(
+            removeGitUrlCredentials(
+                "deploy:secret@git.example.com:team/repo.git"
+            )
+        ).toBe("git.example.com:team/repo.git");
     });
 
     it("validates HTTPS, SSH, git, and SCP repository URLs", () => {
-        expect(validateGitUrl("https://git.example.com/team/repo.git").protocol).toBe("https");
-        expect(validateGitUrl("ssh://git.example.com/team/repo.git").protocol).toBe("ssh");
-        expect(validateGitUrl("git@git.example.com:team/repo.git").protocol).toBe("scp");
-        expect(() => validateGitUrl("file:///tmp/repo")).toThrow("HTTPS, SSH, git, or SCP");
-        expect(() => validateGitUrl("https://git.example.com")).toThrow("repository path");
+        expect(
+            validateGitUrl("https://git.example.com/team/repo.git").protocol
+        ).toBe("https");
+        expect(
+            validateGitUrl("ssh://git.example.com/team/repo.git").protocol
+        ).toBe("ssh");
+        expect(
+            validateGitUrl("git@git.example.com:team/repo.git").protocol
+        ).toBe("scp");
+        expect(() => validateGitUrl("file:///tmp/repo")).toThrow(
+            "HTTPS, SSH, git, or SCP"
+        );
+        expect(() => validateGitUrl("https://git.example.com")).toThrow(
+            "repository path"
+        );
     });
 
     it("adds a non-secret SSH username without adding URL credentials", () => {
@@ -139,13 +153,16 @@ describe("Git URL handling", () => {
                 method: "ssh",
                 privateKey,
                 username: "deploy",
-            }),
+            })
         ).toBe("ssh://deploy@git.example.com/team/repo.git");
         expect(
-            gitUrlForAuthentication("https://user:secret@git.example.com/repo.git", {
-                method: "token",
-                token: "secret",
-            }),
+            gitUrlForAuthentication(
+                "https://user:secret@git.example.com/repo.git",
+                {
+                    method: "token",
+                    token: "secret",
+                }
+            )
         ).toBe("https://git.example.com/repo.git");
     });
 
@@ -154,25 +171,25 @@ describe("Git URL handling", () => {
             validateGitSource({
                 authentication: { method: "token", token: "secret" },
                 url: "https://git.example.com/team/repo.git",
-            }).url,
+            }).url
         ).toBe("https://git.example.com/team/repo.git");
         expect(() =>
             validateGitSource({
                 authentication: { method: "token", token: "secret" },
                 url: "ssh://git.example.com/team/repo.git",
-            }),
+            })
         ).toThrow("require an HTTPS URL");
         expect(() =>
             validateGitSource({
                 authentication: { method: "none" },
                 url: "https://user:secret@git.example.com/team/repo.git",
-            }),
+            })
         ).toThrow("choose an authentication method");
         expect(
             validateGitSource({
                 authentication: { method: "none" },
                 url: "git@git.example.com:team/repo.git",
-            }).url,
+            }).url
         ).toBe("git@git.example.com:team/repo.git");
     });
 
@@ -182,7 +199,7 @@ describe("Git URL handling", () => {
                 authMethod: "basic",
                 password: "secret",
                 username: "deploy",
-            }),
+            })
         ).toEqual({ method: "basic", password: "secret", username: "deploy" });
     });
 });
@@ -197,7 +214,7 @@ describe("Git authentication runtime", () => {
 
         try {
             expect(runtime.env.GIT_CONFIG_VALUE_0).toBe(
-                "Authorization: Basic eC1hY2Nlc3MtdG9rZW46Z2hwX3NlY3JldA==",
+                "Authorization: Basic eC1hY2Nlc3MtdG9rZW46Z2hwX3NlY3JldA=="
             );
             expect(runtime.env.GIT_CONFIG_VALUE_0).not.toContain("ghp_secret");
             expect(runtime.env.GIT_TERMINAL_PROMPT).toBe("0");
@@ -229,8 +246,8 @@ describe("Git authentication runtime", () => {
             await expect(
                 withLocalGitRepo(
                     { method: "token", token: "test-token" },
-                    async (repo) => await repo.status(),
-                ),
+                    async (repo) => await repo.status()
+                )
             ).resolves.toMatchObject({ current: "main" });
         } finally {
             if (previousEditor === undefined) {
@@ -243,7 +260,10 @@ describe("Git authentication runtime", () => {
 
     it("runs SSH-authenticated git commands despite simple-git's GIT_SSH_COMMAND block", async () => {
         await expect(
-            withLocalGitRepo({ method: "ssh", privateKey }, async (repo) => await repo.status()),
+            withLocalGitRepo(
+                { method: "ssh", privateKey },
+                async (repo) => await repo.status()
+            )
         ).resolves.toMatchObject({ current: "main" });
     });
 
@@ -253,7 +273,7 @@ describe("Git authentication runtime", () => {
                 method: "basic",
                 password: "secret",
                 username: "deploy",
-            }),
+            })
         ).toEqual({
             hasCredentials: true,
             method: "basic",
@@ -268,15 +288,18 @@ describe("Git authentication encryption", () => {
             method: "token" as const,
             token: "ghp_secret",
         };
-        const encrypted = await encryptGitAuthentication(authentication, "app-secret");
+        const encrypted = await encryptGitAuthentication(
+            authentication,
+            "app-secret"
+        );
 
         expect(encrypted).toMatch(/^v1\.[^.]+\.[^.]+$/u);
         expect(encrypted).not.toContain("ghp_secret");
-        await expect(decryptGitAuthentication(encrypted, "app-secret")).resolves.toEqual(
-            authentication,
-        );
-        await expect(decryptGitAuthentication(encrypted, "wrong-secret")).rejects.toThrow(
-            "Unable to decrypt Git credentials",
-        );
+        await expect(
+            decryptGitAuthentication(encrypted, "app-secret")
+        ).resolves.toEqual(authentication);
+        await expect(
+            decryptGitAuthentication(encrypted, "wrong-secret")
+        ).rejects.toThrow("Unable to decrypt Git credentials");
     });
 });

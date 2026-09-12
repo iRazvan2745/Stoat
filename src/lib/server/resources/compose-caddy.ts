@@ -19,7 +19,9 @@ export interface CaddyIngress {
 const UPSTREAMS_PATTERN =
     /\{\{\s*upstreams(?:\s+"(?<service>[^"]+)")?(?:\s+(?<port>\d+))?\s*\}\}/gu;
 
-const parseSiteAddress = (address: string): { host: string; protocol: "http" | "https" } => {
+const parseSiteAddress = (
+    address: string
+): { host: string; protocol: "http" | "https" } => {
     let host = address;
     let protocol: "http" | "https" = "https";
 
@@ -68,8 +70,10 @@ const splitSiteBlocks = (caddyfile: string): SiteBlock[] => {
             continue;
         }
 
-        const opens = line.split("{").length - 1 - (line.split("{{").length - 1) * 2;
-        const closes = line.split("}").length - 1 - (line.split("}}").length - 1) * 2;
+        const opens =
+            line.split("{").length - 1 - (line.split("{{").length - 1) * 2;
+        const closes =
+            line.split("}").length - 1 - (line.split("}}").length - 1) * 2;
 
         if (depth === 0 && line.endsWith("{")) {
             const addressPart = line.slice(0, -1).trim();
@@ -110,7 +114,8 @@ interface UpstreamRoute {
     upstreamService: string;
 }
 
-const MATCHER_BLOCK_PATTERN = /^(?:handle_path|handle|route)\s+(?<path>\S+)\s*\{$/u;
+const MATCHER_BLOCK_PATTERN =
+    /^(?:handle_path|handle|route)\s+(?<path>\S+)\s*\{$/u;
 
 const stripMatcherQuotes = (token: string): string => {
     const isDoubleQuoted = token.startsWith('"') && token.endsWith('"');
@@ -127,7 +132,10 @@ const stripMatcherQuotes = (token: string): string => {
  * Walks a site block body and pairs every `{{upstreams ...}}` directive with
  * the path matcher of its enclosing handle/handle_path/route block, if any.
  */
-const parseUpstreamRoutes = (body: string, serviceName: string): UpstreamRoute[] => {
+const parseUpstreamRoutes = (
+    body: string,
+    serviceName: string
+): UpstreamRoute[] => {
     const routes: UpstreamRoute[] = [];
     // Path matcher active at each brace depth (undefined for unmatched blocks).
     const matcherStack: (string | undefined)[] = [];
@@ -139,7 +147,9 @@ const parseUpstreamRoutes = (body: string, serviceName: string): UpstreamRoute[]
             continue;
         }
 
-        const currentPath = matcherStack.findLast((matcher) => matcher !== undefined);
+        const currentPath = matcherStack.findLast(
+            (matcher) => matcher !== undefined
+        );
 
         for (const match of line.matchAll(UPSTREAMS_PATTERN)) {
             const port = match.groups?.port;
@@ -151,12 +161,17 @@ const parseUpstreamRoutes = (body: string, serviceName: string): UpstreamRoute[]
             });
         }
 
-        const opens = line.split("{").length - 1 - (line.split("{{").length - 1) * 2;
-        const closes = line.split("}").length - 1 - (line.split("}}").length - 1) * 2;
+        const opens =
+            line.split("{").length - 1 - (line.split("{{").length - 1) * 2;
+        const closes =
+            line.split("}").length - 1 - (line.split("}}").length - 1) * 2;
 
         if (opens > closes) {
             const rawMatcher = MATCHER_BLOCK_PATTERN.exec(line)?.groups?.path;
-            const matcher = rawMatcher === undefined ? undefined : stripMatcherQuotes(rawMatcher);
+            const matcher =
+                rawMatcher === undefined
+                    ? undefined
+                    : stripMatcherQuotes(rawMatcher);
             matcherStack.push(matcher?.startsWith("/") ? matcher : undefined);
 
             for (let extra = 1; extra < opens - closes; extra += 1) {
@@ -173,7 +188,10 @@ const parseUpstreamRoutes = (body: string, serviceName: string): UpstreamRoute[]
 };
 
 /** Extracts ingresses from a single service's `x-caddy` value. */
-export function parseCaddyIngresses(caddyfile: string, serviceName: string): CaddyIngress[] {
+export function parseCaddyIngresses(
+    caddyfile: string,
+    serviceName: string
+): CaddyIngress[] {
     const ingresses: CaddyIngress[] = [];
 
     const seen = new Set<string>();
@@ -197,9 +215,12 @@ export function parseCaddyIngresses(caddyfile: string, serviceName: string): Cad
                 routes.length > 0 ? routes : [{ upstreamService: serviceName }];
 
             for (const route of blockRoutes) {
-                const key = [host, route.path, route.upstreamService, route.containerPort].join(
-                    "\u0000",
-                );
+                const key = [
+                    host,
+                    route.path,
+                    route.upstreamService,
+                    route.containerPort,
+                ].join("\u0000");
 
                 if (seen.has(key)) {
                     continue;
@@ -240,7 +261,11 @@ export function listComposeCaddyIngresses(compose: string): CaddyIngress[] {
     const ingresses: CaddyIngress[] = [];
 
     for (const pair of serviceMap.items) {
-        if (!isScalar(pair.key) || typeof pair.key.value !== "string" || !isMap(pair.value)) {
+        if (
+            !isScalar(pair.key) ||
+            typeof pair.key.value !== "string" ||
+            !isMap(pair.value)
+        ) {
             continue;
         }
 

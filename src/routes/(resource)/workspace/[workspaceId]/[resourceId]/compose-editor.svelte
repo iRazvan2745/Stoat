@@ -213,11 +213,18 @@
 
 <div class="compose flex h-full min-h-48 min-w-0 flex-col">
     <Card variant="elevated">
-        <div class="flex min-h-10 shrink-0 flex-wrap items-center justify-between gap-2">
-            <h2 class="m3-font-title-small text-on-surface m-0 min-w-0">Compose Editor</h2>
+        <div
+            class="flex min-h-10 shrink-0 flex-wrap items-center justify-between gap-2"
+        >
+            <h2 class="m3-font-title-small text-on-surface m-0 min-w-0">
+                Compose Editor
+            </h2>
 
             <div class="flex shrink-0 items-center gap-1">
-                <div class="text-primary grid size-12 shrink-0 place-items-center" aria-live="polite">
+                <div
+                    class="text-primary grid size-12 shrink-0 place-items-center"
+                    aria-live="polite"
+                >
                     {#if isSaving}
                         <LoadingIndicator
                             size={32}
@@ -239,7 +246,7 @@
         </div>
 
         <div
-            class="editor relative -mx-4 -mb-4 mt-2 min-h-0 flex-1 overflow-hidden rounded-b-md bg-transparent!"
+            class="editor relative -mx-4 mt-2 -mb-4 min-h-0 flex-1 overflow-hidden rounded-b-md bg-transparent!"
             aria-busy={editorLoading || isSaving}
             aria-label="Compose YAML editor"
         >
@@ -262,7 +269,10 @@
             />
 
             {#if editorLoading}
-                <div class="absolute inset-0 z-10 flex items-center justify-center bg-transparent!" role="status">
+                <div
+                    class="absolute inset-0 z-10 flex items-center justify-center bg-transparent!"
+                    role="status"
+                >
                     <LoadingIndicator aria-label="Loading code editor" />
                 </div>
             {/if}
@@ -282,9 +292,12 @@
                 <LoadingIndicator aria-label="Formatting compose" />
             </div>
         {:else if previewError}
-            <p class="m3-font-body-medium text-error m-0" role="alert">{previewError}</p>
+            <p class="m3-font-body-medium text-error m-0" role="alert">
+                {previewError}
+            </p>
         {:else}
-            <pre class="m3-font-body-small bg-surface-container text-on-surface m-0 max-h-[min(32rem,calc(100vh-16rem))] overflow-auto rounded-md p-4 font-mono whitespace-pre">{previewYaml}</pre>
+            <pre
+                class="m3-font-body-small bg-surface-container text-on-surface m-0 max-h-[min(32rem,calc(100vh-16rem))] overflow-auto rounded-md p-4 font-mono whitespace-pre">{previewYaml}</pre>
         {/if}
 
         {#snippet buttons()}

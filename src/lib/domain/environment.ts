@@ -65,7 +65,9 @@ export function unquoteEnvValue(raw: string): string {
     return trimmed;
 }
 
-export function serializeEnvFile(variables: readonly EnvironmentVariable[]): string {
+export function serializeEnvFile(
+    variables: readonly EnvironmentVariable[]
+): string {
     return variables
         .map((variable) => ({
             name: variable.name.trim(),
@@ -126,7 +128,7 @@ export function parseEnvFile(source: string): ParsedEnvFile {
 }
 
 export function normalizeEnvironmentVariables(
-    variables: readonly EnvironmentVariable[],
+    variables: readonly EnvironmentVariable[]
 ): EnvironmentVariable[] {
     return variables
         .map((variable) => ({
@@ -136,7 +138,9 @@ export function normalizeEnvironmentVariables(
         .filter((variable) => variable.name !== "");
 }
 
-export function validateEnvironmentVariables(variables: readonly EnvironmentVariable[]): string[] {
+export function validateEnvironmentVariables(
+    variables: readonly EnvironmentVariable[]
+): string[] {
     const errors: string[] = [];
     const names = new Set<string>();
 
@@ -171,16 +175,22 @@ export function validateEnvironmentVariables(variables: readonly EnvironmentVari
  */
 export function mergeEnvironmentVariables(
     workspaceVars: readonly EnvironmentVariable[],
-    resourceVars: readonly EnvironmentVariable[],
+    resourceVars: readonly EnvironmentVariable[]
 ): EnvironmentVariable[] {
     const merged = new Map<string, EnvironmentVariable>();
 
     for (const variable of workspaceVars) {
-        merged.set(variable.name, { name: variable.name, value: variable.value });
+        merged.set(variable.name, {
+            name: variable.name,
+            value: variable.value,
+        });
     }
 
     for (const variable of resourceVars) {
-        merged.set(variable.name, { name: variable.name, value: variable.value });
+        merged.set(variable.name, {
+            name: variable.name,
+            value: variable.value,
+        });
     }
 
     return [...merged.values()];

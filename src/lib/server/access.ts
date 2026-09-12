@@ -1,11 +1,17 @@
 import { and, eq } from "drizzle-orm";
 
 import { db } from "#lib/db";
-import { dataSource, gitSource, member, resources, workspace } from "#lib/db/schema";
+import {
+    dataSource,
+    gitSource,
+    member,
+    resources,
+    workspace,
+} from "#lib/db/schema";
 
 export const hasAccessToThisDataSource = async (
     userId: string,
-    dataSourceId: string,
+    dataSourceId: string
 ): Promise<boolean> => {
     const [row] = await db
         .select({ id: dataSource.id })
@@ -19,7 +25,7 @@ export const hasAccessToThisDataSource = async (
 
 export const hasAccessToThisGitSource = async (
     userId: string,
-    gitSourceId: string,
+    gitSourceId: string
 ): Promise<boolean> => {
     const [match] = await db
         .select({ id: gitSource.id })
@@ -33,7 +39,7 @@ export const hasAccessToThisGitSource = async (
 
 export const hasAccessToThisWorkspace = async (
     userId: string,
-    workspaceId: string,
+    workspaceId: string
 ): Promise<boolean> => {
     const [row] = await db
         .select({ id: workspace.id })
@@ -47,7 +53,7 @@ export const hasAccessToThisWorkspace = async (
 
 export const hasAccessToThisResource = async (
     userId: string,
-    resourceId: string,
+    resourceId: string
 ): Promise<boolean> => {
     const [row] = await db
         .select({ id: resources.id })
@@ -62,14 +68,17 @@ export const hasAccessToThisResource = async (
 
 export const getOrganizationIdForUser = async (
     userId: string,
-    preferredOrganizationId?: string | null,
+    preferredOrganizationId?: string | null
 ): Promise<string | null> => {
     if (preferredOrganizationId) {
         const [membership] = await db
             .select({ organizationId: member.organizationId })
             .from(member)
             .where(
-                and(eq(member.userId, userId), eq(member.organizationId, preferredOrganizationId)),
+                and(
+                    eq(member.userId, userId),
+                    eq(member.organizationId, preferredOrganizationId)
+                )
             )
             .limit(1);
 

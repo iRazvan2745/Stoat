@@ -20,7 +20,7 @@ describe("formatComposeFile", () => {
     x-ports:
       - 25001:80/https
 `,
-            "nginx-f7gzq",
+            "nginx-f7gzq"
         );
 
         expect(formatted.serviceNames).toEqual(["nginx-f7gzq-nginx"]);
@@ -38,10 +38,13 @@ describe("formatComposeFile", () => {
   db:
     image: postgres
 `,
-            "app-abc12",
+            "app-abc12"
         );
 
-        expect(formatted.serviceNames).toEqual(["app-abc12-web", "app-abc12-db"]);
+        expect(formatted.serviceNames).toEqual([
+            "app-abc12-web",
+            "app-abc12-db",
+        ]);
     });
 
     it("prefixes depends_on references and x-caddy upstreams", () => {
@@ -70,7 +73,7 @@ describe("formatComposeFile", () => {
   redis:
     image: redis
 `,
-            "sf-abc12",
+            "sf-abc12"
         );
 
         expect(formatted.serviceNames).toEqual([
@@ -79,9 +82,13 @@ describe("formatComposeFile", () => {
             "sf-abc12-db",
             "sf-abc12-redis",
         ]);
-        expect(formatted.yaml).toContain('reverse_proxy {{upstreams "sf-abc12-seadoc" 80}}');
+        expect(formatted.yaml).toContain(
+            'reverse_proxy {{upstreams "sf-abc12-seadoc" 80}}'
+        );
         expect(formatted.yaml).toContain("reverse_proxy {{upstreams 80}}");
-        expect(formatted.yaml).toContain("sf-abc12-db:\n        condition: service_healthy");
+        expect(formatted.yaml).toContain(
+            "sf-abc12-db:\n        condition: service_healthy"
+        );
         expect(formatted.yaml).toContain("- sf-abc12-db");
     });
 
@@ -103,11 +110,13 @@ volumes:
   postgres_data:
   logs:
 `,
-            "db-abc12",
+            "db-abc12"
         );
 
         expect(formatted.yaml).toContain("db-abc12-postgres:");
-        expect(formatted.yaml).toContain("- db-abc12-postgres_data:/var/lib/postgresql");
+        expect(formatted.yaml).toContain(
+            "- db-abc12-postgres_data:/var/lib/postgresql"
+        );
         expect(formatted.yaml).toContain("source: db-abc12-logs");
         expect(formatted.yaml).toMatch(/^ {2}db-abc12-postgres_data:/mu);
         expect(formatted.yaml).toMatch(/^ {2}db-abc12-logs:/mu);
@@ -126,7 +135,7 @@ volumes:
       - nginx_data:/var/lib/nginx
 volumes:
   nginx_data:
-`,
+`
         );
 
         expect(formatted.serviceNames).toEqual(["nginx"]);
@@ -138,12 +147,14 @@ volumes:
     });
 
     it("rejects invalid YAML", () => {
-        expect(() => formatComposeFile("services: [", "slug")).toThrow("Invalid compose YAML");
+        expect(() => formatComposeFile("services: [", "slug")).toThrow(
+            "Invalid compose YAML"
+        );
     });
 
     it("rejects compose files without a services map", () => {
         expect(() => formatComposeFile("version: '3'\n", "slug")).toThrow(
-            'Compose must contain a "services" map',
+            'Compose must contain a "services" map'
         );
     });
 });
@@ -155,7 +166,7 @@ describe("applyEnvironmentVariables", () => {
   web:
     image: nginx
 `,
-            [{ name: "FOO", value: "bar" }],
+            [{ name: "FOO", value: "bar" }]
         );
 
         expect(yaml).toContain("env_file: .env");
@@ -170,7 +181,7 @@ describe("applyEnvironmentVariables", () => {
     image: nginx
     env_file: .env.production
 `,
-            [{ name: "FOO", value: "bar" }],
+            [{ name: "FOO", value: "bar" }]
         );
 
         expect(yaml).toContain(".env.production");
@@ -185,7 +196,7 @@ describe("applyEnvironmentVariables", () => {
     image: nginx
     env_file: .env
 `,
-            [{ name: "FOO", value: "bar" }],
+            [{ name: "FOO", value: "bar" }]
         );
 
         expect(yaml.match(/\.env/gu)?.length).toBe(1);
@@ -201,7 +212,7 @@ describe("applyEnvironmentVariables", () => {
       FOO: old
       KEEP: yes
 `,
-            [{ name: "FOO", value: "new" }],
+            [{ name: "FOO", value: "new" }]
         );
 
         expect(yaml).toContain("FOO: new");
@@ -218,7 +229,7 @@ describe("applyEnvironmentVariables", () => {
     environment:
       - FOO=old
 `,
-            [{ name: "BAR", value: "baz" }],
+            [{ name: "BAR", value: "baz" }]
         );
 
         expect(yaml).toContain("FOO=old");
@@ -235,7 +246,7 @@ describe("applyEnvironmentVariables", () => {
       - FOO=old
       - KEEP=yes
 `,
-            [{ name: "FOO", value: "new" }],
+            [{ name: "FOO", value: "new" }]
         );
 
         expect(yaml).toContain("FOO=new");
@@ -253,7 +264,7 @@ describe("applyEnvironmentVariables", () => {
       - FOO
       - KEEP=yes
 `,
-            [{ name: "FOO", value: "new" }],
+            [{ name: "FOO", value: "new" }]
         );
 
         expect(yaml).toContain("FOO=new");
@@ -269,7 +280,7 @@ describe("inlineEnvironmentVariables", () => {
   web:
     image: nginx
 `,
-            [{ name: "FOO", value: "bar" }],
+            [{ name: "FOO", value: "bar" }]
         );
 
         expect(yaml).toContain("FOO: bar");
@@ -283,7 +294,7 @@ describe("inlineEnvironmentVariables", () => {
     image: nginx
     env_file: .env
 `,
-            [{ name: "FOO", value: "bar" }],
+            [{ name: "FOO", value: "bar" }]
         );
 
         expect(yaml).toContain("FOO: bar");
@@ -307,7 +318,7 @@ configs:
   longconfig:
     content: hello
 `,
-            "app-abc12",
+            "app-abc12"
         );
 
         expect(formatted.yaml).toMatch(/^ {2}app-abc12-myconfig:/mu);
@@ -331,7 +342,7 @@ configs:
     file: ./my.txt
   longconfig:
     content: hello
-`,
+`
         );
 
         expect(formatted.yaml).toContain("- myconfig");
@@ -352,8 +363,8 @@ configs:
   myconfig:
     content: hi
 `,
-                "app-abc12",
-            ),
+                "app-abc12"
+            )
         ).toThrow("Invalid configs entry");
     });
 
@@ -381,7 +392,7 @@ configs:
 volumes:
   app_data:
 `,
-            "app-abc12",
+            "app-abc12"
         );
 
         expect(formatted.yaml).toContain("source: app-abc12-app_config");
@@ -390,7 +401,9 @@ volumes:
         expect(formatted.yaml).toContain("- app-abc12-db");
         expect(formatted.yaml).not.toMatch(/app-abc12-app-abc12/u);
         // Unformatting restores the anchor body as well.
-        expect(unformatComposeFile(formatted.yaml, "app-abc12")).toContain("source: app_config");
+        expect(unformatComposeFile(formatted.yaml, "app-abc12")).toContain(
+            "source: app_config"
+        );
     });
 
     it("leaves unrelated x-* extensions untouched", () => {
@@ -403,7 +416,7 @@ services:
   web:
     image: nginx
 `,
-            "app-abc12",
+            "app-abc12"
         );
 
         expect(formatted.yaml).toContain("- 3000/https");
@@ -448,7 +461,7 @@ configs:
     content: hello
   from_external:
     external: true
-`,
+`
         );
 
         expect(refs).toEqual([
@@ -478,7 +491,7 @@ configs:
             listComposeConfigReferences(`services:
   web:
     image: nginx
-`),
+`)
         ).toEqual([]);
     });
 
@@ -489,12 +502,14 @@ configs:
     image: nginx
 configs:
   - a
-`),
+`)
         ).toEqual([]);
     });
 
     it("rejects invalid YAML", () => {
-        expect(() => listComposeConfigReferences("configs: [")).toThrow("Invalid compose YAML");
+        expect(() => listComposeConfigReferences("configs: [")).toThrow(
+            "Invalid compose YAML"
+        );
     });
 });
 
@@ -510,7 +525,7 @@ configs:
   myconfig:
     file: hello.txt
 `,
-            (p) => (p === "hello.txt" ? "hello world" : null),
+            (p) => (p === "hello.txt" ? "hello world" : null)
         );
 
         expect(out).toContain("content:");
@@ -533,7 +548,7 @@ configs:
             (p) => {
                 seen.push(p);
                 return p === "party.conf" ? "party content" : null;
-            },
+            }
         );
 
         expect(seen).toEqual(["party.conf"]);
@@ -557,7 +572,7 @@ configs:
 `,
             () => {
                 throw new Error("should not resolve");
-            },
+            }
         );
 
         expect(out).toContain("content: hi");
@@ -575,8 +590,8 @@ configs:
   myconfig:
     file: missing.txt
 `,
-                () => null,
-            ),
+                () => null
+            )
         ).toThrow("Files page");
     });
 
@@ -591,8 +606,8 @@ configs:
     file: missing.txt
 `,
                 () => null,
-                { composePath: "docker-compose.yml" },
-            ),
+                { composePath: "docker-compose.yml" }
+            )
         ).toThrow("docker-compose.yml");
     });
 
@@ -606,8 +621,8 @@ configs:
   myconfig:
     file: ../secret.txt
 `,
-                () => "x",
-            ),
+                () => "x"
+            )
         ).toThrow("unsafe file path");
     });
 
@@ -621,8 +636,8 @@ configs:
   myconfig:
     file: bin.dat
 `,
-                () => "a\0b",
-            ),
+                () => "a\0b"
+            )
         ).toThrow("looks binary");
     });
 
@@ -638,8 +653,8 @@ configs:
   myconfig:
     file: big.txt
 `,
-                () => big,
-            ),
+                () => big
+            )
         ).toThrow("exceeds 256 KiB");
     });
 
@@ -655,8 +670,8 @@ configs:
   real:
     content: hi
 `,
-                () => null,
-            ),
+                () => null
+            )
         ).toThrow("has no top-level configs entry");
     });
 
@@ -673,8 +688,8 @@ configs:
   real:
     content: hi
 `,
-                () => null,
-            ),
+                () => null
+            )
         ).toThrow("has no top-level configs entry");
     });
 
@@ -688,8 +703,8 @@ configs:
   myconfig:
     name: custom
 `,
-                () => null,
-            ),
+                () => null
+            )
         ).toThrow("must declare file:");
     });
 
@@ -716,7 +731,9 @@ configs:
   appcfg:
     file: app.conf
 `;
-        const out = inlineComposeConfigs(input, (p) => (p === "app.conf" ? "cfg-body" : null));
+        const out = inlineComposeConfigs(input, (p) =>
+            p === "app.conf" ? "cfg-body" : null
+        );
 
         expect(out).toContain("&copyparty");
         expect(out).toContain("*copyparty");

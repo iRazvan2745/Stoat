@@ -1,3 +1,4 @@
+import { mergeEnvironmentVariables } from "#lib/domain/environment";
 import {
     DEFAULT_POSTGRES_PORT,
     buildPostgresUrl,
@@ -5,15 +6,20 @@ import {
     postgresConnectionParts,
 } from "#lib/domain/resources/database-url";
 import type { PostgresConnectionUrl } from "#lib/domain/resources/database-url";
-import { mergeEnvironmentVariables } from "#lib/domain/environment";
 import { getResourceDataSource } from "#lib/server/data-sources/data-sources";
 import { formatComposeFile } from "#lib/server/deployments/deployment-compose";
 // oxlint-disable func-style
-import { findPublishedTcpPort, listComposePorts } from "#lib/server/resources/compose-ports";
+import {
+    findPublishedTcpPort,
+    listComposePorts,
+} from "#lib/server/resources/compose-ports";
 import { listEnvironmentVariables } from "#lib/server/resources/resource-environment";
-import { listWorkspaceEnvironmentVariables } from "#lib/server/workspaces/environment";
-import { getResource, resourceComposePrefix } from "#lib/server/resources/resources";
+import {
+    getResource,
+    resourceComposePrefix,
+} from "#lib/server/resources/resources";
 import { firstPublicHost } from "#lib/server/uncloud/public-host";
+import { listWorkspaceEnvironmentVariables } from "#lib/server/workspaces/environment";
 
 export interface PostgresConnectionInfo {
     database: string;
@@ -26,7 +32,7 @@ export interface PostgresConnectionInfo {
 const externalHost = async (
     resourceId: string,
     hostIp: string | undefined,
-    hostname: string | undefined,
+    hostname: string | undefined
 ): Promise<string | undefined> => {
     const configuredHost = hostIp ?? hostname;
 
@@ -38,7 +44,7 @@ const externalHost = async (
 };
 
 export async function getPostgresConnection(
-    resourceId: string,
+    resourceId: string
 ): Promise<PostgresConnectionInfo | null> {
     const resource = await getResource(resourceId);
 
@@ -50,7 +56,9 @@ export async function getPostgresConnection(
         listWorkspaceEnvironmentVariables(resource.workspaceId),
         listEnvironmentVariables(resourceId),
     ]);
-    const parts = postgresConnectionParts(mergeEnvironmentVariables(workspaceVars, resourceVars));
+    const parts = postgresConnectionParts(
+        mergeEnvironmentVariables(workspaceVars, resourceVars)
+    );
     const compose = resource.value ?? "";
     let formattedNames: string[] = [];
 
@@ -58,7 +66,7 @@ export async function getPostgresConnection(
         try {
             formattedNames = formatComposeFile(
                 resource.value,
-                resourceComposePrefix(resource),
+                resourceComposePrefix(resource)
             ).serviceNames;
         } catch {
             formattedNames = [];
@@ -66,7 +74,10 @@ export async function getPostgresConnection(
     }
 
     const resourceName = formattedNames[0] ?? resource.slug ?? resource.id;
-    const published = findPublishedTcpPort(listComposePorts(compose), DEFAULT_POSTGRES_PORT);
+    const published = findPublishedTcpPort(
+        listComposePorts(compose),
+        DEFAULT_POSTGRES_PORT
+    );
     const internalPort = published?.containerPort ?? DEFAULT_POSTGRES_PORT;
     const internal = {
         host: internalHostname(resourceName),
@@ -87,7 +98,11 @@ export async function getPostgresConnection(
         };
     }
 
-    const host = await externalHost(resourceId, published.hostIp, published.hostname);
+    const host = await externalHost(
+        resourceId,
+        published.hostIp,
+        published.hostname
+    );
 
     if (!host) {
         return {

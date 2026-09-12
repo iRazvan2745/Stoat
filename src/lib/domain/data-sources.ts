@@ -31,7 +31,9 @@ export const CreateGitSourceInput = v.object({
 export const UpdateGitSourceInput = v.object({
     authMethod: v.optional(GitAuthMethodSchema),
     id: v.pipe(v.string(), v.trim(), v.minLength(1)),
-    name: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(120))),
+    name: v.optional(
+        v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(120))
+    ),
     password: SecretInput,
     sshKnownHosts: SecretInput,
     sshPassphrase: SecretInput,
@@ -41,8 +43,12 @@ export const UpdateGitSourceInput = v.object({
     username: SecretInput,
 });
 
-export type CreateGitSourceInputOutput = v.InferOutput<typeof CreateGitSourceInput>;
-export type UpdateGitSourceInputOutput = v.InferOutput<typeof UpdateGitSourceInput>;
+export type CreateGitSourceInputOutput = v.InferOutput<
+    typeof CreateGitSourceInput
+>;
+export type UpdateGitSourceInputOutput = v.InferOutput<
+    typeof UpdateGitSourceInput
+>;
 
 /** A safe Git Source representation suitable for sending to the browser. */
 export interface GitSourceSummary {
@@ -91,5 +97,6 @@ export const gitSourceSummary = ({
     username,
 });
 
-export const gitSourceLabel = (source: Pick<GitSourceSummary, "name" | "url">): string =>
-    source.name || source.url || "Git Source";
+export const gitSourceLabel = (
+    source: Pick<GitSourceSummary, "name" | "url">
+): string => source.name || source.url || "Git Source";

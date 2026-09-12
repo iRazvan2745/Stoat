@@ -5,18 +5,18 @@ import type { ContainerLogRecord } from "#lib/domain/resources/container-logs";
 
 const logs: ContainerLogRecord[] = [
     {
-        id: 1,
         containerId: "a",
         containerLabel: "api",
+        id: 1,
         machineName: "one",
-        message: "\u001b[31mConnection FAILED\u001b[0m",
+        message: "\u001B[31mConnection FAILED\u001B[0m",
         stream: "stderr",
         timestamp: "2026-09-05T00:00:00Z",
     },
     {
-        id: 2,
         containerId: "b",
         containerLabel: "web",
+        id: 2,
         machineName: "one",
         message: "Connection ready",
         stream: "stdout",
@@ -25,7 +25,9 @@ const logs: ContainerLogRecord[] = [
 ];
 
 it("combines container, case-insensitive visible text and stderr filters", () => {
-    expect(filterContainerLogs(logs, ["a"], " connection failed ", true)).toEqual([logs[0]]);
+    expect(
+        filterContainerLogs(logs, ["a"], " connection failed ", true)
+    ).toEqual([logs[0]]);
     expect(filterContainerLogs(logs, ["b"], "connection", true)).toEqual([]);
     expect(filterContainerLogs(logs, [], "connection")).toEqual(logs);
     expect(filterContainerLogs(logs, [], "31m")).toEqual([]);

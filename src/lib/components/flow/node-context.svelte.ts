@@ -13,7 +13,9 @@ export function setFlowNodeAnchorContext(value: FlowNodeAnchorContextValue) {
 }
 
 export function useFlowNodeAnchorContext() {
-    const context = getContext<FlowNodeAnchorContextValue | undefined>(FLOW_NODE_CONTEXT_KEY);
+    const context = getContext<FlowNodeAnchorContextValue | undefined>(
+        FLOW_NODE_CONTEXT_KEY
+    );
 
     if (!context) {
         throw new Error("Flow.Anchor must be used within Flow.Node");

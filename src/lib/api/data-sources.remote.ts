@@ -1,16 +1,20 @@
-import { eq } from "drizzle-orm";
-
-import { db } from "#lib/db";
-import { gitSource } from "#lib/db/schema";
-import { syncGitSource as syncGitSourceRecord } from "#lib/server/git-sources/sync";
-
 import { command, query } from "$app/server";
 import { error } from "@sveltejs/kit";
+import { eq } from "drizzle-orm";
 import * as v from "valibot";
 
-import { requireDataSourceAccess, requireGitSourceAccess, requireSession } from "#lib/api/guard";
+import {
+    requireDataSourceAccess,
+    requireGitSourceAccess,
+    requireSession,
+} from "#lib/api/guard";
 import { withRemoteLogging } from "#lib/api/remote-logging";
-import { CreateGitSourceInput, UpdateGitSourceInput } from "#lib/domain/data-sources";
+import { db } from "#lib/db";
+import { gitSource } from "#lib/db/schema";
+import {
+    CreateGitSourceInput,
+    UpdateGitSourceInput,
+} from "#lib/domain/data-sources";
 import { getOrganizationIdForUser } from "#lib/server/access";
 import {
     createDataSource as createDataSourceRecord,
@@ -24,6 +28,7 @@ import {
     updateDataSource as updateDataSourceRecord,
     updateGitSource as updateGitSourceRecord,
 } from "#lib/server/data-sources/data-sources";
+import { syncGitSource as syncGitSourceRecord } from "#lib/server/git-sources/sync";
 
 const DataSourceIdInput = v.pipe(v.string(), v.trim(), v.minLength(1));
 
@@ -50,7 +55,7 @@ export const listGitSources = query(
         const session = requireSession();
         const organizationId = await getOrganizationIdForUser(
             session.user.id,
-            session.session.activeOrganizationId,
+            session.session.activeOrganizationId
         );
 
         if (!organizationId) {
@@ -58,7 +63,7 @@ export const listGitSources = query(
         }
 
         return await listGitSourcesForOrganization(organizationId);
-    }),
+    })
 );
 
 export const getGitSource = query(
@@ -70,17 +75,20 @@ export const getGitSource = query(
             const session = await requireGitSourceAccess(gitSourceId);
             const organizationId = await getOrganizationIdForUser(
                 session.user.id,
-                session.session.activeOrganizationId,
+                session.session.activeOrganizationId
             );
 
             if (!organizationId) {
                 error(403, "No organization membership");
             }
 
-            return await getGitSourceForOrganization(gitSourceId, organizationId);
+            return await getGitSourceForOrganization(
+                gitSourceId,
+                organizationId
+            );
         },
-        { inputKey: "gitSourceId" },
-    ),
+        { inputKey: "gitSourceId" }
+    )
 );
 
 export const createGitSource = command(
@@ -92,7 +100,7 @@ export const createGitSource = command(
             const session = requireSession();
             const organizationId = await getOrganizationIdForUser(
                 session.user.id,
-                session.session.activeOrganizationId,
+                session.session.activeOrganizationId
             );
 
             if (!organizationId) {
@@ -100,8 +108,8 @@ export const createGitSource = command(
             }
 
             return await createGitSourceRecord({ ...input, organizationId });
-        },
-    ),
+        }
+    )
 );
 
 export const updateGitSource = command(
@@ -112,8 +120,8 @@ export const updateGitSource = command(
         async (input: v.InferOutput<typeof UpdateGitSourceInput>) => {
             await requireGitSourceAccess(input.id);
             return await updateGitSourceRecord(input);
-        },
-    ),
+        }
+    )
 );
 
 export const deleteGitSource = command(
@@ -125,8 +133,8 @@ export const deleteGitSource = command(
             await requireGitSourceAccess(gitSourceId);
             return await deleteGitSourceRecord(gitSourceId);
         },
-        { inputKey: "gitSourceId" },
-    ),
+        { inputKey: "gitSourceId" }
+    )
 );
 
 export const listDataSources = query(
@@ -134,7 +142,7 @@ export const listDataSources = query(
         const session = requireSession();
         const organizationId = await getOrganizationIdForUser(
             session.user.id,
-            session.session.activeOrganizationId,
+            session.session.activeOrganizationId
         );
 
         if (!organizationId) {
@@ -142,7 +150,7 @@ export const listDataSources = query(
         }
 
         return await listDataSourcesForOrganization(organizationId);
-    }),
+    })
 );
 
 export const createDataSource = command(
@@ -154,7 +162,7 @@ export const createDataSource = command(
             const session = requireSession();
             const organizationId = await getOrganizationIdForUser(
                 session.user.id,
-                session.session.activeOrganizationId,
+                session.session.activeOrganizationId
             );
 
             if (!organizationId) {
@@ -162,8 +170,8 @@ export const createDataSource = command(
             }
 
             return await createDataSourceRecord({ ...input, organizationId });
-        },
-    ),
+        }
+    )
 );
 
 export const updateDataSource = command(
@@ -174,8 +182,8 @@ export const updateDataSource = command(
         async (input: v.InferOutput<typeof UpdateDataSourceInput>) => {
             await requireDataSourceAccess(input.id);
             return await updateDataSourceRecord(input);
-        },
-    ),
+        }
+    )
 );
 
 export const discoverDataSource = command(
@@ -187,8 +195,8 @@ export const discoverDataSource = command(
             await requireDataSourceAccess(dataSourceId);
             return await discoverDataSourceRecord(dataSourceId);
         },
-        { inputKey: "dataSourceId" },
-    ),
+        { inputKey: "dataSourceId" }
+    )
 );
 
 export const deleteDataSource = command(
@@ -200,11 +208,14 @@ export const deleteDataSource = command(
             await requireDataSourceAccess(dataSourceId);
             return await deleteDataSourceRecord(dataSourceId);
         },
-        { inputKey: "dataSourceId" },
-    ),
+        { inputKey: "dataSourceId" }
+    )
 );
 
-const UpdateGitSourceSyncInput = v.object({ gitSourceId: DataSourceIdInput, enabled: v.boolean() });
+const UpdateGitSourceSyncInput = v.object({
+    enabled: v.boolean(),
+    gitSourceId: DataSourceIdInput,
+});
 
 export const syncGitSource = command(
     DataSourceIdInput,
@@ -218,12 +229,12 @@ export const syncGitSource = command(
             } catch {
                 error(
                     400,
-                    "Git sync failed. Check repository access, connectivity, and history; no force-push was performed.",
+                    "Git sync failed. Check repository access, connectivity, and history; no force-push was performed."
                 );
             }
         },
-        { inputKey: "gitSourceId" },
-    ),
+        { inputKey: "gitSourceId" }
+    )
 );
 
 export const updateGitSourceSync = command(
@@ -231,14 +242,17 @@ export const updateGitSourceSync = command(
     withRemoteLogging(
         "dataSources.updateGitSourceSync",
         "command",
-        async ({ gitSourceId, enabled }: v.InferOutput<typeof UpdateGitSourceSyncInput>) => {
+        async ({
+            gitSourceId,
+            enabled,
+        }: v.InferOutput<typeof UpdateGitSourceSyncInput>) => {
             await requireGitSourceAccess(gitSourceId);
             await db
                 .update(gitSource)
                 .set({ syncEnabled: enabled })
                 .where(eq(gitSource.id, gitSourceId));
-        },
-    ),
+        }
+    )
 );
 
 const ResolveGitSourceSyncInput = v.object({
@@ -251,13 +265,19 @@ export const resolveGitSourceSync = command(
     withRemoteLogging(
         "dataSources.resolveGitSourceSync",
         "command",
-        async ({ gitSourceId, resolution }: v.InferOutput<typeof ResolveGitSourceSyncInput>) => {
+        async ({
+            gitSourceId,
+            resolution,
+        }: v.InferOutput<typeof ResolveGitSourceSyncInput>) => {
             await requireGitSourceAccess(gitSourceId);
             try {
                 return await syncGitSourceRecord(gitSourceId, resolution);
             } catch {
-                error(400, "Git sync failed. Check repository access, connectivity, and history.");
+                error(
+                    400,
+                    "Git sync failed. Check repository access, connectivity, and history."
+                );
             }
-        },
-    ),
+        }
+    )
 );

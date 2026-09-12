@@ -26,10 +26,17 @@ const readBracedExpression = (text: string, start: number): number => {
     return index;
 };
 
-const resolveBraced = (expression: string, lookup: Lookup, interpolate: Interpolator): string => {
+const resolveBraced = (
+    expression: string,
+    lookup: Lookup,
+    interpolate: Interpolator
+): string => {
     let nameEnd = 0;
 
-    while (nameEnd < expression.length && isNameChar(expression[nameEnd] ?? "")) {
+    while (
+        nameEnd < expression.length &&
+        isNameChar(expression[nameEnd] ?? "")
+    ) {
         nameEnd += 1;
     }
 
@@ -44,7 +51,9 @@ const resolveBraced = (expression: string, lookup: Lookup, interpolate: Interpol
     const emptyIsUnset = rest.startsWith(":");
     const operator = emptyIsUnset ? rest[1] : rest[0];
     const argument = rest.slice(emptyIsUnset ? 2 : 1);
-    const isSet = emptyIsUnset ? value !== undefined && value !== "" : value !== undefined;
+    const isSet = emptyIsUnset
+        ? value !== undefined && value !== ""
+        : value !== undefined;
 
     switch (operator) {
         case "-": {
@@ -69,7 +78,10 @@ const resolveBraced = (expression: string, lookup: Lookup, interpolate: Interpol
  * `${VAR:?err}`, `${VAR?err}`, `${VAR:+alt}`, `${VAR+alt}`, nested defaults,
  * and the `$$` escape. Unset variables resolve to an empty string.
  */
-export function interpolateComposeVariables(text: string, lookup: Lookup): string {
+export function interpolateComposeVariables(
+    text: string,
+    lookup: Lookup
+): string {
     let result = "";
     let index = 0;
 
@@ -91,7 +103,11 @@ export function interpolateComposeVariables(text: string, lookup: Lookup): strin
         if (text[index + 1] === "{") {
             const end = readBracedExpression(text, index + 2);
             const expression = text.slice(index + 2, end - 1);
-            result += resolveBraced(expression, lookup, interpolateComposeVariables);
+            result += resolveBraced(
+                expression,
+                lookup,
+                interpolateComposeVariables
+            );
             index = end;
             continue;
         }

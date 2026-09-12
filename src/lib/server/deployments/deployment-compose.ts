@@ -93,7 +93,11 @@ const prefixVolumeMount = (node: unknown, rename: Rename): void => {
 
     const source = node.get("source", true);
 
-    if (isScalar(source) && typeof source.value === "string" && isNamedVolumeSource(source.value)) {
+    if (
+        isScalar(source) &&
+        typeof source.value === "string" &&
+        isNamedVolumeSource(source.value)
+    ) {
         source.value = rename(source.value);
     }
 };
@@ -122,50 +126,6 @@ const prefixTopLevelVolumes = (volumes: unknown, rename: Rename): void => {
         }
 
         pair.key.value = rename(pair.key.value);
-    }
-};
-
-const prefixServiceFragment = (service: YAMLMap, rename: Rename): void => {
-    prefixServiceVolumes(service, rename);
-    prefixServiceConfigs(service, rename);
-    prefixDependsOn(service, rename);
-    prefixCaddyUpstreams(service, rename);
-};
-
-/**
- * Prefix service-style references inside YAML anchors merged into services
- * (e.g. `x-copyparty: &copyparty` + `<<: *copyparty`). Anchors are resolved
- * precisely through their aliases so unrelated `x-*` extensions are untouched.
- */
-const prefixMergedAnchors = (
-    doc: ReturnType<typeof YAML.parseDocument>,
-    serviceMap: YAMLMap,
-    rename: Rename,
-): void => {
-    const seen = new Set<string>();
-    const collectMergeAliases = (node: unknown): void => {
-        if (isAlias(node)) {
-            if (seen.has(node.source)) {
-                return;
-            }
-            seen.add(node.source);
-            const target = node.resolve(doc);
-            if (isMap(target)) {
-                prefixServiceFragment(target, rename);
-                collectMergeAliases(target.get("<<", true));
-            }
-            return;
-        }
-        if (isSeq(node)) {
-            for (const item of node.items) {
-                collectMergeAliases(item);
-            }
-        }
-    };
-    for (const pair of serviceMap.items) {
-        if (isMap(pair.value)) {
-            collectMergeAliases(pair.value.get("<<", true));
-        }
     }
 };
 
@@ -249,7 +209,8 @@ const prefixDependsOn = (service: YAMLMap, rename: Rename): void => {
     }
 };
 
-const CADDY_UPSTREAMS_SERVICE = /(?<open>\{\{\s*upstreams\s+")(?<name>[^"]+)(?<close>")/gu;
+const CADDY_UPSTREAMS_SERVICE =
+    /(?<open>\{\{\s*upstreams\s+")(?<name>[^"]+)(?<close>")/gu;
 
 const prefixCaddyUpstreams = (service: YAMLMap, rename: Rename): void => {
     const caddy = service.get("x-caddy", true);
@@ -260,8 +221,53 @@ const prefixCaddyUpstreams = (service: YAMLMap, rename: Rename): void => {
 
     caddy.value = caddy.value.replace(
         CADDY_UPSTREAMS_SERVICE,
-        (_match, open: string, name: string, close: string) => `${open}${rename(name)}${close}`,
+        (_match, open: string, name: string, close: string) =>
+            `${open}${rename(name)}${close}`
     );
+};
+
+const prefixServiceFragment = (service: YAMLMap, rename: Rename): void => {
+    prefixServiceVolumes(service, rename);
+    prefixServiceConfigs(service, rename);
+    prefixDependsOn(service, rename);
+    prefixCaddyUpstreams(service, rename);
+};
+
+/**
+ * Prefix service-style references inside YAML anchors merged into services
+ * (e.g. `x-copyparty: &copyparty` + `<<: *copyparty`). Anchors are resolved
+ * precisely through their aliases so unrelated `x-*` extensions are untouched.
+ */
+const prefixMergedAnchors = (
+    doc: ReturnType<typeof YAML.parseDocument>,
+    serviceMap: YAMLMap,
+    rename: Rename
+): void => {
+    const seen = new Set<string>();
+    const collectMergeAliases = (node: unknown): void => {
+        if (isAlias(node)) {
+            if (seen.has(node.source)) {
+                return;
+            }
+            seen.add(node.source);
+            const target = node.resolve(doc);
+            if (isMap(target)) {
+                prefixServiceFragment(target, rename);
+                collectMergeAliases(target.get("<<", true));
+            }
+            return;
+        }
+        if (isSeq(node)) {
+            for (const item of node.items) {
+                collectMergeAliases(item);
+            }
+        }
+    };
+    for (const pair of serviceMap.items) {
+        if (isMap(pair.value)) {
+            collectMergeAliases(pair.value.get("<<", true));
+        }
+    }
 };
 
 const environmentListKey = (item: unknown): string | undefined => {
@@ -275,14 +281,17 @@ const environmentListKey = (item: unknown): string | undefined => {
     return separatorIndex === -1 ? entry : entry.slice(0, separatorIndex);
 };
 
-const overlayEnvironment = (service: YAMLMap, variables: readonly EnvironmentVariable[]): void => {
+const overlayEnvironment = (
+    service: YAMLMap,
+    variables: readonly EnvironmentVariable[]
+): void => {
     const existing = service.get("environment", true);
 
     if (isSeq(existing)) {
         for (const variable of variables) {
             const entry = `${variable.name}=${variable.value}`;
             const index = existing.items.findIndex(
-                (item) => environmentListKey(item) === variable.name,
+                (item) => environmentListKey(item) === variable.name
             );
             const item = index === -1 ? undefined : existing.items[index];
 
@@ -306,7 +315,9 @@ const overlayEnvironment = (service: YAMLMap, variables: readonly EnvironmentVar
 
     service.set(
         "environment",
-        Object.fromEntries(variables.map((variable) => [variable.name, variable.value])),
+        Object.fromEntries(
+            variables.map((variable) => [variable.name, variable.value])
+        )
     );
 };
 
@@ -368,7 +379,10 @@ const ensureEnvFile = (service: YAMLMap): void => {
     }
 };
 
-function transformComposeNames(compose: string, rename: Rename): FormattedCompose {
+function transformComposeNames(
+    compose: string,
+    rename: Rename
+): FormattedCompose {
     const doc = YAML.parseDocument(compose);
 
     if (doc.errors.length > 0) {
@@ -408,7 +422,10 @@ function transformComposeNames(compose: string, rename: Rename): FormattedCompos
     };
 }
 
-export function formatComposeFile(compose: string, prefix?: string): FormattedCompose {
+export function formatComposeFile(
+    compose: string,
+    prefix?: string
+): FormattedCompose {
     return transformComposeNames(compose, (name) => prefixName(name, prefix));
 }
 
@@ -416,18 +433,22 @@ export function formatComposeFile(compose: string, prefix?: string): FormattedCo
 export function unformatComposeFile(compose: string, prefix?: string): string {
     const separator = prefix ? `${prefix}-` : undefined;
     const result = transformComposeNames(compose, (name) =>
-        separator && name.startsWith(separator) ? name.slice(separator.length) : name,
+        separator && name.startsWith(separator)
+            ? name.slice(separator.length)
+            : name
     );
     // A Git edit may introduce two names that collapse to the same unprefixed key.
     if (YAML.parseDocument(result.yaml).errors.length > 0) {
-        throw new Error("Compose names collide after removing the Stoat prefix");
+        throw new Error(
+            "Compose names collide after removing the Stoat prefix"
+        );
     }
     return result.yaml;
 }
 
 export function applyEnvironmentVariables(
     compose: string,
-    variables: readonly EnvironmentVariable[],
+    variables: readonly EnvironmentVariable[]
 ): string {
     if (variables.length === 0) {
         return compose;
@@ -460,7 +481,7 @@ export function applyEnvironmentVariables(
 
 export function inlineEnvironmentVariables(
     compose: string,
-    variables: readonly EnvironmentVariable[],
+    variables: readonly EnvironmentVariable[]
 ): string {
     if (variables.length === 0) {
         return compose;
@@ -523,7 +544,12 @@ export function isUnsafeConfigPath(p: string): boolean {
     }
 
     for (const segment of normalized.split("/")) {
-        if (segment === "" || segment === "." || segment === ".." || segment === ".git") {
+        if (
+            segment === "" ||
+            segment === "." ||
+            segment === ".." ||
+            segment === ".git"
+        ) {
             return true;
         }
     }
@@ -538,7 +564,9 @@ export interface ComposeConfigReference {
     hasExternal: boolean;
 }
 
-export function listComposeConfigReferences(compose: string): ComposeConfigReference[] {
+export function listComposeConfigReferences(
+    compose: string
+): ComposeConfigReference[] {
     const doc = YAML.parseDocument(compose);
 
     if (doc.errors.length > 0) {
@@ -582,17 +610,20 @@ export function listComposeConfigReferences(compose: string): ComposeConfigRefer
     return references;
 }
 
-const isExternalConfig = (entry: YAMLMap): boolean => entry.get("external") === true;
+const isExternalConfig = (entry: YAMLMap): boolean =>
+    entry.get("external") === true;
 
 const inlineFileConfig = (
     name: string,
     entry: YAMLMap,
     filePath: string,
     resolveFile: (relPath: string) => string | null,
-    composePath: string,
+    composePath: string
 ): void => {
     if (isUnsafeConfigPath(filePath)) {
-        throw new Error(`Config '${name}' has an unsafe file path '${filePath}'`);
+        throw new Error(
+            `Config '${name}' has an unsafe file path '${filePath}'`
+        );
     }
 
     const normalizedPath = normalizeConfigFilePath(filePath);
@@ -600,7 +631,7 @@ const inlineFileConfig = (
 
     if (text === null || text === undefined) {
         throw new Error(
-            `Config '${name}' uses file: ${filePath}, but it was not found next to ${composePath}. Add it via the resource Files page or commit it next to the compose file in Git.`,
+            `Config '${name}' uses file: ${filePath}, but it was not found next to ${composePath}. Add it via the resource Files page or commit it next to the compose file in Git.`
         );
     }
 
@@ -620,13 +651,17 @@ const inlineSingleConfig = (
     name: string,
     entry: unknown,
     resolveFile: (relPath: string) => string | null,
-    composePath: string,
+    composePath: string
 ): void => {
     if (!isMap(entry)) {
         throw new Error(`Config '${name}' must be a mapping`);
     }
 
-    if (entry.has("content") || isExternalConfig(entry) || entry.has("environment")) {
+    if (
+        entry.has("content") ||
+        isExternalConfig(entry) ||
+        entry.has("environment")
+    ) {
         return;
     }
 
@@ -638,7 +673,7 @@ const inlineSingleConfig = (
     }
 
     throw new Error(
-        `Config '${name}' must declare file:, content:, environment:, or external: true`,
+        `Config '${name}' must declare file:, content:, environment:, or external: true`
     );
 };
 
@@ -646,7 +681,7 @@ const checkServiceConfigEntry = (item: unknown, topConfigs: YAMLMap): void => {
     if (isScalar(item) && typeof item.value === "string") {
         if (!topConfigs.has(item.value)) {
             throw new Error(
-                `Config '${item.value}' is referenced by a service but has no top-level configs entry`,
+                `Config '${item.value}' is referenced by a service but has no top-level configs entry`
             );
         }
         return;
@@ -657,7 +692,7 @@ const checkServiceConfigEntry = (item: unknown, topConfigs: YAMLMap): void => {
 
         if (source !== undefined && !topConfigs.has(source)) {
             throw new Error(
-                `Config '${source}' is referenced by a service but has no top-level configs entry`,
+                `Config '${source}' is referenced by a service but has no top-level configs entry`
             );
         }
         return;
@@ -666,7 +701,10 @@ const checkServiceConfigEntry = (item: unknown, topConfigs: YAMLMap): void => {
     throw new Error("Invalid configs entry");
 };
 
-const validateServiceConfigReferences = (serviceMap: YAMLMap, topConfigs: YAMLMap): void => {
+const validateServiceConfigReferences = (
+    serviceMap: YAMLMap,
+    topConfigs: YAMLMap
+): void => {
     for (const pair of serviceMap.items) {
         const service = pair.value;
 
@@ -694,7 +732,7 @@ const validateServiceConfigReferences = (serviceMap: YAMLMap, topConfigs: YAMLMa
 export function inlineComposeConfigs(
     compose: string,
     resolveFile: (relPath: string) => string | null,
-    options?: { composePath?: string },
+    options?: { composePath?: string }
 ): string {
     const doc = YAML.parseDocument(compose);
 
@@ -721,7 +759,12 @@ export function inlineComposeConfigs(
             throw new Error("Invalid config name");
         }
 
-        inlineSingleConfig(pair.key.value, pair.value, resolveFile, composePath);
+        inlineSingleConfig(
+            pair.key.value,
+            pair.value,
+            resolveFile,
+            composePath
+        );
     }
 
     validateServiceConfigReferences(serviceMap, topConfigs);

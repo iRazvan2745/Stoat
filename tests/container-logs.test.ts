@@ -14,7 +14,8 @@ import type { ContainerLogRecord } from "#lib/domain/resources/container-logs";
 import { consumeSseJsonStream } from "#lib/server/shared/sse";
 
 const log = (
-    partial: Partial<ContainerLogRecord> & Pick<ContainerLogRecord, "id" | "timestamp">,
+    partial: Partial<ContainerLogRecord> &
+        Pick<ContainerLogRecord, "id" | "timestamp">
 ): ContainerLogRecord => ({
     containerId: "abc",
     containerLabel: "nginx",
@@ -26,7 +27,9 @@ const log = (
 
 describe("composeServiceName", () => {
     it("strips the stoat service slug prefix", () => {
-        expect(composeServiceName("nginx-f7gzq-nginx", "nginx-f7gzq")).toBe("nginx");
+        expect(composeServiceName("nginx-f7gzq-nginx", "nginx-f7gzq")).toBe(
+            "nginx"
+        );
     });
 
     it("returns the uncloud name when prefixing is off", () => {
@@ -44,7 +47,9 @@ describe("resolveContainerLabel", () => {
             shortId: "aaaaaaaaaaaa",
         };
 
-        expect(resolveContainerLabel(container, [container], "nginx-f7gzq")).toBe("nginx");
+        expect(
+            resolveContainerLabel(container, [container], "nginx-f7gzq")
+        ).toBe("nginx");
     });
 
     it("disambiguates replicas with the machine name", () => {
@@ -63,8 +68,12 @@ describe("resolveContainerLabel", () => {
             shortId: "bbbbbbbbbbbb",
         };
 
-        expect(resolveContainerLabel(web1, [web1, web2], "app-abc12")).toBe("web@node-1");
-        expect(resolveContainerLabel(web2, [web1, web2], "app-abc12")).toBe("web@node-2");
+        expect(resolveContainerLabel(web1, [web1, web2], "app-abc12")).toBe(
+            "web@node-1"
+        );
+        expect(resolveContainerLabel(web2, [web1, web2], "app-abc12")).toBe(
+            "web@node-2"
+        );
     });
 });
 
@@ -80,7 +89,7 @@ describe("parseContainerLogEvent", () => {
                 },
                 stream: "stdout",
                 timestamp: "2026-01-01T00:00:00.000Z",
-            }),
+            })
         ).toEqual({
             containerId: "abc123",
             machineName: "node-1",
@@ -96,7 +105,7 @@ describe("parseContainerLogEvent", () => {
             parseContainerLogEvent({
                 stream: "heartbeat",
                 timestamp: "2026-01-01T00:00:00.000Z",
-            }),
+            })
         ).toBeNull();
     });
 
@@ -105,7 +114,7 @@ describe("parseContainerLogEvent", () => {
             parseContainerLogEvent({
                 error: "container died",
                 stream: "unknown",
-            }),
+            })
         ).toMatchObject({
             message: "container died",
             stream: "stdout",
@@ -132,11 +141,18 @@ describe("insertLogSorted", () => {
     it("inserts out-of-order historical lines by timestamp", () => {
         const logs: ContainerLogRecord[] = [];
 
-        insertLogSorted(logs, log({ id: 2, message: "second", timestamp: "2" }));
+        insertLogSorted(
+            logs,
+            log({ id: 2, message: "second", timestamp: "2" })
+        );
         insertLogSorted(logs, log({ id: 1, message: "first", timestamp: "1" }));
         insertLogSorted(logs, log({ id: 3, message: "third", timestamp: "3" }));
 
-        expect(logs.map((entry) => entry.message)).toEqual(["first", "second", "third"]);
+        expect(logs.map((entry) => entry.message)).toEqual([
+            "first",
+            "second",
+            "third",
+        ]);
     });
 });
 
@@ -160,8 +176,8 @@ describe("consumeSseJsonStream", () => {
             start(controller) {
                 controller.enqueue(
                     new TextEncoder().encode(
-                        `: ping\n\nevent: log\ndata: {"message":"hello","stream":"stdout"}\n\n`,
-                    ),
+                        `: ping\n\nevent: log\ndata: {"message":"hello","stream":"stdout"}\n\n`
+                    )
                 );
                 controller.close();
             },
@@ -183,7 +199,10 @@ describe("consumeSseJsonStream", () => {
 
     it("resolves without unhandled rejections when aborted", async () => {
         const controller = new AbortController();
-        const abortError = new DOMException("This operation was aborted", "AbortError");
+        const abortError = new DOMException(
+            "This operation was aborted",
+            "AbortError"
+        );
         const body = new ReadableStream<Uint8Array>({
             cancel() {
                 return Promise.reject(abortError);
@@ -200,7 +219,11 @@ describe("consumeSseJsonStream", () => {
         process.on("unhandledRejection", onUnhandled);
 
         try {
-            const consume = consumeSseJsonStream(body, () => Promise.resolve(), controller.signal);
+            const consume = consumeSseJsonStream(
+                body,
+                () => Promise.resolve(),
+                controller.signal
+            );
 
             controller.abort();
             await consume;

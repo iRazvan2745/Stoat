@@ -39,7 +39,7 @@
 </script>
 
 <article
-    class="border-outline-variant/40 flex items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0 m:px-5"
+    class="border-outline-variant/40 m:px-5 flex items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0"
 >
     <div class="flex min-w-0 flex-1 items-center gap-3">
         <div
@@ -48,9 +48,9 @@
             <Icon icon={deploymentsIcon} size={20} />
         </div>
 
-        <div class="flex min-w-0 flex-1 flex-row gap-2 m:items-center">
+        <div class="m:items-center flex min-w-0 flex-1 flex-row gap-2">
             <div>
-                <div class="flex min-w-0 items-baseline gap-1.5 m:w-56">
+                <div class="m:w-56 flex min-w-0 items-baseline gap-1.5">
                     <span class="m3-font-label-large text-on-surface">
                         Deployment
                     </span>
@@ -62,7 +62,9 @@
                     </span>
                 </div>
 
-                <span class="text-on-surface-variant m3-font-body-small m:flex-1">
+                <span
+                    class="text-on-surface-variant m3-font-body-small m:flex-1"
+                >
                     {formatDate(deployment.createdAt)}
                     {#if deployment.gitCommit}
                         · <span class="font-mono" title={deployment.gitCommit}

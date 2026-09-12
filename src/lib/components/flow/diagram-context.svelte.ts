@@ -20,7 +20,9 @@ export function setDiagramContext(value: DiagramContextValue) {
 }
 
 export function useDiagramContext() {
-    const context = getContext<DiagramContextValue | undefined>(DIAGRAM_CONTEXT_KEY);
+    const context = getContext<DiagramContextValue | undefined>(
+        DIAGRAM_CONTEXT_KEY
+    );
 
     if (!context) {
         throw new Error("Flow diagram context is missing");

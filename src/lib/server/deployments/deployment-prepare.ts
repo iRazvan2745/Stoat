@@ -26,7 +26,7 @@ import type { DeploymentSnapshot } from "./deployment-snapshot";
 async function addDeploymentLog(
     deploymentId: string,
     stream: string,
-    message: string,
+    message: string
 ): Promise<void> {
     await db.transaction(async (tx) => {
         // Serialize log writes with terminal transitions.  A cancellation can
@@ -36,7 +36,12 @@ async function addDeploymentLog(
         const [deployment] = await tx
             .select({ id: deployments.id })
             .from(deployments)
-            .where(and(eq(deployments.id, deploymentId), isNull(deployments.finishedAt)))
+            .where(
+                and(
+                    eq(deployments.id, deploymentId),
+                    isNull(deployments.finishedAt)
+                )
+            )
             .for("update");
         if (!deployment) {
             return;
@@ -64,14 +69,139 @@ const ensureEnvIgnored = async (resourceDir: string): Promise<void> => {
         return;
     }
 
-    const prefix = existing === "" || existing.endsWith("\n") ? existing : `${existing}\n`;
+    const prefix =
+        existing === "" || existing.endsWith("\n") ? existing : `${existing}\n`;
     await fs.writeFile(gitignorePath, `${prefix}.env\n`, "utf-8");
+};
+
+type DeploymentLog = (
+    stream: "debug" | "stderr" | "stdout",
+    message: string
+) => Promise<void>;
+
+const validateDeploymentSnapshot = (
+    snapshot: DeploymentSnapshot
+): { resourceCompose: string; resourceSlug: string } => {
+    const resourceCompose = snapshot.resource.value;
+    if (!resourceCompose) {
+        throw new Error("the compose is invalid");
+    }
+
+    if (snapshot.gitValidationError) {
+        throw new Error(snapshot.gitValidationError);
+    }
+
+    return {
+        resourceCompose,
+        resourceSlug: snapshot.resource.slug ?? snapshot.resource.id,
+    };
+};
+
+const inlineDeploymentConfigs = async (
+    snapshot: DeploymentSnapshot,
+    compose: string,
+    resourceSlug: string,
+    log: DeploymentLog
+): Promise<string> => {
+    const configReferences = listComposeConfigReferences(compose);
+
+    if (configReferences.length === 0) {
+        return compose;
+    }
+
+    const available = new Map<string, string>();
+    for (const file of snapshot.resourceFiles ?? []) {
+        available.set(file.path, file.content);
+    }
+    for (const file of snapshot.gitFiles ?? []) {
+        if (!available.has(file.path)) {
+            available.set(file.path, file.content);
+        }
+    }
+
+    const names = [...available.keys()].join(", ") || "none";
+    const inlined = inlineComposeConfigs(
+        compose,
+        (relativePath) => {
+            const hit = available.get(relativePath) ?? null;
+            if (hit === null) {
+                throw new Error(
+                    `Config uses file: ${relativePath}, but it was not found next to ${resourceSlug}/compose.yaml (available: ${names}). Add it via the resource Files page or commit it next to the compose file in Git.`
+                );
+            }
+            return hit;
+        },
+        { composePath: `${resourceSlug}/compose.yaml` }
+    );
+
+    await log(
+        "debug",
+        `Inlined ${configReferences.length} configs (${names || "none"})`
+    );
+    return inlined;
+};
+
+const logEnvironmentApplied = async (
+    environment: DeploymentSnapshot["environment"],
+    log: DeploymentLog
+): Promise<void> => {
+    if (environment.length === 0) {
+        return;
+    }
+
+    await log("debug", `Applied ${environment.length} environment variables`);
+};
+
+const sendComposeDeployment = async (
+    source: DeploymentSnapshot["source"],
+    compose: string,
+    signal: AbortSignal | undefined,
+    log: DeploymentLog,
+    resourceName: string | null,
+    resourceSlug: string
+): Promise<void> => {
+    const deploy = await createUncloudStreamClient(source).POST(
+        "/api/v1/services/deploy/compose",
+        {
+            body: {
+                compose: Buffer.from(compose).toString("base64"),
+                options: {
+                    //profiles: [""],
+                    //recreate: true,
+                    //skipHealth: true,
+                },
+            },
+            parseAs: "stream",
+            signal,
+        }
+    );
+
+    if (deploy.error) {
+        // The schema declares no error body for this endpoint, so widen the type
+        // to surface whatever uncloud actually returned.
+        const errorBody: unknown = deploy.error;
+        const detail =
+            typeof errorBody === "string"
+                ? errorBody
+                : JSON.stringify(errorBody);
+        const httpStatus = deploy.response
+            ? ` (HTTP ${deploy.response.status})`
+            : "";
+        throw new Error(`Failed to deploy resource${httpStatus}: ${detail}`);
+    }
+
+    if (!deploy.response) {
+        throw new Error("Deploy request did not return a response");
+    }
+
+    await consumeDeployStream(deploy.response, log);
+    await log("stdout", `Deployed resource ${resourceName} (${resourceSlug})`);
 };
 
 export async function prepareDeployment(
     snapshot: DeploymentSnapshot,
     deploymentId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
 ): Promise<void> {
     const log = (stream: "debug" | "stderr" | "stdout", message: string) =>
         addDeploymentLog(deploymentId, stream, message);
@@ -82,54 +212,34 @@ export async function prepareDeployment(
     };
 
     const { environment, git, resource, source, workspace: wrk } = snapshot;
-
-    if (!resource?.value) {
-        throw new Error("the compose is invalid");
-    }
-
-    if (snapshot.gitValidationError) throw new Error(snapshot.gitValidationError);
-    const resourceSlug = resource.slug ?? resource.id;
+    const { resourceCompose, resourceSlug } =
+        validateDeploymentSnapshot(snapshot);
     const formatted = formatComposeFile(
-        snapshot.gitCompose ?? resource.value,
-        snapshot.gitCompose === undefined ? resourceComposePrefix(resource) : undefined,
+        snapshot.gitCompose ?? resourceCompose,
+        snapshot.gitCompose === undefined
+            ? resourceComposePrefix(resource)
+            : undefined
     );
-    let deployCompose = inlineEnvironmentVariables(formatted.yaml, environment);
-    // Inline compose `configs:` `file:` content: only the single compose file
-    // is sent to Uncloud, so referenced siblings must travel inside it. DB
-    // files are the source of truth; Git commit siblings are the fallback.
-    const configReferences = listComposeConfigReferences(deployCompose);
-    if (configReferences.length > 0) {
-        const available = new Map<string, string>();
-        for (const file of snapshot.resourceFiles ?? []) available.set(file.path, file.content);
-        for (const file of snapshot.gitFiles ?? []) {
-            if (!available.has(file.path)) available.set(file.path, file.content);
-        }
-        const names = [...available.keys()].join(", ") || "none";
-        deployCompose = inlineComposeConfigs(
-            deployCompose,
-            (relativePath) => {
-                const hit = available.get(relativePath) ?? null;
-                if (hit === null) {
-                    throw new Error(
-                        `Config uses file: ${relativePath}, but it was not found next to ${resourceSlug}/compose.yaml (available: ${names}). Add it via the resource Files page or commit it next to the compose file in Git.`,
-                    );
-                }
-                return hit;
-            },
-            { composePath: `${resourceSlug}/compose.yaml` },
-        );
-        await log("debug", `Inlined ${configReferences.length} configs (${names || "none"})`);
-    }
+    const deployCompose = await inlineDeploymentConfigs(
+        snapshot,
+        inlineEnvironmentVariables(formatted.yaml, environment),
+        resourceSlug,
+        log
+    );
     const repoPath = workspacePath(wrk.id);
     const resourcePath = path.join(wrk.slug, resourceSlug);
     const dataResourceDir = path.join(repoPath, resourcePath);
 
-    await log("stdout", `Preparing deployment for resource ${resource.name} (${resourceSlug})`);
-    await log("debug", `Parsed compose file with ${formatted.serviceCount} services`);
+    await log(
+        "stdout",
+        `Preparing deployment for resource ${resource.name} (${resourceSlug})`
+    );
+    await log(
+        "debug",
+        `Parsed compose file with ${formatted.serviceCount} services`
+    );
 
-    if (environment.length > 0) {
-        await log("debug", `Applied ${environment.length} environment variables`);
-    }
+    await logEnvironmentApplied(environment, log);
 
     throwIfCancelled();
 
@@ -149,22 +259,35 @@ export async function prepareDeployment(
                       },
                       async (repo) => {
                           await fs.mkdir(dataResourceDir, { recursive: true });
-                          const dataComposePath = path.join(dataResourceDir, "compose.yaml");
-                          const dataEnvPath = path.join(dataResourceDir, ".env");
+                          const dataComposePath = path.join(
+                              dataResourceDir,
+                              "compose.yaml"
+                          );
+                          const dataEnvPath = path.join(
+                              dataResourceDir,
+                              ".env"
+                          );
                           // Commit the raw (non-interpolated) compose so secret values never enter
                           // git history; the deploy payload sent to uncloud is built separately.
-                          await fs.writeFile(dataComposePath, formatted.yaml, "utf-8");
-                          await log("debug", `Wrote compose file to ${dataComposePath}`);
+                          await fs.writeFile(
+                              dataComposePath,
+                              formatted.yaml,
+                              "utf-8"
+                          );
+                          await log(
+                              "debug",
+                              `Wrote compose file to ${dataComposePath}`
+                          );
 
                           if (environment.length > 0) {
                               await fs.writeFile(
                                   dataEnvPath,
                                   serializeEnvFile(environment),
-                                  "utf-8",
+                                  "utf-8"
                               );
                               await log(
                                   "debug",
-                                  `Wrote environment file to ${dataEnvPath} (kept out of git)`,
+                                  `Wrote environment file to ${dataEnvPath} (kept out of git)`
                               );
                           } else {
                               await fs.rm(dataEnvPath, { force: true });
@@ -174,54 +297,94 @@ export async function prepareDeployment(
 
                           throwIfCancelled();
 
-                          const composeRepoPath = path.join(resourcePath, "compose.yaml");
-                          const gitignoreRepoPath = path.join(resourcePath, ".gitignore");
+                          const composeRepoPath = path.join(
+                              resourcePath,
+                              "compose.yaml"
+                          );
+                          const gitignoreRepoPath = path.join(
+                              resourcePath,
+                              ".gitignore"
+                          );
                           const envRepoPath = path.join(resourcePath, ".env");
 
                           // Drop a .env committed by earlier versions from the index (not the
                           // working tree) so it stops being tracked and pushed.
-                          const trackedEnv = await repo.raw(["ls-files", "--", envRepoPath]);
+                          const trackedEnv = await repo.raw([
+                              "ls-files",
+                              "--",
+                              envRepoPath,
+                          ]);
                           const envWasTracked = trackedEnv.trim() !== "";
                           if (envWasTracked) {
-                              await repo.raw(["rm", "--cached", "--quiet", "--", envRepoPath]);
-                              await log("debug", `Removed ${envRepoPath} from git tracking`);
+                              await repo.raw([
+                                  "rm",
+                                  "--cached",
+                                  "--quiet",
+                                  "--",
+                                  envRepoPath,
+                              ]);
+                              await log(
+                                  "debug",
+                                  `Removed ${envRepoPath} from git tracking`
+                              );
                           }
 
-                          await log("debug", `Checking git status in ${repoPath}`);
+                          await log(
+                              "debug",
+                              `Checking git status in ${repoPath}`
+                          );
 
                           const status = await repo.status();
                           const changedFiles = status.files.filter(
                               (file) =>
-                                  file.path === composeRepoPath || file.path === gitignoreRepoPath,
+                                  file.path === composeRepoPath ||
+                                  file.path === gitignoreRepoPath
                           );
                           if (changedFiles.length > 0 || envWasTracked) {
-                              const addPaths = changedFiles.map((file) => file.path);
+                              const addPaths = changedFiles.map(
+                                  (file) => file.path
+                              );
 
                               if (addPaths.length > 0) {
                                   const fileList = addPaths
                                       .map((filePath) => `  ${filePath}`)
                                       .join("\n");
-                                  await log("debug", `Changes detected:\n${fileList}`);
+                                  await log(
+                                      "debug",
+                                      `Changes detected:\n${fileList}`
+                                  );
 
                                   await repo.add(addPaths);
-                                  await log("debug", `Added ${addPaths.join(", ")} to git index`);
+                                  await log(
+                                      "debug",
+                                      `Added ${addPaths.join(", ")} to git index`
+                                  );
                               }
 
                               const commit = await repo.commit(
-                                  `Committing new changes on Resource ${resource.name} before deploying`,
+                                  `Committing new changes on Resource ${resource.name} before deploying`
                               );
-                              await log("debug", `Committed changes: ${commit.commit}`);
                               await log(
                                   "debug",
-                                  `Changes: ${commit.summary.changes}, insertions: ${commit.summary.insertions}, deletions: ${commit.summary.deletions}`,
+                                  `Committed changes: ${commit.commit}`
                               );
-                              await log("stdout", "Saved compose changes to git");
+                              await log(
+                                  "debug",
+                                  `Changes: ${commit.summary.changes}, insertions: ${commit.summary.insertions}, deletions: ${commit.summary.deletions}`
+                              );
+                              await log(
+                                  "stdout",
+                                  "Saved compose changes to git"
+                              );
                           } else {
                               await log(
                                   "debug",
-                                  "No changes to commit — compose file is already up to date",
+                                  "No changes to commit — compose file is already up to date"
                               );
-                              await log("stdout", "Compose file is already up to date");
+                              await log(
+                                  "stdout",
+                                  "Compose file is already up to date"
+                              );
                           }
 
                           await log("debug", "Pushing changes to git remote");
@@ -230,47 +393,33 @@ export async function prepareDeployment(
                               for (const detail of push.pushed) {
                                   await log(
                                       "debug",
-                                      `  Pushed ${detail.local} -> ${detail.remote}`,
+                                      `  Pushed ${detail.local} -> ${detail.remote}`
                                   );
                               }
-                              await log("stdout", "Pushed configuration to git remote");
+                              await log(
+                                  "stdout",
+                                  "Pushed configuration to git remote"
+                              );
                           } else {
-                              await log("debug", "Nothing to push — remote is already up to date");
+                              await log(
+                                  "debug",
+                                  "Nothing to push — remote is already up to date"
+                              );
                           }
-                      },
-                  ),
+                      }
+                  )
           )
         : log("debug", "Data source has no Git URL — skipping git sync");
     await gitSync;
 
     throwIfCancelled();
 
-    const deploy = await createUncloudStreamClient(source).POST("/api/v1/services/deploy/compose", {
-        body: {
-            compose: Buffer.from(deployCompose).toString("base64"),
-            options: {
-                //profiles: [""],
-                //recreate: true,
-                //skipHealth: true,
-            },
-        },
-        parseAs: "stream",
+    await sendComposeDeployment(
+        source,
+        deployCompose,
         signal,
-    });
-
-    if (deploy.error) {
-        // The schema declares no error body for this endpoint, so widen the type
-        // to surface whatever uncloud actually returned.
-        const errorBody: unknown = deploy.error;
-        const detail = typeof errorBody === "string" ? errorBody : JSON.stringify(errorBody);
-        const httpStatus = deploy.response ? ` (HTTP ${deploy.response.status})` : "";
-        throw new Error(`Failed to deploy resource${httpStatus}: ${detail}`);
-    }
-
-    if (!deploy.response) {
-        throw new Error("Deploy request did not return a response");
-    }
-
-    await consumeDeployStream(deploy.response, log);
-    await log("stdout", `Deployed resource ${resource.name} (${resourceSlug})`);
+        log,
+        resource.name,
+        resourceSlug
+    );
 }

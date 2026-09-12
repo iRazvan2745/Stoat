@@ -82,7 +82,31 @@ function defaultStyle(): AnsiLogStyle {
     };
 }
 
-function readEscapeSequence(value: string, index: number): EscapeSequence | null {
+function readCsiSequence(value: string, start: number): EscapeSequence {
+    let cursor = start;
+
+    while (cursor < value.length) {
+        const code = value.codePointAt(cursor) ?? 0;
+
+        if (code >= 0x40 && code <= 0x7e) {
+            return {
+                end: cursor + 1,
+                final: value[cursor] ?? "",
+                kind: "csi",
+                parameters: value.slice(start, cursor),
+            };
+        }
+
+        cursor += 1;
+    }
+
+    return { end: value.length, kind: "control" };
+}
+
+function readEscapeSequence(
+    value: string,
+    index: number
+): EscapeSequence | null {
     const first = value[index];
 
     if (first === CSI) {
@@ -125,27 +149,6 @@ function readEscapeSequence(value: string, index: number): EscapeSequence | null
     };
 }
 
-function readCsiSequence(value: string, start: number): EscapeSequence {
-    let cursor = start;
-
-    while (cursor < value.length) {
-        const code = value.charCodeAt(cursor);
-
-        if (code >= 0x40 && code <= 0x7e) {
-            return {
-                end: cursor + 1,
-                final: value[cursor] ?? "",
-                kind: "csi",
-                parameters: value.slice(start, cursor),
-            };
-        }
-
-        cursor += 1;
-    }
-
-    return { end: value.length, kind: "control" };
-}
-
 function parseSgrParameters(parameters: string): number[] {
     if (!parameters) {
         return [0];
@@ -160,12 +163,17 @@ function parseSgrParameters(parameters: string): number[] {
 }
 
 function validColorComponent(value: number | undefined): value is number {
-    return value !== undefined && Number.isInteger(value) && value >= 0 && value <= 255;
+    return (
+        value !== undefined &&
+        Number.isInteger(value) &&
+        value >= 0 &&
+        value <= 255
+    );
 }
 
 function readExtendedColor(
     parameters: number[],
-    index: number,
+    index: number
 ): { color: AnsiColor; consumed: number } | null {
     const mode = parameters[index + 1];
 
@@ -188,7 +196,11 @@ function readExtendedColor(
         const green = parameters[index + 3];
         const blue = parameters[index + 4];
 
-        if (validColorComponent(red) && validColorComponent(green) && validColorComponent(blue)) {
+        if (
+            validColorComponent(red) &&
+            validColorComponent(green) &&
+            validColorComponent(blue)
+        ) {
             return {
                 color: { blue, green, kind: "rgb", red },
                 consumed: 4,
@@ -198,6 +210,124 @@ function readExtendedColor(
 
     return null;
 }
+
+const applySgrFlags = (
+    style: AnsiLogStyle,
+    code: number
+): AnsiLogStyle | undefined => {
+    switch (code) {
+        case 0: {
+            return defaultStyle();
+        }
+        case 1: {
+            return { ...style, bold: true };
+        }
+        case 2: {
+            return { ...style, dim: true };
+        }
+        case 3: {
+            return { ...style, italic: true };
+        }
+        case 4: {
+            return { ...style, underline: true };
+        }
+        case 7: {
+            return { ...style, inverse: true };
+        }
+        case 9: {
+            return { ...style, strikethrough: true };
+        }
+        case 22: {
+            return { ...style, bold: false, dim: false };
+        }
+        case 23: {
+            return { ...style, italic: false };
+        }
+        case 24: {
+            return { ...style, underline: false };
+        }
+        case 27: {
+            return { ...style, inverse: false };
+        }
+        case 29: {
+            return { ...style, strikethrough: false };
+        }
+        case 39: {
+            return { ...style, foreground: undefined };
+        }
+        case 49: {
+            return { ...style, background: undefined };
+        }
+        default: {
+            return undefined;
+        }
+    }
+};
+
+const namedColorForCode = (
+    code: number
+):
+    | { name: AnsiNamedColor; target: "background" | "foreground" }
+    | undefined => {
+    if (code >= 30 && code <= 37) {
+        const name = STANDARD_COLORS[code - 30];
+        return name ? { name, target: "foreground" } : undefined;
+    }
+
+    if (code >= 40 && code <= 47) {
+        const name = STANDARD_COLORS[code - 40];
+        return name ? { name, target: "background" } : undefined;
+    }
+
+    if (code >= 90 && code <= 97) {
+        const name = BRIGHT_COLORS[code - 90];
+        return name ? { name, target: "foreground" } : undefined;
+    }
+
+    if (code >= 100 && code <= 107) {
+        const name = BRIGHT_COLORS[code - 100];
+        return name ? { name, target: "background" } : undefined;
+    }
+
+    return undefined;
+};
+
+const applyNamedColor = (
+    style: AnsiLogStyle,
+    code: number
+): AnsiLogStyle | undefined => {
+    const color = namedColorForCode(code);
+    return color
+        ? {
+              ...style,
+              [color.target]: { kind: "named", name: color.name },
+          }
+        : undefined;
+};
+
+const applyExtendedSgrColor = (
+    style: AnsiLogStyle,
+    parameters: number[],
+    index: number,
+    code: number
+): { consumed: number; style: AnsiLogStyle } | undefined => {
+    if (code !== 38 && code !== 48) {
+        return undefined;
+    }
+
+    const extended = readExtendedColor(parameters, index);
+    if (!extended) {
+        return undefined;
+    }
+
+    return {
+        consumed: extended.consumed,
+        style: {
+            ...style,
+            [code === 38 ? "foreground" : "background"]: extended.color,
+        },
+    };
+};
 
 function applySgr(style: AnsiLogStyle, parameterText: string): AnsiLogStyle {
     const parameters = parseSgrParameters(parameterText);
@@ -210,136 +340,37 @@ function applySgr(style: AnsiLogStyle, parameterText: string): AnsiLogStyle {
             continue;
         }
 
-        if (code === 0) {
-            next = defaultStyle();
+        const flags = applySgrFlags(next, code);
+        if (flags) {
+            next = flags;
             continue;
         }
 
-        if (code === 1) {
-            next.bold = true;
+        const namedColor = applyNamedColor(next, code);
+        if (namedColor) {
+            next = namedColor;
             continue;
         }
 
-        if (code === 2) {
-            next.dim = true;
-            continue;
-        }
-
-        if (code === 3) {
-            next.italic = true;
-            continue;
-        }
-
-        if (code === 4) {
-            next.underline = true;
-            continue;
-        }
-
-        if (code === 7) {
-            next.inverse = true;
-            continue;
-        }
-
-        if (code === 9) {
-            next.strikethrough = true;
-            continue;
-        }
-
-        if (code === 22) {
-            next.bold = false;
-            next.dim = false;
-            continue;
-        }
-
-        if (code === 23) {
-            next.italic = false;
-            continue;
-        }
-
-        if (code === 24) {
-            next.underline = false;
-            continue;
-        }
-
-        if (code === 27) {
-            next.inverse = false;
-            continue;
-        }
-
-        if (code === 29) {
-            next.strikethrough = false;
-            continue;
-        }
-
-        if (code === 39) {
-            next.foreground = undefined;
-            continue;
-        }
-
-        if (code === 49) {
-            next.background = undefined;
-            continue;
-        }
-
-        if (code >= 30 && code <= 37) {
-            const name = STANDARD_COLORS[code - 30];
-
-            if (name) {
-                next.foreground = { kind: "named", name };
-            }
-
-            continue;
-        }
-
-        if (code >= 40 && code <= 47) {
-            const name = STANDARD_COLORS[code - 40];
-
-            if (name) {
-                next.background = { kind: "named", name };
-            }
-
-            continue;
-        }
-
-        if (code >= 90 && code <= 97) {
-            const name = BRIGHT_COLORS[code - 90];
-
-            if (name) {
-                next.foreground = { kind: "named", name };
-            }
-
-            continue;
-        }
-
-        if (code >= 100 && code <= 107) {
-            const name = BRIGHT_COLORS[code - 100];
-
-            if (name) {
-                next.background = { kind: "named", name };
-            }
-
-            continue;
-        }
-
-        if (code === 38 || code === 48) {
-            const extended = readExtendedColor(parameters, index);
-
-            if (extended) {
-                if (code === 38) {
-                    next.foreground = extended.color;
-                } else {
-                    next.background = extended.color;
-                }
-
-                index += extended.consumed;
-            }
+        const extendedColor = applyExtendedSgrColor(
+            next,
+            parameters,
+            index,
+            code
+        );
+        if (extendedColor) {
+            next = extendedColor.style;
+            index += extendedColor.consumed;
         }
     }
 
     return next;
 }
 
-function sameColor(left: AnsiColor | undefined, right: AnsiColor | undefined): boolean {
+function sameColor(
+    left: AnsiColor | undefined,
+    right: AnsiColor | undefined
+): boolean {
     if (left === right) {
         return true;
     }
@@ -379,7 +410,7 @@ function sameStyle(left: AnsiLogStyle, right: AnsiLogStyle): boolean {
 }
 
 function isControlCharacter(character: string): boolean {
-    const code = character.charCodeAt(0);
+    const code = character.codePointAt(0) ?? 0;
 
     return (code < 0x20 && code !== 0x09 && code !== 0x0d) || code === 0x7f;
 }
@@ -433,7 +464,10 @@ export function parseAnsiLogLines(value: string): AnsiLogLine[] {
             continue;
         }
 
-        if (character === "\r" || (character && isControlCharacter(character))) {
+        if (
+            character === "\r" ||
+            (character && isControlCharacter(character))
+        ) {
             continue;
         }
 

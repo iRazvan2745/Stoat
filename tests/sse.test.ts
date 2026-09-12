@@ -9,7 +9,9 @@ it("cancels the upstream stream and releases its lock when the consumer fails", 
     const body = new ReadableStream<Uint8Array>({
         cancel,
         start(controller) {
-            controller.enqueue(encoder.encode('event: log\ndata: {"message":"hello"}\n\n'));
+            controller.enqueue(
+                encoder.encode('event: log\ndata: {"message":"hello"}\n\n')
+            );
         },
     });
     const failure = new Error("Consumer failed");
@@ -17,7 +19,7 @@ it("cancels the upstream stream and releases its lock when the consumer fails", 
     await expect(
         consumeSseJsonStream(body, () => {
             throw failure;
-        }),
+        })
     ).rejects.toBe(failure);
     expect(cancel).toHaveBeenCalledOnce();
     expect(body.locked).toBe(false);
@@ -36,7 +38,7 @@ it("preserves the consumer error when upstream cancellation also fails", async (
     await expect(
         consumeSseJsonStream(body, () => {
             throw new Error("Consumer failed");
-        }),
+        })
     ).rejects.toThrow("Consumer failed");
     expect(body.locked).toBe(false);
 });
@@ -46,7 +48,11 @@ it("aborts a pending read and cancels its upstream stream", async () => {
     const cancel = vi.fn();
     const onEvent = vi.fn();
     const body = new ReadableStream<Uint8Array>({ cancel });
-    const consumption = consumeSseJsonStream(body, onEvent, abortController.signal);
+    const consumption = consumeSseJsonStream(
+        body,
+        onEvent,
+        abortController.signal
+    );
 
     abortController.abort();
 
@@ -60,8 +66,12 @@ it("consumes fragmented events and a final unterminated event before releasing t
     const onEvent = vi.fn();
     const body = new ReadableStream<Uint8Array>({
         start(controller) {
-            controller.enqueue(encoder.encode('event: log\r\ndata: {"message":'));
-            controller.enqueue(encoder.encode('"hello"}\r\n\r\ndata: {"done":true}'));
+            controller.enqueue(
+                encoder.encode('event: log\r\ndata: {"message":')
+            );
+            controller.enqueue(
+                encoder.encode('"hello"}\r\n\r\ndata: {"done":true}')
+            );
             controller.close();
         },
     });

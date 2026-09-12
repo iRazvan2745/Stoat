@@ -28,7 +28,9 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 
     return {
         gravatarUrl:
-            (session.user.image?.length ?? 0) > 0 ? null : await getGravatarUrl(session.user.email),
+            (session.user.image?.length ?? 0) > 0
+                ? null
+                : await getGravatarUrl(session.user.email),
         organizations,
         session,
     };

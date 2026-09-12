@@ -2,7 +2,10 @@ import { command, getRequestEvent, query, requested } from "$app/server";
 import * as v from "valibot";
 
 import { requireResourceAccess, requireWorkspaceAccess } from "#lib/api/guard";
-import { withRemoteLiveLogging, withRemoteLogging } from "#lib/api/remote-logging";
+import {
+    withRemoteLiveLogging,
+    withRemoteLogging,
+} from "#lib/api/remote-logging";
 import { ENV_NAME_PATTERN } from "#lib/domain/environment";
 import { MAX_RESOURCE_NAME_LENGTH } from "#lib/domain/resources/identity";
 import { ResourceSettingsSchema } from "#lib/domain/resources/settings";
@@ -22,6 +25,7 @@ import {
     copyResource as copyResourceRecord,
     deleteResourceIngress as deleteResourceIngressRecord,
     deleteResource as deleteResourceRecord,
+    getGitSourceIdForResource as getGitSourceIdForResourceRecord,
     getResource as getResourceRecord,
     listResourcesInWorkspace as listResourcesInWorkspaceRecords,
     moveResource as moveResourceRecord,
@@ -64,10 +68,17 @@ const UpdateResourceComposeInput = v.object({
 
 const IngressRouteFieldsInput = {
     composeService: v.pipe(v.string(), v.trim(), v.minLength(1)),
-    containerPort: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(65_535)),
+    containerPort: v.pipe(
+        v.number(),
+        v.integer(),
+        v.minValue(1),
+        v.maxValue(65_535)
+    ),
     hostname: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(253))),
     protocol: v.picklist(["http", "https", "tcp", "udp"]),
-    publishedPort: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(65_535))),
+    publishedPort: v.optional(
+        v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(65_535))
+    ),
 };
 
 const CreateResourceIngressInput = v.object({
@@ -77,13 +88,13 @@ const CreateResourceIngressInput = v.object({
 
 const UpdateResourceIngressInput = v.object({
     ...IngressRouteFieldsInput,
-    routeId: v.pipe(v.string(), v.minLength(1)),
     resourceId: ResourceIdInput,
+    routeId: v.pipe(v.string(), v.minLength(1)),
 });
 
 const DeleteResourceIngressInput = v.object({
-    routeId: v.pipe(v.string(), v.minLength(1)),
     resourceId: ResourceIdInput,
+    routeId: v.pipe(v.string(), v.minLength(1)),
 });
 
 const TransferResourceInput = v.object({
@@ -100,22 +111,27 @@ const UpdateResourceEnvironmentInput = v.pipe(
         (input) =>
             new Set(input.variables.map((variable) => variable.name)).size ===
             input.variables.length,
-        "Environment variable names must be unique",
-    ),
+        "Environment variable names must be unique"
+    )
 );
 
 const UpdateResourceIdentityInput = v.pipe(
     v.object({
         icon: v.optional(v.nullable(v.string())),
         name: v.optional(
-            v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(MAX_RESOURCE_NAME_LENGTH)),
+            v.pipe(
+                v.string(),
+                v.trim(),
+                v.minLength(1),
+                v.maxLength(MAX_RESOURCE_NAME_LENGTH)
+            )
         ),
         resourceId: ResourceIdInput,
     }),
     v.check(
         (input) => input.icon !== undefined || input.name !== undefined,
-        "Name or icon is required",
-    ),
+        "Name or icon is required"
+    )
 );
 
 const UpdateResourceSettingsInput = v.object({
@@ -133,8 +149,8 @@ export const listResourcesInWorkspace = query(
             await requireWorkspaceAccess(workspaceId);
             return await listResourcesInWorkspaceRecords(workspaceId);
         },
-        { inputKey: "workspaceId" },
-    ),
+        { inputKey: "workspaceId" }
+    )
 );
 
 export const getResource = query(
@@ -146,8 +162,21 @@ export const getResource = query(
             await requireResourceAccess(resourceId);
             return await getResourceRecord(resourceId);
         },
-        { inputKey: "resourceId" },
-    ),
+        { inputKey: "resourceId" }
+    )
+);
+
+export const getResourceGitSourceId = query(
+    ResourceIdInput,
+    withRemoteLogging(
+        "resources.getResourceGitSourceId",
+        "query",
+        async (resourceId: string) => {
+            await requireResourceAccess(resourceId);
+            return await getGitSourceIdForResourceRecord(resourceId);
+        },
+        { inputKey: "resourceId" }
+    )
 );
 
 export const getPostgresConnection = query(
@@ -159,8 +188,8 @@ export const getPostgresConnection = query(
             await requireResourceAccess(resourceId);
             return await getPostgresConnectionRecord(resourceId);
         },
-        { inputKey: "resourceId" },
-    ),
+        { inputKey: "resourceId" }
+    )
 );
 
 export const listEnvironmentVariables = query(
@@ -172,8 +201,8 @@ export const listEnvironmentVariables = query(
             await requireResourceAccess(resourceId);
             return await listResourceEnvironmentVariables(resourceId);
         },
-        { inputKey: "resourceId" },
-    ),
+        { inputKey: "resourceId" }
+    )
 );
 
 export const listResourceContainers = query(
@@ -185,8 +214,8 @@ export const listResourceContainers = query(
             await requireResourceAccess(resourceId);
             return await listResourceContainerRecords(resourceId);
         },
-        { inputKey: "resourceId" },
-    ),
+        { inputKey: "resourceId" }
+    )
 );
 
 export const listResourceIngresses = query(
@@ -198,28 +227,30 @@ export const listResourceIngresses = query(
             await requireResourceAccess(resourceId);
             return await listResourceIngressRecords(resourceId);
         },
-        { inputKey: "resourceId" },
-    ),
+        { inputKey: "resourceId" }
+    )
 );
 
 // Live queries
-const streamResourceContainerLogsRemote = async function* streamResourceContainerLogsRemote(
-    resourceId: string,
-) {
-    await requireResourceAccess(resourceId);
+const streamResourceContainerLogsRemote =
+    async function* streamResourceContainerLogsRemote(resourceId: string) {
+        await requireResourceAccess(resourceId);
 
-    const { request } = getRequestEvent();
+        const { request } = getRequestEvent();
 
-    try {
-        yield* streamResourceContainerLogsFromServer(resourceId, request.signal);
-    } catch (error) {
-        if (isAbortError(error)) {
-            return;
+        try {
+            yield* streamResourceContainerLogsFromServer(
+                resourceId,
+                request.signal
+            );
+        } catch (error) {
+            if (isAbortError(error)) {
+                return;
+            }
+
+            throw error;
         }
-
-        throw error;
-    }
-};
+    };
 
 export const streamResourceContainerLogs = query.live(
     ResourceIdInput,
@@ -228,20 +259,38 @@ export const streamResourceContainerLogs = query.live(
         streamResourceContainerLogsRemote,
         {
             inputKey: "resourceId",
-        },
-    ),
+        }
+    )
 );
 
 const RESOURCE_QUERY_REFRESH_LIMIT = 8;
 
 const refreshResourceQueries = async (): Promise<void> => {
     await requested(getResource, RESOURCE_QUERY_REFRESH_LIMIT).refreshAll();
-    await requested(listResourceContainers, RESOURCE_QUERY_REFRESH_LIMIT).refreshAll();
-    await requested(getPostgresConnection, RESOURCE_QUERY_REFRESH_LIMIT).refreshAll();
-    await requested(listEnvironmentVariables, RESOURCE_QUERY_REFRESH_LIMIT).refreshAll();
-    await requested(listResourcesInWorkspace, RESOURCE_QUERY_REFRESH_LIMIT).refreshAll();
-    await requested(listResourceIngresses, RESOURCE_QUERY_REFRESH_LIMIT).refreshAll();
-    await requested(streamResourceContainerLogs, RESOURCE_QUERY_REFRESH_LIMIT).reconnectAll();
+    await requested(
+        listResourceContainers,
+        RESOURCE_QUERY_REFRESH_LIMIT
+    ).refreshAll();
+    await requested(
+        getPostgresConnection,
+        RESOURCE_QUERY_REFRESH_LIMIT
+    ).refreshAll();
+    await requested(
+        listEnvironmentVariables,
+        RESOURCE_QUERY_REFRESH_LIMIT
+    ).refreshAll();
+    await requested(
+        listResourcesInWorkspace,
+        RESOURCE_QUERY_REFRESH_LIMIT
+    ).refreshAll();
+    await requested(
+        listResourceIngresses,
+        RESOURCE_QUERY_REFRESH_LIMIT
+    ).refreshAll();
+    await requested(
+        streamResourceContainerLogs,
+        RESOURCE_QUERY_REFRESH_LIMIT
+    ).reconnectAll();
 };
 
 // Commands
@@ -250,13 +299,19 @@ export const createResourceIngress = command(
     withRemoteLogging(
         "resources.createResourceIngress",
         "command",
-        async ({ resourceId, ...route }: v.InferOutput<typeof CreateResourceIngressInput>) => {
+        async ({
+            resourceId,
+            ...route
+        }: v.InferOutput<typeof CreateResourceIngressInput>) => {
             await requireResourceAccess(resourceId);
-            const updated = await createResourceIngressRecord(resourceId, route);
+            const updated = await createResourceIngressRecord(
+                resourceId,
+                route
+            );
             await refreshResourceQueries();
             return updated;
-        },
-    ),
+        }
+    )
 );
 
 export const updateResourceIngress = command(
@@ -270,11 +325,15 @@ export const updateResourceIngress = command(
             ...route
         }: v.InferOutput<typeof UpdateResourceIngressInput>) => {
             await requireResourceAccess(resourceId);
-            const updated = await updateResourceIngressRecord(resourceId, routeId, route);
+            const updated = await updateResourceIngressRecord(
+                resourceId,
+                routeId,
+                route
+            );
             await refreshResourceQueries();
             return updated;
-        },
-    ),
+        }
+    )
 );
 
 export const deleteResourceIngress = command(
@@ -282,13 +341,19 @@ export const deleteResourceIngress = command(
     withRemoteLogging(
         "resources.deleteResourceIngress",
         "command",
-        async ({ routeId, resourceId }: v.InferOutput<typeof DeleteResourceIngressInput>) => {
+        async ({
+            routeId,
+            resourceId,
+        }: v.InferOutput<typeof DeleteResourceIngressInput>) => {
             await requireResourceAccess(resourceId);
-            const updated = await deleteResourceIngressRecord(resourceId, routeId);
+            const updated = await deleteResourceIngressRecord(
+                resourceId,
+                routeId
+            );
             await refreshResourceQueries();
             return updated;
-        },
-    ),
+        }
+    )
 );
 
 export const createResource = command(
@@ -299,8 +364,8 @@ export const createResource = command(
         async (input: v.InferOutput<typeof CreateResourceInput>) => {
             await requireWorkspaceAccess(input.workspaceId);
             return await createResourceRecord(input);
-        },
-    ),
+        }
+    )
 );
 
 export const createResourceFromTemplate = command(
@@ -308,11 +373,13 @@ export const createResourceFromTemplate = command(
     withRemoteLogging(
         "resources.createResourceFromTemplate",
         "command",
-        async (input: v.InferOutput<typeof CreateResourceFromTemplateInput>) => {
+        async (
+            input: v.InferOutput<typeof CreateResourceFromTemplateInput>
+        ) => {
             await requireWorkspaceAccess(input.workspaceId);
             return await createResourceFromTemplateRecord(input);
-        },
-    ),
+        }
+    )
 );
 
 export const copyResource = command(
@@ -320,14 +387,20 @@ export const copyResource = command(
     withRemoteLogging(
         "resources.copyResource",
         "command",
-        async ({ resourceId, targetWorkspaceId }: v.InferOutput<typeof TransferResourceInput>) => {
+        async ({
+            resourceId,
+            targetWorkspaceId,
+        }: v.InferOutput<typeof TransferResourceInput>) => {
             await requireResourceAccess(resourceId);
             await requireWorkspaceAccess(targetWorkspaceId);
-            const copied = await copyResourceRecord(resourceId, targetWorkspaceId);
+            const copied = await copyResourceRecord(
+                resourceId,
+                targetWorkspaceId
+            );
             await refreshResourceQueries();
             return copied;
-        },
-    ),
+        }
+    )
 );
 
 export const moveResource = command(
@@ -335,14 +408,20 @@ export const moveResource = command(
     withRemoteLogging(
         "resources.moveResource",
         "command",
-        async ({ resourceId, targetWorkspaceId }: v.InferOutput<typeof TransferResourceInput>) => {
+        async ({
+            resourceId,
+            targetWorkspaceId,
+        }: v.InferOutput<typeof TransferResourceInput>) => {
             await requireResourceAccess(resourceId);
             await requireWorkspaceAccess(targetWorkspaceId);
-            const moved = await moveResourceRecord(resourceId, targetWorkspaceId);
+            const moved = await moveResourceRecord(
+                resourceId,
+                targetWorkspaceId
+            );
             await refreshResourceQueries();
             return moved;
-        },
-    ),
+        }
+    )
 );
 
 export const updateResourceCompose = command(
@@ -350,11 +429,14 @@ export const updateResourceCompose = command(
     withRemoteLogging(
         "resources.updateResourceCompose",
         "command",
-        async ({ compose, resourceId }: v.InferOutput<typeof UpdateResourceComposeInput>) => {
+        async ({
+            compose,
+            resourceId,
+        }: v.InferOutput<typeof UpdateResourceComposeInput>) => {
             await requireResourceAccess(resourceId);
             return await updateResourceComposeRecord(resourceId, compose);
-        },
-    ),
+        }
+    )
 );
 
 export const previewResourceCompose = command(
@@ -362,11 +444,14 @@ export const previewResourceCompose = command(
     withRemoteLogging(
         "resources.previewResourceCompose",
         "command",
-        async ({ compose, resourceId }: v.InferOutput<typeof UpdateResourceComposeInput>) => {
+        async ({
+            compose,
+            resourceId,
+        }: v.InferOutput<typeof UpdateResourceComposeInput>) => {
             await requireResourceAccess(resourceId);
             return await previewResourceComposeRecord(resourceId, compose);
-        },
-    ),
+        }
+    )
 );
 
 export const updateEnvironmentVariables = command(
@@ -374,11 +459,14 @@ export const updateEnvironmentVariables = command(
     withRemoteLogging(
         "resources.updateEnvironmentVariables",
         "command",
-        async ({ resourceId, variables }: v.InferOutput<typeof UpdateResourceEnvironmentInput>) => {
+        async ({
+            resourceId,
+            variables,
+        }: v.InferOutput<typeof UpdateResourceEnvironmentInput>) => {
             await requireResourceAccess(resourceId);
             return await replaceEnvironmentVariables(resourceId, variables);
-        },
-    ),
+        }
+    )
 );
 
 export const updateResourceIdentity = command(
@@ -386,7 +474,11 @@ export const updateResourceIdentity = command(
     withRemoteLogging(
         "resources.updateResourceIdentity",
         "command",
-        async ({ icon, name, resourceId }: v.InferOutput<typeof UpdateResourceIdentityInput>) => {
+        async ({
+            icon,
+            name,
+            resourceId,
+        }: v.InferOutput<typeof UpdateResourceIdentityInput>) => {
             await requireResourceAccess(resourceId);
             const updated = await updateResourceIdentityRecord(resourceId, {
                 icon,
@@ -394,8 +486,8 @@ export const updateResourceIdentity = command(
             });
             await refreshResourceQueries();
             return updated;
-        },
-    ),
+        }
+    )
 );
 
 export const updateResourceSettings = command(
@@ -403,13 +495,19 @@ export const updateResourceSettings = command(
     withRemoteLogging(
         "resources.updateResourceSettings",
         "command",
-        async ({ resourceId, settings }: v.InferOutput<typeof UpdateResourceSettingsInput>) => {
+        async ({
+            resourceId,
+            settings,
+        }: v.InferOutput<typeof UpdateResourceSettingsInput>) => {
             await requireResourceAccess(resourceId);
-            const updated = await updateResourceSettingsRecord(resourceId, settings);
+            const updated = await updateResourceSettingsRecord(
+                resourceId,
+                settings
+            );
             await refreshResourceQueries();
             return updated;
-        },
-    ),
+        }
+    )
 );
 
 export const deployResource = command(
@@ -421,8 +519,8 @@ export const deployResource = command(
             await requireResourceAccess(resourceId);
             return await deployResourceRecord(resourceId);
         },
-        { inputKey: "resourceId" },
-    ),
+        { inputKey: "resourceId" }
+    )
 );
 
 export const deleteResource = command(
@@ -434,6 +532,6 @@ export const deleteResource = command(
             await requireResourceAccess(resourceId);
             return await deleteResourceRecord(resourceId);
         },
-        { inputKey: "resourceId" },
-    ),
+        { inputKey: "resourceId" }
+    )
 );

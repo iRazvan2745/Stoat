@@ -6,7 +6,9 @@ const ESC = "\u001B";
 
 describe("parseAnsiLogLines", () => {
     it("renders SGR colors and styles as structured segments", () => {
-        const lines = parseAnsiLogLines(`${ESC}[2mmuted ${ESC}[32mgreen${ESC}[0m plain`);
+        const lines = parseAnsiLogLines(
+            `${ESC}[2mmuted ${ESC}[32mgreen${ESC}[0m plain`
+        );
 
         expect(lines).toEqual([
             [
@@ -57,11 +59,15 @@ describe("parseAnsiLogLines", () => {
             style: { foreground: { kind: "named", name: "red" } },
             text: "second",
         });
-        expect(stripAnsi(`${ESC}[31mfirst\nsecond${ESC}[0m\r`)).toBe("first\nsecond");
+        expect(stripAnsi(`${ESC}[31mfirst\nsecond${ESC}[0m\r`)).toBe(
+            "first\nsecond"
+        );
     });
 
     it("supports 256-color and true-color SGR values", () => {
-        const [line] = parseAnsiLogLines(`${ESC}[38;5;123mindexed${ESC}[48;2;1;2;3mrgb${ESC}[0m`);
+        const [line] = parseAnsiLogLines(
+            `${ESC}[38;5;123mindexed${ESC}[48;2;1;2;3mrgb${ESC}[0m`
+        );
 
         expect(line).toEqual([
             {

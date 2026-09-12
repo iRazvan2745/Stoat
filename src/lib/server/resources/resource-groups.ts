@@ -20,11 +20,12 @@ type OrderedResourceRow = Omit<ResourceOrderRow, "sortOrder"> & {
 type DbExecutor = Pick<typeof db, "select" | "update">;
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-const asExecutor = (tx: DbTransaction): DbExecutor => tx as unknown as DbExecutor;
+const asExecutor = (tx: DbTransaction): DbExecutor =>
+    tx as unknown as DbExecutor;
 
 const listResourceOrderRows = async (
     executor: DbExecutor,
-    workspaceId: string,
+    workspaceId: string
 ): Promise<ResourceOrderRow[]> =>
     await executor
         .select({
@@ -41,24 +42,40 @@ const listResourceOrderRows = async (
 const materializePendingOrders = async (
     executor: DbExecutor,
     workspaceId: string,
-    rows: ResourceOrderRow[],
+    rows: ResourceOrderRow[]
 ): Promise<OrderedResourceRow[]> => {
-    const maxOrder = rows.reduce(
-        (max, row) => (row.sortOrder === null ? max : Math.max(max, row.sortOrder)),
-        Number.NEGATIVE_INFINITY,
-    );
-    let next = maxOrder === Number.NEGATIVE_INFINITY ? 0 : maxOrder + ORDER_SPACING;
+    let maxOrder = Number.NEGATIVE_INFINITY;
+    for (const row of rows) {
+        if (row.sortOrder !== null) {
+            maxOrder = Math.max(maxOrder, row.sortOrder);
+        }
+    }
+
+    let next =
+        maxOrder === Number.NEGATIVE_INFINITY ? 0 : maxOrder + ORDER_SPACING;
+    const updates: PromiseLike<unknown>[] = [];
+
     for (const row of rows) {
         if (row.sortOrder !== null) {
             continue;
         }
-        await executor
-            .update(resources)
-            .set({ sortOrder: next })
-            .where(and(eq(resources.id, row.id), eq(resources.workspaceId, workspaceId)));
+
+        updates.push(
+            executor
+                .update(resources)
+                .set({ sortOrder: next })
+                .where(
+                    and(
+                        eq(resources.id, row.id),
+                        eq(resources.workspaceId, workspaceId)
+                    )
+                )
+        );
         row.sortOrder = next;
         next += ORDER_SPACING;
     }
+
+    await Promise.all(updates);
     return rows as OrderedResourceRow[];
 };
 
@@ -67,24 +84,39 @@ const materializePendingOrders = async (
 const renormalizeOrders = async (
     executor: DbExecutor,
     workspaceId: string,
-    rows: OrderedResourceRow[],
+    rows: OrderedResourceRow[]
 ): Promise<void> => {
+    const updates: PromiseLike<unknown>[] = [];
+
     for (const [index, row] of rows.entries()) {
         const sortOrder = index * ORDER_SPACING;
         if (row.sortOrder === sortOrder) {
             continue;
         }
-        await executor
-            .update(resources)
-            .set({ sortOrder })
-            .where(and(eq(resources.id, row.id), eq(resources.workspaceId, workspaceId)));
+
+        updates.push(
+            executor
+                .update(resources)
+                .set({ sortOrder })
+                .where(
+                    and(
+                        eq(resources.id, row.id),
+                        eq(resources.workspaceId, workspaceId)
+                    )
+                )
+        );
         row.sortOrder = sortOrder;
     }
+
+    await Promise.all(updates);
 };
 
 // Order for a resource appended to the end of a group (null = ungrouped end,
 // which is also where brand new groups start).
-const appendOrderFor = (rows: OrderedResourceRow[], groupName: string | null): number => {
+const appendOrderFor = (
+    rows: OrderedResourceRow[],
+    groupName: string | null
+): number => {
     const endOrder = (rows.at(-1)?.sortOrder ?? -ORDER_SPACING) + ORDER_SPACING;
     if (groupName === null) {
         return endOrder;
@@ -99,7 +131,7 @@ const appendOrderFor = (rows: OrderedResourceRow[], groupName: string | null): n
 export const updateResourceGroup = async (
     workspaceId: string,
     resourceId: string,
-    groupName: string | null,
+    groupName: string | null
 ): Promise<void> => {
     // Serialize ordering writes per workspace so two concurrent moves cannot
     // assign duplicate sortOrder values; the whole read-modify-write runs in
@@ -108,14 +140,23 @@ export const updateResourceGroup = async (
         await db.transaction(async (tx) => {
             const executor = asExecutor(tx);
             const pending = await listResourceOrderRows(executor, workspaceId);
-            const rows = await materializePendingOrders(executor, workspaceId, pending);
+            const rows = await materializePendingOrders(
+                executor,
+                workspaceId,
+                pending
+            );
             if (!rows.some((row) => row.id === resourceId)) {
                 throw new Error("Resource is no longer in this workspace");
             }
             await executor
                 .update(resources)
                 .set({ groupName, sortOrder: appendOrderFor(rows, groupName) })
-                .where(and(eq(resources.id, resourceId), eq(resources.workspaceId, workspaceId)));
+                .where(
+                    and(
+                        eq(resources.id, resourceId),
+                        eq(resources.workspaceId, workspaceId)
+                    )
+                );
         });
     });
 };
@@ -123,12 +164,17 @@ export const updateResourceGroup = async (
 export const updateResourceGroupName = async (
     workspaceId: string,
     groupName: string,
-    newGroupName: string | null,
+    newGroupName: string | null
 ): Promise<void> => {
     await db
         .update(resources)
         .set({ groupName: newGroupName })
-        .where(and(eq(resources.workspaceId, workspaceId), eq(resources.groupName, groupName)));
+        .where(
+            and(
+                eq(resources.workspaceId, workspaceId),
+                eq(resources.groupName, groupName)
+            )
+        );
 };
 
 // Places a resource at a new dashboard position. With a target resource the
@@ -141,13 +187,17 @@ export const updateResourcePosition = async (
     workspaceId: string,
     resourceId: string,
     beforeResourceId: string | null,
-    groupName: string | null,
+    groupName: string | null
 ): Promise<void> => {
     await withKeyedLock(`workspace-order:${workspaceId}`, async () => {
         await db.transaction(async (tx) => {
             const executor = asExecutor(tx);
             const pending = await listResourceOrderRows(executor, workspaceId);
-            const rows = await materializePendingOrders(executor, workspaceId, pending);
+            const rows = await materializePendingOrders(
+                executor,
+                workspaceId,
+                pending
+            );
             const moving = rows.find((row) => row.id === resourceId);
             if (!moving) {
                 throw new Error("Resource is no longer in this workspace");
@@ -162,11 +212,13 @@ export const updateResourcePosition = async (
             } else {
                 const before = rows.find((row) => row.id === beforeResourceId);
                 if (!before) {
-                    throw new Error("Target resource is no longer in this workspace");
+                    throw new Error(
+                        "Target resource is no longer in this workspace"
+                    );
                 }
                 if (groupName !== null && groupName !== before.groupName) {
                     throw new Error(
-                        "Group does not match the target resource's group; omit groupName when moving before another resource",
+                        "Group does not match the target resource's group; omit groupName when moving before another resource"
                     );
                 }
                 nextGroupName = before.groupName;
@@ -178,10 +230,13 @@ export const updateResourcePosition = async (
                     }
                     nextOrder = moving.sortOrder;
                 } else {
-                    let previousOrder = previous?.sortOrder ?? before.sortOrder - ORDER_SPACING;
+                    let previousOrder =
+                        previous?.sortOrder ?? before.sortOrder - ORDER_SPACING;
                     if (before.sortOrder - previousOrder < MIN_ORDER_GAP) {
                         await renormalizeOrders(executor, workspaceId, rows);
-                        previousOrder = previous?.sortOrder ?? before.sortOrder - ORDER_SPACING;
+                        previousOrder =
+                            previous?.sortOrder ??
+                            before.sortOrder - ORDER_SPACING;
                     }
                     nextOrder = (previousOrder + before.sortOrder) / 2;
                 }
@@ -190,7 +245,12 @@ export const updateResourcePosition = async (
             await executor
                 .update(resources)
                 .set({ groupName: nextGroupName, sortOrder: nextOrder })
-                .where(and(eq(resources.id, resourceId), eq(resources.workspaceId, workspaceId)));
+                .where(
+                    and(
+                        eq(resources.id, resourceId),
+                        eq(resources.workspaceId, workspaceId)
+                    )
+                );
         });
     });
 };

@@ -43,7 +43,7 @@ const getErrorMessage = (error: unknown, label: string): string =>
         : `Unable to load machines from ${label}.`;
 
 const loadDataSourceMachines = async (
-    source: OrganizationDataSourceConnection,
+    source: OrganizationDataSourceConnection
 ): Promise<{
     dataSource: OrganizationDataSourceStatus;
     items: OrganizationMachine[];
@@ -114,12 +114,15 @@ const loadDataSourceMachines = async (
             })),
         };
     } catch (error) {
-        getRemoteLogger()?.error(error instanceof Error ? error : String(error), {
-            cluster: {
-                dataSourceId: source.id,
-                resource: "machines",
-            },
-        });
+        getRemoteLogger()?.error(
+            error instanceof Error ? error : String(error),
+            {
+                cluster: {
+                    dataSourceId: source.id,
+                    resource: "machines",
+                },
+            }
+        );
         return {
             dataSource: {
                 ...baseDataSource,
@@ -140,22 +143,23 @@ export const listOrganizationMachines = query(
             const session = requireSession();
             const organizationId = await getOrganizationIdForUser(
                 session.user.id,
-                session.session.activeOrganizationId,
+                session.session.activeOrganizationId
             );
 
             if (!organizationId) {
                 kitError(403, "No organization membership");
             }
 
-            const sources = await listDataSourceConnectionsForOrganization(organizationId);
+            const sources =
+                await listDataSourceConnectionsForOrganization(organizationId);
             const results = await Promise.all(
-                sources.map((source) => loadDataSourceMachines(source)),
+                sources.map((source) => loadDataSourceMachines(source))
             );
 
             return {
                 dataSources: results.map((result) => result.dataSource),
                 items: results.flatMap((result) => result.items),
             };
-        },
-    ),
+        }
+    )
 );

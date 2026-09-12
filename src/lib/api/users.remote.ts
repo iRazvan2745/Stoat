@@ -17,7 +17,7 @@ export const getUserSettings = query(
     withRemoteLogging("users.getUserSettings", "query", async () => {
         const session = requireSession();
         return await getUserSettingsRecord(session.user.id);
-    }),
+    })
 );
 
 export const updateUserSettings = command(
@@ -28,6 +28,6 @@ export const updateUserSettings = command(
         async ({ settings }: v.InferOutput<typeof UpdateUserSettingsInput>) => {
             const session = requireSession();
             return await updateUserSettingsRecord(session.user.id, settings);
-        },
-    ),
+        }
+    )
 );

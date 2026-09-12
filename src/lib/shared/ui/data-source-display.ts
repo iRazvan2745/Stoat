@@ -20,7 +20,9 @@ const asString = (value: unknown): string | null =>
  * client-side defence in depth: credentials should already be excluded from
  * API responses, but old data can still contain an embedded token.
  */
-export const redactDisplayedUrl = (value: string | null | undefined): string => {
+export const redactDisplayedUrl = (
+    value: string | null | undefined
+): string => {
     if (!value) {
         return "";
     }
@@ -67,7 +69,11 @@ export const presentDataSource = (value: unknown): DataSourcePresentation => {
 
     return {
         gitRepository: repositoryUrl ? redactDisplayedUrl(repositoryUrl) : null,
-        gitSource: name ?? (repositoryUrl ? redactDisplayedUrl(repositoryUrl) : "Not assigned"),
+        gitSource:
+            name ??
+            (repositoryUrl
+                ? redactDisplayedUrl(repositoryUrl)
+                : "Not assigned"),
         uncloudUrl: asString(source.uncloudUrl) ?? "Unknown endpoint",
     };
 };

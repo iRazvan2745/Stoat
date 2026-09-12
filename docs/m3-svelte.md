@@ -18,14 +18,14 @@ pnpm install m3-svelte vite-plugin-functions-mixins @ktibow/iconset-material-sym
 
 ## Design tokens
 
-| Kind        | Example                                                                       | Where it comes from          |
-| ----------- | ----------------------------------------------------------------------------- | ---------------------------- |
-| Colors      | `--m3c-primary`, `--m3c-surface-container`, `--m3c-tertiary-container-subtle` | Your theme snippet           |
-| Shapes      | `--m3-shape-small`, `--m3-shape-full`                                         | `m3-svelte/etc/styles.css`   |
-| Elevation   | `--m3-elevation-1` … `--m3-elevation-5`                                       | `m3-svelte/etc/styles.css`   |
-| Type        | `--m3-title-large`, `--m3-label-medium`, …                                    | `m3-svelte/etc/styles.css`   |
-| Easing      | `--m3-easing-fast`, `--m3-easing-fast-spatial`                                | `m3-svelte/etc/styles.css`   |
-| Config vars | `--m3v-bottom-offset` (snackbar offset), `--m3v-background`                   | Your CSS, read by components |
+| Kind | Example | Where it comes from |
+| --- | --- | --- |
+| Colors | `--m3c-primary`, `--m3c-surface-container`, `--m3c-tertiary-container-subtle` | Your theme snippet |
+| Shapes | `--m3-shape-small`, `--m3-shape-full` | `m3-svelte/etc/styles.css` |
+| Elevation | `--m3-elevation-1` … `--m3-elevation-5` | `m3-svelte/etc/styles.css` |
+| Type | `--m3-title-large`, `--m3-label-medium`, … | `m3-svelte/etc/styles.css` |
+| Easing | `--m3-easing-fast`, `--m3-easing-fast-spatial` | `m3-svelte/etc/styles.css` |
+| Config vars | `--m3v-bottom-offset` (snackbar offset), `--m3v-background` | Your CSS, read by components |
 
 Mixins (use in your own components too, thanks to the plugin):
 
@@ -100,13 +100,13 @@ Rich, animated menus with CSS anchor positioning, labels, submenus, groups, divi
 
 ### API
 
-| Component                | Props                                                                                                                                                                                                     |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ExpressiveMenu`         | `children` (required), `vibrant`, `open` (default `true`), `submenu`, `anchored`, `label`, `x: "start"\|"end"`, `y: "down"\|"up"`                                                                         |
-| `ExpressiveMenuItem`     | `leadingIcon`, `trailingIcon`, `disabled`, `selected`, `label` (required), `details`, `submenuOpen` (bindable), `badge` (snippet), `submenu` (snippet `(open: boolean)`), `trailing` (snippet), `onclick` |
-| `ExpressiveMenuGroup`    | `children`                                                                                                                                                                                                |
-| `MenuDivider`            | —                                                                                                                                                                                                         |
-| `Menu` (legacy, patched) | `children`, `open`, `anchored`, `x`, `y`                                                                                                                                                                  |
+| Component | Props |
+| --- | --- |
+| `ExpressiveMenu` | `children` (required), `vibrant`, `open` (default `true`), `submenu`, `anchored`, `label`, `x: "start"\|"end"`, `y: "down"\|"up"` |
+| `ExpressiveMenuItem` | `leadingIcon`, `trailingIcon`, `disabled`, `selected`, `label` (required), `details`, `submenuOpen` (bindable), `badge` (snippet), `submenu` (snippet `(open: boolean)`), `trailing` (snippet), `onclick` |
+| `ExpressiveMenuGroup` | `children` |
+| `MenuDivider` | — |
+| `Menu` (legacy, patched) | `children`, `open`, `anchored`, `x`, `y` |
 
 ### Positioning notes
 

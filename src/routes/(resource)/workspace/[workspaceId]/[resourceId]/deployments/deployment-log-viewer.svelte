@@ -10,6 +10,7 @@
     import { attachFollowScroll } from "#lib/shared/ui/follow-scroll";
 
     import type { Deployment } from "./deployment";
+    import DeploymentGitSyncAction from "./deployment-git-sync-action.svelte";
     import DeploymentLogBanner from "./deployment-log-banner.svelte";
     import DeploymentLogEntry from "./deployment-log-entry.svelte";
     import DeploymentLogFilters from "./deployment-log-filters.svelte";
@@ -111,6 +112,10 @@
     stdoutCount={logView.stdoutCount}
 />
 
+{#if deployment?.resourceId}
+    <DeploymentGitSyncAction {logs} resourceId={deployment.resourceId} />
+{/if}
+
 {#if logView.filteredLogEntries.length === 0}
     <div
         class="bg-surface-container-lowest border-outline-variant/40 mt-2 flex min-h-32 items-center justify-center rounded-xl border px-4 text-center"
@@ -133,8 +138,8 @@
         onscroll={handleLogScroll}
     >
         <div {@attach followLogs}>
-            {#if logFilter.current !== "stderr"}
-                <DeploymentLogBanner resourceId={deployment?.resourceId ?? ""} />
+            {#if logFilter.current !== "stderr" && deployment?.resourceId}
+                <DeploymentLogBanner resourceId={deployment.resourceId} />
             {/if}
 
             {#each logView.visibleLogEntries as entry (entry.kind === "text" ? entry.log.id : entry.key)}

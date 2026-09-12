@@ -36,15 +36,22 @@ export function parseResourceSettings(value: unknown): ResourceSettings {
     return settings as ResourceSettings;
 }
 
-export function shouldPrefixResources(settings?: ResourceSettings | null): boolean {
+export function shouldPrefixResources(
+    settings?: ResourceSettings | null
+): boolean {
     return settings?.shouldPrefix !== false;
 }
 
-export function shouldSyncResourceFilesToGit(settings?: ResourceSettings | null): boolean {
+export function shouldSyncResourceFilesToGit(
+    settings?: ResourceSettings | null
+): boolean {
     return settings?.syncFilesToGit !== false;
 }
 
-export function mergeResourceSettings(current: unknown, patch: ResourceSettings): ResourceSettings {
+export function mergeResourceSettings(
+    current: unknown,
+    patch: ResourceSettings
+): ResourceSettings {
     const next = parseResourceSettings(current);
 
     if ("shouldPrefix" in patch) {
@@ -68,9 +75,12 @@ export function mergeResourceSettings(current: unknown, patch: ResourceSettings)
 
 export function prefixChangeWarning(
     currentShouldPrefix: boolean,
-    deployedShouldPrefix?: boolean,
+    deployedShouldPrefix?: boolean
 ): string | undefined {
-    if (deployedShouldPrefix === undefined || currentShouldPrefix === deployedShouldPrefix) {
+    if (
+        deployedShouldPrefix === undefined ||
+        currentShouldPrefix === deployedShouldPrefix
+    ) {
         return undefined;
     }
 

@@ -199,7 +199,7 @@
     <div bind:this={root} class="relative">
         <button
             type="button"
-            class="organization-trigger m3-layer flex min-h-12 w-[min(15rem,100%)] cursor-pointer items-center gap-2.5 overflow-hidden rounded-full border-0 bg-surface-container-high py-1 pr-2.5 pl-1 text-left font-inherit text-on-surface transition-colors hover:bg-secondary-container hover:text-on-secondary-container aria-expanded:bg-secondary-container aria-expanded:text-on-secondary-container"
+            class="organization-trigger m3-layer bg-surface-container-high font-inherit text-on-surface hover:bg-secondary-container hover:text-on-secondary-container aria-expanded:bg-secondary-container aria-expanded:text-on-secondary-container flex min-h-12 w-[min(15rem,100%)] cursor-pointer items-center gap-2.5 overflow-hidden rounded-full border-0 py-1 pr-2.5 pl-1 text-left transition-colors"
             style="anchor-name: --m3-menu-anchor"
             aria-haspopup="menu"
             aria-expanded={menuOpen}
@@ -222,8 +222,7 @@
             </span>
 
             <span class="flex min-w-0 flex-1 flex-col overflow-hidden">
-                <span
-                    class="m3-font-label-small text-on-surface-variant"
+                <span class="m3-font-label-small text-on-surface-variant"
                     >Organization</span
                 >
                 <span

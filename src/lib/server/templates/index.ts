@@ -6,7 +6,11 @@ import * as v from "valibot";
 
 import { parseEnvFile } from "#lib/domain/environment";
 import { ensureSvgNamespace, svglIconUrl } from "#lib/domain/templates";
-import type { ResourceTemplate, TemplateManifest, TemplateVersion } from "#lib/domain/templates";
+import type {
+    ResourceTemplate,
+    TemplateManifest,
+    TemplateVersion,
+} from "#lib/domain/templates";
 
 const TemplateManifestSchema = v.object({
     description: v.pipe(v.string(), v.minLength(1)),
@@ -24,7 +28,8 @@ const LOGO_MEDIA_TYPES = {
     "logo.svg": "image/svg+xml",
 } as const;
 
-export const defaultTemplatesRoot = (): string => path.join(process.cwd(), "templates");
+export const defaultTemplatesRoot = (): string =>
+    path.join(process.cwd(), "templates");
 
 export function assertSafeTemplateSegment(value: string, label: string): void {
     if (!SAFE_SEGMENT.test(value)) {
@@ -62,7 +67,7 @@ const compareVersions = (left: string, right: string): number =>
     });
 
 const findLocalLogo = async (
-    appPath: string,
+    appPath: string
 ): Promise<{
     fileName: (typeof LOGO_FILES)[number];
     filePath: string;
@@ -81,7 +86,7 @@ const findLocalLogo = async (
 const resolveLogo = async (
     appId: string,
     appPath: string,
-    icon?: string,
+    icon?: string
 ): Promise<string | null> => {
     if (await findLocalLogo(appPath)) {
         return `/templates/${encodeURIComponent(appId)}/logo`;
@@ -96,7 +101,7 @@ const resolveLogo = async (
 
 export async function readTemplateLogo(
     appId: string,
-    root = defaultTemplatesRoot(),
+    root = defaultTemplatesRoot()
 ): Promise<{ body: Uint8Array; contentType: string } | null> {
     assertSafeTemplateSegment(appId, "template");
 
@@ -107,7 +112,9 @@ export async function readTemplateLogo(
     }
 
     if (logo.fileName === "logo.svg") {
-        const svg = ensureSvgNamespace(await fs.readFile(logo.filePath, "utf-8"));
+        const svg = ensureSvgNamespace(
+            await fs.readFile(logo.filePath, "utf-8")
+        );
         return {
             body: new TextEncoder().encode(svg),
             contentType: LOGO_MEDIA_TYPES[logo.fileName],
@@ -123,7 +130,7 @@ export async function readTemplateLogo(
 export async function readTemplateIconValue(
     appId: string,
     icon?: string,
-    root = defaultTemplatesRoot(),
+    root = defaultTemplatesRoot()
 ): Promise<string | null> {
     const logo = await readTemplateLogo(appId, root);
 
@@ -166,7 +173,9 @@ const readComposeFile = async (versionPath: string): Promise<string> => {
     throw new Error("Template version is missing a compose file");
 };
 
-const readEnvFile = async (versionPath: string): Promise<{ name: string; value: string }[]> => {
+const readEnvFile = async (
+    versionPath: string
+): Promise<{ name: string; value: string }[]> => {
     const envPath = path.join(versionPath, ".env");
 
     if (!(await isFile(envPath))) {
@@ -182,10 +191,12 @@ const readEnvFile = async (versionPath: string): Promise<{ name: string; value: 
     return parsed.variables;
 };
 
-export async function readTemplateManifest(appPath: string): Promise<TemplateManifest> {
+export async function readTemplateManifest(
+    appPath: string
+): Promise<TemplateManifest> {
     const parsed = v.safeParse(
         TemplateManifestSchema,
-        await readJson(path.join(appPath, "manifest.json")),
+        await readJson(path.join(appPath, "manifest.json"))
     );
 
     if (!parsed.success) {
@@ -195,7 +206,9 @@ export async function readTemplateManifest(appPath: string): Promise<TemplateMan
     return parsed.output;
 }
 
-export async function listTemplates(root = defaultTemplatesRoot()): Promise<ResourceTemplate[]> {
+export async function listTemplates(
+    root = defaultTemplatesRoot()
+): Promise<ResourceTemplate[]> {
     if (!(await isDirectory(root))) {
         return [];
     }
@@ -232,13 +245,15 @@ export async function listTemplates(root = defaultTemplatesRoot()): Promise<Reso
         }
     }
 
-    return templates.toSorted((left, right) => left.name.localeCompare(right.name));
+    return templates.toSorted((left, right) =>
+        left.name.localeCompare(right.name)
+    );
 }
 
 export async function readTemplateVersion(
     appId: string,
     version: string,
-    root = defaultTemplatesRoot(),
+    root = defaultTemplatesRoot()
 ): Promise<TemplateVersion> {
     assertSafeTemplateSegment(appId, "template");
     assertSafeTemplateSegment(version, "version");

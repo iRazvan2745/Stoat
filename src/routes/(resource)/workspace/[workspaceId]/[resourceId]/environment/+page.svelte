@@ -37,7 +37,9 @@
 
     const { params } = $props();
 
-    const variablesQuery = $derived(listEnvironmentVariables(params.resourceId));
+    const variablesQuery = $derived(
+        listEnvironmentVariables(params.resourceId)
+    );
     const savedVariables = $derived(await variablesQuery);
 
     const createDraft = (name = "", value = ""): DraftVariable => ({
@@ -243,9 +245,9 @@
                     Inherited from workspace ({workspaceVars.length})
                 </h2>
                 <p class="m3-font-body-small text-on-surface-variant">
-                    Read-only. Workspace variables are merged in; resource values
-                    win on conflict. Toggle “Show values” in the .env editor to
-                    reveal values.
+                    Read-only. Workspace variables are merged in; resource
+                    values win on conflict. Toggle “Show values” in the .env
+                    editor to reveal values.
                 </p>
             </div>
             {#if workspaceVars.length === 0}

@@ -25,7 +25,7 @@
 <button
     type="button"
     class={[
-        "template-card m3-layer flex h-full min-h-64 cursor-pointer flex-col items-start gap-3 rounded-li border p-5 text-left transition-colors",
+        "template-card m3-layer rounded-li flex h-full min-h-64 cursor-pointer flex-col items-start gap-3 border p-5 text-left transition-colors",
         selected
             ? "border-primary bg-primary-container-subtle"
             : "border-outline-variant bg-surface-container",
@@ -55,7 +55,9 @@
         </h3>
     </div>
 
-    <p class="m3-font-body-medium text-on-surface-variant m-0 line-clamp-3 flex-1">
+    <p
+        class="m3-font-body-medium text-on-surface-variant m-0 line-clamp-3 flex-1"
+    >
         {template.description}
     </p>
 

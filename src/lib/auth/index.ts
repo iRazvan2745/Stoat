@@ -13,7 +13,8 @@ import * as schema from "#lib/db/schema";
 export const isSignupAllowed = (): boolean => ALLOW_SIGNUP;
 
 const appUrl = new URL(APP_URL);
-const authProtocol: "http" | "https" = appUrl.protocol === "http:" ? "http" : "https";
+const authProtocol: "http" | "https" =
+    appUrl.protocol === "http:" ? "http" : "https";
 const authBaseURL = {
     allowedHosts: [appUrl.host, "localhost:*", "127.0.0.1:*", "[::1]:*"],
     fallback: APP_URL,
@@ -51,7 +52,10 @@ export const auth = betterAuth({
                     } catch (error) {
                         evlog.error({
                             action: "auth.provision_default_organization",
-                            error: error instanceof Error ? error.message : String(error),
+                            error:
+                                error instanceof Error
+                                    ? error.message
+                                    : String(error),
                             outcome: "failed",
                             userId: user.id,
                         });

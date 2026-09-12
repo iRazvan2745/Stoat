@@ -1,5 +1,6 @@
 // oxlint-disable func-style
 import { stripAnsi } from "#lib/domain/logs/ansi";
+
 export interface ContainerLogSource {
     id: string;
     label: string;
@@ -37,7 +38,10 @@ function readString(value: unknown): string | undefined {
     return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-function compareLogOrder(left: ContainerLogRecord, right: ContainerLogRecord): number {
+function compareLogOrder(
+    left: ContainerLogRecord,
+    right: ContainerLogRecord
+): number {
     if (left.timestamp === right.timestamp) {
         return left.id - right.id;
     }
@@ -45,7 +49,10 @@ function compareLogOrder(left: ContainerLogRecord, right: ContainerLogRecord): n
     return left.timestamp < right.timestamp ? -1 : 1;
 }
 
-export function composeServiceName(uncloudServiceName: string, prefix?: string): string {
+export function composeServiceName(
+    uncloudServiceName: string,
+    prefix?: string
+): string {
     if (!prefix) {
         return uncloudServiceName;
     }
@@ -72,7 +79,7 @@ export function resolveContainerLabel(
         machineName: string;
         serviceName: string;
     }>,
-    prefix?: string,
+    prefix?: string
 ): string {
     const base = composeServiceName(container.serviceName, prefix);
     const sameBase: {
@@ -91,7 +98,9 @@ export function resolveContainerLabel(
         return base || container.name;
     }
 
-    const sameMachine = sameBase.filter((sibling) => sibling.machineName === container.machineName);
+    const sameMachine = sameBase.filter(
+        (sibling) => sibling.machineName === container.machineName
+    );
 
     if (sameMachine.length <= 1) {
         return `${base}@${container.machineName}`;
@@ -100,12 +109,15 @@ export function resolveContainerLabel(
     return `${base}@${container.shortId ?? container.id.slice(0, 12)}`;
 }
 
-export function parseContainerLogEvent(payload: unknown): ParsedContainerLogEvent | null {
+export function parseContainerLogEvent(
+    payload: unknown
+): ParsedContainerLogEvent | null {
     if (!isRecord(payload)) {
         return null;
     }
 
-    const stream = typeof payload.stream === "string" ? payload.stream : "unknown";
+    const stream =
+        typeof payload.stream === "string" ? payload.stream : "unknown";
 
     if (stream === HEARTBEAT_STREAM) {
         return null;
@@ -126,7 +138,9 @@ export function parseContainerLogEvent(payload: unknown): ParsedContainerLogEven
 
     const metadata = isRecord(payload.metadata) ? payload.metadata : {};
     const containerId =
-        readString(metadata.containerId) ?? readString(metadata.serviceId) ?? "unknown";
+        readString(metadata.containerId) ??
+        readString(metadata.serviceId) ??
+        "unknown";
     const timestamp =
         typeof payload.timestamp === "string" && payload.timestamp.length > 0
             ? payload.timestamp
@@ -142,7 +156,10 @@ export function parseContainerLogEvent(payload: unknown): ParsedContainerLogEven
     };
 }
 
-export function insertLogSorted(logs: ContainerLogRecord[], log: ContainerLogRecord): void {
+export function insertLogSorted(
+    logs: ContainerLogRecord[],
+    log: ContainerLogRecord
+): void {
     const last = logs.at(-1);
 
     if (last === undefined || compareLogOrder(last, log) <= 0) {
@@ -167,7 +184,10 @@ export function insertLogSorted(logs: ContainerLogRecord[], log: ContainerLogRec
     logs.splice(low, 0, log);
 }
 
-export function trimContainerLogs(logs: ContainerLogRecord[], maxLines: number): void {
+export function trimContainerLogs(
+    logs: ContainerLogRecord[],
+    maxLines: number
+): void {
     if (logs.length <= maxLines) {
         return;
     }
@@ -179,7 +199,7 @@ export function filterContainerLogs(
     logs: ContainerLogRecord[],
     selectedIds: readonly string[],
     search = "",
-    stderrOnly = false,
+    stderrOnly = false
 ): ContainerLogRecord[] {
     const query = search.trim().toLowerCase();
 
@@ -193,18 +213,18 @@ export function filterContainerLogs(
         (log) =>
             (selected.size === 0 || selected.has(log.containerId)) &&
             (!stderrOnly || log.stream === "stderr") &&
-            (!query || stripAnsi(log.message).toLowerCase().includes(query)),
+            (!query || stripAnsi(log.message).toLowerCase().includes(query))
     );
 }
 
 export function matchContainerId(
     containers: readonly ContainerLogSource[],
-    containerId: string,
+    containerId: string
 ): ContainerLogSource | undefined {
     return containers.find(
         (container) =>
             container.id === containerId ||
             container.id.startsWith(containerId) ||
-            containerId.startsWith(container.id),
+            containerId.startsWith(container.id)
     );
 }

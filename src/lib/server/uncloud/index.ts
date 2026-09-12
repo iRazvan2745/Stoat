@@ -16,7 +16,9 @@ export const normalizeUncloudUrl = (value: string): string => {
     return URL_SCHEME_PATTERN.test(url) ? url : `http://${url}`;
 };
 
-const authorizationHeaders = (token: string | null): Record<string, string> | undefined =>
+const authorizationHeaders = (
+    token: string | null
+): Record<string, string> | undefined =>
     token ? { Authorization: `Bearer ${token}` } : undefined;
 
 export const createUncloudClient = (connection: UncloudConnection) =>

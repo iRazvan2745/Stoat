@@ -77,9 +77,13 @@
             <LoadingIndicator aria-label="Loading machines" />
         </div>
     {:else if machines.error}
-        <div class="text-error m3-font-body-medium p-6">{machines.error.message}</div>
+        <div class="text-error m3-font-body-medium p-6">
+            {machines.error.message}
+        </div>
     {:else if sourceCount === 0}
-        <div class="text-on-surface-variant m3-font-body-medium px-5 py-10 text-center">
+        <div
+            class="text-on-surface-variant m3-font-body-medium px-5 py-10 text-center"
+        >
             No data sources are configured for this organization.
         </div>
     {:else}
@@ -221,7 +225,9 @@
                                 </td>
 
                                 <td class="px-5 py-4 align-middle">
-                                    <div class="m3-font-body-medium text-on-surface">
+                                    <div
+                                        class="m3-font-body-medium text-on-surface"
+                                    >
                                         {machine.osPrettyName ?? "Unknown OS"}
                                     </div>
                                     <div

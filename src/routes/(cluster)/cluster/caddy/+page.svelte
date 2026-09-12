@@ -83,9 +83,13 @@
             <LoadingIndicator aria-label="Loading Caddy configurations" />
         </div>
     {:else if caddy.error}
-        <div class="text-error m3-font-body-medium p-6">{caddy.error.message}</div>
+        <div class="text-error m3-font-body-medium p-6">
+            {caddy.error.message}
+        </div>
     {:else if configs.length === 0}
-        <div class="text-on-surface-variant m3-font-body-medium px-5 py-10 text-center">
+        <div
+            class="text-on-surface-variant m3-font-body-medium px-5 py-10 text-center"
+        >
             No Caddy configurations are available.
         </div>
     {:else}
@@ -123,8 +127,7 @@
                                             name="caddy-machine"
                                             value={configKey(item)}
                                             checked={selectedConfig === item}
-                                            onchange={() =>
-                                                selectConfig(item)}
+                                            onchange={() => selectConfig(item)}
                                             aria-label={`Show Caddyfile for ${item.config.machineName}`}
                                         />
                                     </RadioAnim1>

@@ -1,6 +1,9 @@
 // oxlint-disable func-style no-await-in-loop promise/avoid-new
 
-import type { ContainerLogRecord, ContainerLogSource } from "#lib/domain/resources/container-logs";
+import type {
+    ContainerLogRecord,
+    ContainerLogSource,
+} from "#lib/domain/resources/container-logs";
 import {
     insertLogSorted,
     matchContainerId,
@@ -12,7 +15,10 @@ import { getResourceDataSource } from "#lib/server/data-sources/data-sources";
 import { formatComposeFile } from "#lib/server/deployments/deployment-compose";
 import type { ResourceContainerInfo } from "#lib/server/resources/resource-containers";
 import { listResourceContainers } from "#lib/server/resources/resource-containers";
-import { getResource, resourceComposePrefix } from "#lib/server/resources/resources";
+import {
+    getResource,
+    resourceComposePrefix,
+} from "#lib/server/resources/resources";
 import { consumeSseJsonStream, isAbortError } from "#lib/server/shared/sse";
 import type { UncloudConnection } from "#lib/server/uncloud";
 import { normalizeUncloudUrl } from "#lib/server/uncloud";
@@ -90,13 +96,15 @@ class EventQueue {
 }
 
 const getErrorMessage = (error: unknown): string =>
-    error instanceof Error && error.message ? error.message : "Unable to stream container logs.";
+    error instanceof Error && error.message
+        ? error.message
+        : "Unable to stream container logs.";
 
 const snapshotOf = (
     containers: ContainerLogSource[],
     logs: ContainerLogRecord[],
     following: boolean,
-    error: string | null,
+    error: string | null
 ): ResourceContainerLogsSnapshot => ({
     containers: [...containers],
     error,
@@ -104,7 +112,10 @@ const snapshotOf = (
     logs: [...logs],
 });
 
-const relabelContainers = (containers: ContainerLogSource[], prefix?: string): void => {
+const relabelContainers = (
+    containers: ContainerLogSource[],
+    prefix?: string
+): void => {
     for (const container of containers) {
         container.label = resolveContainerLabel(
             {
@@ -115,7 +126,7 @@ const relabelContainers = (containers: ContainerLogSource[], prefix?: string): v
                 shortId: container.id.slice(0, 12),
             },
             containers,
-            prefix,
+            prefix
         );
     }
 };
@@ -123,7 +134,7 @@ const relabelContainers = (containers: ContainerLogSource[], prefix?: string): v
 const toLogSource = (
     container: ResourceContainerInfo,
     siblings: ResourceContainerInfo[],
-    prefix?: string,
+    prefix?: string
 ): ContainerLogSource => ({
     id: container.id,
     label: resolveContainerLabel(container, siblings, prefix),
@@ -139,7 +150,7 @@ const upsertLogSource = (
         machineName: string;
         serviceName: string;
     },
-    prefix?: string,
+    prefix?: string
 ): ContainerLogSource => {
     const existing = matchContainerId(containers, event.containerId);
 
@@ -161,9 +172,14 @@ const upsertLogSource = (
     return source;
 };
 
-const buildResourceLogsUrl = (connection: UncloudConnection, uncloudServiceId: string): string => {
+const buildResourceLogsUrl = (
+    connection: UncloudConnection,
+    uncloudServiceId: string
+): string => {
     const base = normalizeUncloudUrl(connection.uncloudUrl);
-    const url = new URL(`${base}/api/v1/services/${encodeURIComponent(uncloudServiceId)}/logs`);
+    const url = new URL(
+        `${base}/api/v1/services/${encodeURIComponent(uncloudServiceId)}/logs`
+    );
 
     url.searchParams.set("follow", "true");
     url.searchParams.set("tail", String(LOG_TAIL));
@@ -174,18 +190,21 @@ const buildResourceLogsUrl = (connection: UncloudConnection, uncloudServiceId: s
 const openResourceLogStream = async (
     connection: UncloudConnection,
     uncloudServiceId: string,
-    signal: AbortSignal,
+    signal: AbortSignal
 ): Promise<Response | null> => {
     try {
-        const response = await fetch(buildResourceLogsUrl(connection, uncloudServiceId), {
-            headers: {
-                Accept: "text/event-stream",
-                ...(connection.uncloudToken
-                    ? { Authorization: `Bearer ${connection.uncloudToken}` }
-                    : {}),
-            },
-            signal,
-        });
+        const response = await fetch(
+            buildResourceLogsUrl(connection, uncloudServiceId),
+            {
+                headers: {
+                    Accept: "text/event-stream",
+                    ...(connection.uncloudToken
+                        ? { Authorization: `Bearer ${connection.uncloudToken}` }
+                        : {}),
+                },
+                signal,
+            }
+        );
 
         if (response.status === 404) {
             await response.body?.cancel();
@@ -195,7 +214,7 @@ const openResourceLogStream = async (
         if (!response.ok) {
             await response.body?.cancel();
             throw new Error(
-                `Uncloud logs API returned HTTP ${response.status} for ${uncloudServiceId}.`,
+                `Uncloud logs API returned HTTP ${response.status} for ${uncloudServiceId}.`
             );
         }
 
@@ -234,7 +253,9 @@ interface ConsumeLogContext {
     signal: AbortSignal;
 }
 
-const prepareResourceLogContext = async (resourceId: string): Promise<PreparedResourceLogs> => {
+const prepareResourceLogContext = async (
+    resourceId: string
+): Promise<PreparedResourceLogs> => {
     const resource = await getResource(resourceId);
 
     if (!resource) {
@@ -247,7 +268,12 @@ const prepareResourceLogContext = async (resourceId: string): Promise<PreparedRe
     if (!resource.value) {
         return {
             ok: false,
-            snapshot: snapshotOf([], [], false, "This resource does not have a compose file yet."),
+            snapshot: snapshotOf(
+                [],
+                [],
+                false,
+                "This resource does not have a compose file yet."
+            ),
         };
     }
 
@@ -267,7 +293,9 @@ const prepareResourceLogContext = async (resourceId: string): Promise<PreparedRe
 
     return {
         connection: await getResourceDataSource(resourceId),
-        containers: listed.items.map((container) => toLogSource(container, listed.items, prefix)),
+        containers: listed.items.map((container) =>
+            toLogSource(container, listed.items, prefix)
+        ),
         listedError: listed.error,
         ok: true,
         prefix,
@@ -277,7 +305,7 @@ const prepareResourceLogContext = async (resourceId: string): Promise<PreparedRe
 
 const collectOpenStreams = (
     connections: PromiseSettledResult<Response | null>[],
-    listedError: string | null,
+    listedError: string | null
 ): { lastError: string | null; streams: Response[] } => {
     const streams: Response[] = [];
     let lastError = listedError;
@@ -298,7 +326,7 @@ const collectOpenStreams = (
 
 const consumeLogResponse = async (
     response: Response,
-    context: ConsumeLogContext,
+    context: ConsumeLogContext
 ): Promise<void> => {
     const { containers, nextLogId, queue, prefix, signal } = context;
 
@@ -308,7 +336,7 @@ const consumeLogResponse = async (
                 kind: "error",
                 message: "Log stream did not include a body.",
             },
-            { kind: "end" },
+            { kind: "end" }
         );
         return;
     }
@@ -340,7 +368,7 @@ const consumeLogResponse = async (
                 nextLogId.value += 1;
                 return Promise.resolve();
             },
-            signal,
+            signal
         );
     } catch (error) {
         if (!(signal.aborted || isAbortError(error))) {
@@ -359,7 +387,7 @@ const isFatalStreamError = (state: LogQueueState): boolean =>
 
 const applyQueueItem = (
     state: LogQueueState,
-    item: QueueItem,
+    item: QueueItem
 ): ResourceContainerLogsSnapshot | null => {
     if (item.kind === "log") {
         insertLogSorted(state.logs, item.log);
@@ -381,7 +409,7 @@ const applyQueueItem = (
 
 function* drainPendingQueue(
     queue: EventQueue,
-    state: LogQueueState,
+    state: LogQueueState
 ): Generator<ResourceContainerLogsSnapshot> {
     let queued = queue.tryNext();
 
@@ -401,7 +429,7 @@ function* drainPendingQueue(
 async function* iterateLogEvents(
     queue: EventQueue,
     state: LogQueueState,
-    signal: AbortSignal,
+    signal: AbortSignal
 ): AsyncGenerator<ResourceContainerLogsSnapshot> {
     while (!signal.aborted) {
         const item = await queue.next();
@@ -441,7 +469,7 @@ async function* iterateLogEvents(
 
 export async function* streamResourceContainerLogs(
     resourceId: string,
-    signal?: AbortSignal,
+    signal?: AbortSignal
 ): AsyncGenerator<ResourceContainerLogsSnapshot> {
     const controller = new AbortController();
     const logs: ContainerLogRecord[] = [];
@@ -466,28 +494,41 @@ export async function* streamResourceContainerLogs(
             return;
         }
 
-        const { connection, containers, listedError, serviceNames, prefix } = prepared;
+        const { connection, containers, listedError, serviceNames, prefix } =
+            prepared;
 
         yield snapshotOf(containers, logs, false, null);
 
         if (serviceNames.length === 0) {
-            yield snapshotOf(containers, logs, false, "Compose file has no services.");
+            yield snapshotOf(
+                containers,
+                logs,
+                false,
+                "Compose file has no services."
+            );
             return;
         }
 
         const connections = await Promise.allSettled(
             serviceNames.map((uncloudServiceId) =>
-                openResourceLogStream(connection, uncloudServiceId, controller.signal),
-            ),
+                openResourceLogStream(
+                    connection,
+                    uncloudServiceId,
+                    controller.signal
+                )
+            )
         );
-        const { lastError, streams } = collectOpenStreams(connections, listedError);
+        const { lastError, streams } = collectOpenStreams(
+            connections,
+            listedError
+        );
 
         if (streams.length === 0) {
             yield snapshotOf(
                 containers,
                 logs,
                 false,
-                lastError ?? "No running containers to stream logs from.",
+                lastError ?? "No running containers to stream logs from."
             );
             return;
         }
@@ -506,10 +547,14 @@ export async function* streamResourceContainerLogs(
         yield* iterateLogEvents(
             queue,
             { containers, logs, openStreams: streams.length },
-            controller.signal,
+            controller.signal
         );
     } catch (error) {
-        if (controller.signal.aborted || signal?.aborted || isAbortError(error)) {
+        if (
+            controller.signal.aborted ||
+            signal?.aborted ||
+            isAbortError(error)
+        ) {
             return;
         }
 

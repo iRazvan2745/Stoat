@@ -11,7 +11,7 @@ export const getOverview = query(
         const session = requireSession();
         const organizationId = await getOrganizationIdForUser(
             session.user.id,
-            session.session.activeOrganizationId,
+            session.session.activeOrganizationId
         );
 
         if (!organizationId) {
@@ -19,5 +19,5 @@ export const getOverview = query(
         }
 
         return await getOrganizationOverview(organizationId);
-    }),
+    })
 );

@@ -21,7 +21,8 @@ export interface DetectedDeploymentFailure {
 export const DEPLOYMENT_FAILURE_CHECKS: readonly DeploymentFailureCheck[] = [
     {
         id: "unsupported-ingress-protocol",
-        matches: (message) => /unsupported protocol for ingress port \d+:\s*\w+/iu.test(message),
+        matches: (message) =>
+            /unsupported protocol for ingress port \d+:\s*\w+/iu.test(message),
         summary: "Ingress port uses an unsupported protocol",
     },
     {
@@ -31,7 +32,8 @@ export const DEPLOYMENT_FAILURE_CHECKS: readonly DeploymentFailureCheck[] = [
     },
     {
         id: "create-deployment-plan",
-        matches: (message) => /create deployment plan for service/iu.test(message),
+        matches: (message) =>
+            /create deployment plan for service/iu.test(message),
         summary: "Unable to create a deployment plan",
     },
     {
@@ -51,13 +53,14 @@ export const DEPLOYMENT_FAILURE_CHECKS: readonly DeploymentFailureCheck[] = [
     },
     {
         id: "invalid-compose",
-        matches: (message) => /Invalid compose YAML|the compose is invalid/iu.test(message),
+        matches: (message) =>
+            /Invalid compose YAML|the compose is invalid/iu.test(message),
         summary: "Compose file is invalid",
     },
 ];
 
 export function detectDeploymentFailure(
-    logs: Iterable<DeploymentFailureLog>,
+    logs: Iterable<DeploymentFailureLog>
 ): DetectedDeploymentFailure | null {
     for (const log of logs) {
         const message = stripAnsi(log.message);

@@ -129,7 +129,9 @@
                     <span class="text-on-surface m3-font-label-large truncate">
                         {user?.name}
                     </span>
-                    <span class="text-on-surface-variant m3-font-body-small truncate">
+                    <span
+                        class="text-on-surface-variant m3-font-body-small truncate"
+                    >
                         {user?.email}
                     </span>
                 </span>

@@ -4,7 +4,7 @@ export const ResourceGroupNameInput = v.pipe(
     v.string(),
     v.trim(),
     v.minLength(1, "Enter a group name"),
-    v.maxLength(80, "Use 80 characters or fewer"),
+    v.maxLength(80, "Use 80 characters or fewer")
 );
 
 export type ResourceFlowItem<T> =
@@ -15,7 +15,7 @@ export type ResourceFlowItem<T> =
 // its first member's position (members keep their relative order inside it)
 // and ungrouped resources as standalone items exactly where they sit.
 export const toResourceFlow = <T extends { groupName: string | null }>(
-    resources: readonly T[],
+    resources: readonly T[]
 ): ResourceFlowItem<T>[] => {
     const items: ResourceFlowItem<T>[] = [];
     const groups = new Map<string, T[]>();

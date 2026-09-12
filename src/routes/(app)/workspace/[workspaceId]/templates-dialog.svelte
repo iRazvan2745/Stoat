@@ -111,14 +111,18 @@
                 <LoadingIndicator aria-label="Loading templates" />
             </div>
         {:else if templatesQuery.error}
-            <p class="text-error m3-font-body-medium">{templatesQuery.error.message}</p>
+            <p class="text-error m3-font-body-medium">
+                {templatesQuery.error.message}
+            </p>
         {:else if templates.length === 0}
             <p class="text-on-surface-variant m3-font-body-medium">
                 No templates found in /templates.
             </p>
         {:else}
             <div class="flex flex-col gap-4">
-                <div class="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(15.5rem,1fr))]">
+                <div
+                    class="grid [grid-template-columns:repeat(auto-fill,minmax(15.5rem,1fr))] gap-3"
+                >
                     {#each templates as template (template.appId)}
                         <TemplateCard
                             {template}
@@ -132,7 +136,9 @@
                     <div class="flex flex-col gap-3">
                         {#if selectedTemplate.versions.length > 1}
                             <div class="flex flex-wrap items-center gap-2">
-                                <p class="text-on-surface-variant m3-font-body-medium">
+                                <p
+                                    class="text-on-surface-variant m3-font-body-medium"
+                                >
                                     Version
                                 </p>
                                 {#each selectedTemplate.versions as version (version.version)}

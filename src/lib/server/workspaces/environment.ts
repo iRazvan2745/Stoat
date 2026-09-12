@@ -2,7 +2,11 @@
 import { asc, eq } from "drizzle-orm";
 
 import { db } from "#lib/db";
-import { resources, workspace, workspaceEnvironmentVariables } from "#lib/db/schema";
+import {
+    resources,
+    workspace,
+    workspaceEnvironmentVariables,
+} from "#lib/db/schema";
 import type { EnvironmentVariable } from "#lib/domain/environment";
 import { mergeEnvironmentVariables } from "#lib/domain/environment";
 import { listEnvironmentVariables as listResourceEnvironmentVariables } from "#lib/server/resources/resource-environment";
@@ -17,7 +21,7 @@ export async function listWorkspaceEnvironmentVariables(workspaceId: string) {
 
 export async function replaceWorkspaceEnvironmentVariables(
     workspaceId: string,
-    variables: readonly EnvironmentVariable[],
+    variables: readonly EnvironmentVariable[]
 ) {
     const [wrk] = await db
         .select({ id: workspace.id })
@@ -44,13 +48,15 @@ export async function replaceWorkspaceEnvironmentVariables(
                     name: variable.name,
                     value: variable.value,
                     workspaceId,
-                })),
+                }))
             )
             .returning();
     });
 }
 
-export async function deleteWorkspaceEnvironmentVariables(workspaceId: string): Promise<void> {
+export async function deleteWorkspaceEnvironmentVariables(
+    workspaceId: string
+): Promise<void> {
     await db
         .delete(workspaceEnvironmentVariables)
         .where(eq(workspaceEnvironmentVariables.workspaceId, workspaceId));
@@ -58,7 +64,7 @@ export async function deleteWorkspaceEnvironmentVariables(workspaceId: string): 
 
 export async function resolveEffectiveEnvironmentVariables(
     workspaceId: string,
-    resourceId: string,
+    resourceId: string
 ): Promise<EnvironmentVariable[]> {
     const [workspaceVars, resourceVars] = await Promise.all([
         listWorkspaceEnvironmentVariables(workspaceId),
@@ -70,7 +76,7 @@ export async function resolveEffectiveEnvironmentVariables(
 }
 
 export async function listEffectiveEnvironmentVariables(
-    resourceId: string,
+    resourceId: string
 ): Promise<EnvironmentVariable[]> {
     const [resource] = await db
         .select({ workspaceId: resources.workspaceId })
@@ -81,5 +87,8 @@ export async function listEffectiveEnvironmentVariables(
         throw new Error("Resource not found");
     }
 
-    return await resolveEffectiveEnvironmentVariables(resource.workspaceId, resourceId);
+    return await resolveEffectiveEnvironmentVariables(
+        resource.workspaceId,
+        resourceId
+    );
 }

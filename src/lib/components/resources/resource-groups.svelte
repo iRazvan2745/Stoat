@@ -15,12 +15,14 @@
         snackbar,
     } from "m3-svelte";
 
-    import { updateResourceGroup, updateResourceGroupName, updateResourcePosition } from "#lib/api/resource-groups.remote";
-    import ResourceIcon from "#lib/components/resources/resource-icon.svelte";
     import {
-        toResourceFlow,
-        type ResourceFlowItem,
-    } from "#lib/domain/resources/groups";
+        updateResourceGroup,
+        updateResourceGroupName,
+        updateResourcePosition,
+    } from "#lib/api/resource-groups.remote";
+    import ResourceIcon from "#lib/components/resources/resource-icon.svelte";
+    import { toResourceFlow } from "#lib/domain/resources/groups";
+    import type { ResourceFlowItem } from "#lib/domain/resources/groups";
 
     interface Resource {
         id: string;
@@ -47,9 +49,9 @@
         dialogFolder === null
             ? null
             : (flow.find(
-                      (item): item is GroupItem =>
-                          item.kind === "group" && item.name === dialogFolder,
-                  ) ?? null),
+                  (item): item is GroupItem =>
+                      item.kind === "group" && item.name === dialogFolder
+              ) ?? null)
     );
     let selectedResource = $state<Resource | null>(null);
     let originalName = $state<string | null>(null);
@@ -138,48 +140,52 @@
     const reducedMotion = (): boolean =>
         window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    const m3Token = (name: string): string =>
-        getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    const m3Token = (tokenName: string): string =>
+        getComputedStyle(document.documentElement)
+            .getPropertyValue(tokenName)
+            .trim();
 
-    const m3Duration = (name: string, fallbackMs: number): number => {
-        const raw = m3Token(name);
+    const m3Duration = (tokenName: string, fallbackMs: number): number => {
+        const raw = m3Token(tokenName);
 
-        const ms = raw.match(/([\d.]+)\s*ms/u);
-        if (ms) {
-            return Number(ms[1]);
+        const milliseconds = raw.match(/(?<value>[\d.]+)\s*ms/u);
+        if (milliseconds?.groups?.value) {
+            return Number(milliseconds.groups.value);
         }
 
-        const seconds = raw.match(/([\d.]+)\s*s/u);
-        if (seconds) {
-            return Number(seconds[1]) * 1000;
+        const seconds = raw.match(/(?<value>[\d.]+)\s*s/u);
+        if (seconds?.groups?.value) {
+            return Number(seconds.groups.value) * 1000;
         }
 
         return fallbackMs;
     };
 
-    const m3Easing = (name: string, fallback: string): string =>
-        m3Token(name) || fallback;
+    const m3Easing = (tokenName: string, fallback: string): string =>
+        m3Token(tokenName) || fallback;
 
-    const zoomMotion = (opening: boolean): { duration: number; easing: string } =>
+    const zoomMotion = (
+        opening: boolean
+    ): { duration: number; easing: string } =>
         opening
             ? {
                   duration: m3Duration("--m3-duration-slow-spatial", 500),
                   easing: m3Easing(
                       "--m3-timing-function-slow-spatial",
-                      "cubic-bezier(0.05, 0.7, 0.1, 1)",
+                      "cubic-bezier(0.05, 0.7, 0.1, 1)"
                   ),
               }
             : {
                   duration: m3Duration("--m3-duration-fast", 200),
                   easing: m3Easing(
                       "--m3-timing-function-fast",
-                      "cubic-bezier(0.3, 0, 0.8, 0.15)",
+                      "cubic-bezier(0.3, 0, 0.8, 0.15)"
                   ),
               };
 
     const zoomDelta = (
         from: DOMRect,
-        to: DOMRect,
+        to: DOMRect
     ): { dx: number; dy: number; sx: number; sy: number } => ({
         dx: from.left + from.width / 2 - (to.left + to.width / 2),
         dy: from.top + from.height / 2 - (to.top + to.height / 2),
@@ -187,9 +193,12 @@
         sy: from.height / to.height,
     });
 
-    const openFolderDialog = (name: string, box: HTMLElement | null): void => {
+    const openFolderDialog = (
+        folderName: string,
+        box: HTMLElement | null
+    ): void => {
         zoomFrom = box?.getBoundingClientRect() ?? null;
-        dialogFolder = name;
+        dialogFolder = folderName;
         folderDialogOpen = true;
         if (reducedMotion() || !zoomFrom) {
             return;
@@ -203,7 +212,7 @@
                 }
                 const { dx, dy, sx, sy } = zoomDelta(
                     zoomFrom,
-                    dialog.getBoundingClientRect(),
+                    dialog.getBoundingClientRect()
                 );
                 dialog.animate(
                     [
@@ -213,7 +222,7 @@
                         },
                         { opacity: 1, transform: "none" },
                     ],
-                    zoomMotion(true),
+                    zoomMotion(true)
                 );
             });
         });
@@ -228,7 +237,7 @@
         }
         const { dx, dy, sx, sy } = zoomDelta(
             zoomFrom,
-            dialog.getBoundingClientRect(),
+            dialog.getBoundingClientRect()
         );
         const animation = dialog.animate(
             [
@@ -238,7 +247,7 @@
                     transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`,
                 },
             ],
-            zoomMotion(false),
+            zoomMotion(false)
         );
         animation.onfinish = () => {
             folderDialogOpen = false;
@@ -250,9 +259,9 @@
         const box = (event.currentTarget as HTMLElement | null)?.closest<
             HTMLElement & { dataset: DOMStringMap }
         >("section.group-box");
-        const name = box?.dataset.folder;
-        if (box && name) {
-            openFolderDialog(name, box);
+        const folderName = box?.dataset.folder;
+        if (box && folderName) {
+            openFolderDialog(folderName, box);
         }
     };
 
@@ -278,7 +287,7 @@
         }
         dropTarget = { kind: "before", resource };
     };
-    const dragOverGroup = (event: DragEvent, name: string): void => {
+    const dragOverGroup = (event: DragEvent, groupName: string): void => {
         if (!dragging) {
             return;
         }
@@ -286,7 +295,7 @@
         if (event.dataTransfer) {
             event.dataTransfer.dropEffect = "move";
         }
-        dropTarget = { kind: "group", name };
+        dropTarget = { kind: "group", name: groupName };
     };
     const dragOverUngroup = (event: DragEvent): void => {
         if (!dragging || dragging.groupName === null) {
@@ -370,7 +379,8 @@
             draggable="false"
             href={`/workspace/${workspaceId}/${resource.id}`}
         >
-            <span class="text-on-surface bg-surface-container-highest grid size-10 shrink-0 place-items-center rounded-full"
+            <span
+                class="text-on-surface bg-surface-container-highest grid size-10 shrink-0 place-items-center rounded-full"
                 ><ResourceIcon
                     icon={resource.icon}
                     type={resource.type}
@@ -381,7 +391,9 @@
             <span class="grid min-w-0"
                 ><span class="m3-font-body-large [overflow-wrap:anywhere]"
                     >{resource.name ?? "Untitled"}</span
-                ><span class="m3-font-body-medium text-on-surface-variant [overflow-wrap:anywhere]">{resource.slug ?? ""}</span
+                ><span
+                    class="m3-font-body-medium text-on-surface-variant [overflow-wrap:anywhere]"
+                    >{resource.slug ?? ""}</span
                 ></span
             >
         </a>
@@ -422,7 +434,8 @@
             title={resource.name ?? "Untitled"}
             aria-label={resource.name ?? "Untitled"}
         >
-            <span class="text-on-surface bg-surface-container-highest grid size-10 shrink-0 place-items-center rounded-full"
+            <span
+                class="text-on-surface bg-surface-container-highest grid size-10 shrink-0 place-items-center rounded-full"
                 ><ResourceIcon
                     icon={resource.icon}
                     type={resource.type}
@@ -431,7 +444,8 @@
                 /></span
             >
             {#if showFolderResourceNames}
-                <span class="m3-font-label-medium text-on-surface max-w-full text-center [overflow-wrap:anywhere]"
+                <span
+                    class="m3-font-label-medium text-on-surface max-w-full text-center [overflow-wrap:anywhere]"
                     >{resource.name ?? "Untitled"}</span
                 >
             {/if}
@@ -479,10 +493,8 @@
     </div>
 {/snippet}
 
-<ul class="m-0 list-none p-4 columns-[300px] [column-gap:8px]">
-    {#each flow as item (item.kind === "group"
-        ? `group:${item.name}`
-        : `resource:${item.resource.id}`)}
+<ul class="m-0 list-none columns-[300px] [column-gap:8px] p-4">
+    {#each flow as item (item.kind === "group" ? `group:${item.name}` : `resource:${item.resource.id}`)}
         {#if item.kind === "group"}
             <li class="mb-2 block w-full min-w-0 break-inside-avoid">
                 <section
@@ -497,11 +509,19 @@
                     ondrop={(event) => void drop(event)}
                 >
                     <div class="flex min-h-12 items-center gap-2">
-                        <span class="bg-surface-container-high text-on-surface-variant grid size-10 shrink-0 place-items-center rounded-full" aria-hidden="true"
+                        <span
+                            class="bg-surface-container-high text-on-surface-variant grid size-10 shrink-0 place-items-center rounded-full"
+                            aria-hidden="true"
                             ><Icon icon={folderIcon} size={20} /></span
                         >
-                        <h2 class="m3-font-title-medium text-on-surface m-0 min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap" title={item.name}>{item.name}</h2>
-                        <span class="m3-font-label-medium text-on-surface-variant bg-surface-container-high shrink-0 rounded-full px-4 py-2 whitespace-nowrap"
+                        <h2
+                            class="m3-font-title-medium text-on-surface m-0 min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+                            title={item.name}
+                        >
+                            {item.name}
+                        </h2>
+                        <span
+                            class="m3-font-label-medium text-on-surface-variant bg-surface-container-high shrink-0 rounded-full px-4 py-2 whitespace-nowrap"
                             >{item.resources.length}
                             {item.resources.length === 1
                                 ? "resource"
@@ -544,7 +564,7 @@
     {/each}
     {#if dragging && dragging.groupName !== null}
         <li
-            class="ungroup-drop-zone m3-font-body-medium text-on-surface-variant outline-outline-variant mb-2 grid min-h-24 w-full min-w-0 place-items-center rounded-xl break-inside-avoid outline-2 outline-dashed outline-offset-[-2px] transition-colors"
+            class="ungroup-drop-zone m3-font-body-medium text-on-surface-variant outline-outline-variant mb-2 grid min-h-24 w-full min-w-0 break-inside-avoid place-items-center rounded-xl outline-2 outline-offset-[-2px] transition-colors outline-dashed"
             class:drop-target={dropTarget?.kind === "ungroup"}
             ondragover={dragOverUngroup}
             ondragleave={dragLeave}
@@ -572,14 +592,20 @@
     }}
 >
     {#if dialogItem}
-        <ul class="dialog-list m-0 grid list-none gap-2 p-0" aria-label={`Resources in ${dialogItem.name}`}>
+        <ul
+            class="dialog-list m-0 grid list-none gap-2 p-0"
+            aria-label={`Resources in ${dialogItem.name}`}
+        >
             {#each dialogItem.resources as resource (resource.id)}
-                <li class="bg-surface-container flex min-w-0 items-center overflow-hidden rounded-md">
+                <li
+                    class="bg-surface-container flex min-w-0 items-center overflow-hidden rounded-md"
+                >
                     <a
                         class="dialog-row m3-layer text-on-surface flex min-h-18 min-w-0 flex-1 items-center gap-4 py-2 pr-2 pl-4 no-underline"
                         href={`/workspace/${workspaceId}/${resource.id}`}
                     >
-                        <span class="text-on-surface bg-surface-container-highest grid size-10 shrink-0 place-items-center rounded-full"
+                        <span
+                            class="text-on-surface bg-surface-container-highest grid size-10 shrink-0 place-items-center rounded-full"
                             ><ResourceIcon
                                 icon={resource.icon}
                                 type={resource.type}
@@ -588,9 +614,11 @@
                             /></span
                         >
                         <span class="grid min-w-0"
-                            ><span class="m3-font-body-large [overflow-wrap:anywhere]"
+                            ><span
+                                class="m3-font-body-large [overflow-wrap:anywhere]"
                                 >{resource.name ?? "Untitled"}</span
-                            ><span class="m3-font-body-medium text-on-surface-variant [overflow-wrap:anywhere]"
+                            ><span
+                                class="m3-font-body-medium text-on-surface-variant [overflow-wrap:anywhere]"
                                 >{resource.slug ?? ""}</span
                             ></span
                         >
@@ -640,7 +668,11 @@
             aria-describedby={errorMessage ? "resource-group-error" : undefined}
         />
         {#if selectedResource && flow.some((item) => item.kind === "group")}
-            <div class="group-choices flex max-h-48 flex-wrap gap-2 overflow-y-auto" role="group" aria-label="Existing groups">
+            <div
+                class="group-choices flex max-h-48 flex-wrap gap-2 overflow-y-auto"
+                role="group"
+                aria-label="Existing groups"
+            >
                 {#each flow as item (item.kind === "group" ? item.name : item.resource.id)}
                     {#if item.kind === "group"}
                         <Chip
@@ -697,7 +729,12 @@
         All resources in “{originalName}” will move to Ungrouped. The group will
         disappear. Your resources will keep running.
     </p>
-    {#if errorMessage}<p class="m3-font-body-medium text-error m-0" role="alert">{errorMessage}</p>{/if}
+    {#if errorMessage}<p
+            class="m3-font-body-medium text-error m-0"
+            role="alert"
+        >
+            {errorMessage}
+        </p>{/if}
     {#snippet buttons()}
         <Button
             variant="text"

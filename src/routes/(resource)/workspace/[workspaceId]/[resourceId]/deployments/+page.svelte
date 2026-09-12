@@ -29,11 +29,6 @@
     let logsLoading = $state(false);
     let logsError = $state<{ message: string }>();
 
-    const waitForNextLogBatch = (): Promise<void> =>
-        new Promise((resolve) => {
-            setTimeout(resolve, 1000);
-        });
-
     $effect(() => {
         const deploymentId = view.current;
         logs = [];
@@ -44,44 +39,49 @@
         }
         let disposed = false;
         let afterId = 0;
+        let refreshTimer: ReturnType<typeof setTimeout> | undefined;
         const consume = async (): Promise<void> => {
             try {
-                while (!disposed) {
-                    // Each request carries the cursor it owns. Refresh the
-                    // ordinary query because an unchanged cursor is a valid
-                    // poll and must still reach the server.
-                    // oxlint-disable-next-line no-await-in-loop
-                    const batchQuery = getDeploymentLogBatch({
-                        afterId,
-                        deploymentId,
-                    });
-                    // oxlint-disable-next-line no-await-in-loop
-                    await batchQuery.refresh();
-                    // oxlint-disable-next-line no-await-in-loop
-                    const batch = await batchQuery;
-                    if (disposed) {
-                        break;
-                    }
+                if (disposed) {
+                    return;
+                }
 
-                    for (const log of batch.logs) {
-                        if (log.id > afterId) {
-                            logs.push(log);
-                        }
-                    }
-                    afterId = Math.max(afterId, batch.nextCursor);
-                    logsLoading = false;
+                // Each request carries the cursor it owns. Refresh the
+                // ordinary query because an unchanged cursor is a valid
+                // poll and must still reach the server.
+                const batchQuery = getDeploymentLogBatch({
+                    afterId,
+                    deploymentId,
+                });
+                await batchQuery.refresh();
+                const batch = await batchQuery;
+                if (disposed) {
+                    return;
+                }
 
-                    if (batch.done) {
-                        break;
-                    }
-
-                    // A full batch may have more history ready immediately;
-                    // otherwise wait for the next deployment log update.
-                    if (!batch.hasMore) {
-                        // oxlint-disable-next-line no-await-in-loop
-                        await waitForNextLogBatch();
+                for (const log of batch.logs) {
+                    if (log.id > afterId) {
+                        logs.push(log);
                     }
                 }
+                afterId = Math.max(afterId, batch.nextCursor);
+                logsLoading = false;
+
+                if (batch.done) {
+                    return;
+                }
+
+                // A full batch may have more history ready immediately;
+                // otherwise wait for the next deployment log update.
+                if (batch.hasMore) {
+                    void consume();
+                    return;
+                }
+
+                refreshTimer = setTimeout(() => {
+                    refreshTimer = undefined;
+                    void consume();
+                }, 1000);
             } catch (error) {
                 if (!disposed) {
                     logsError = {
@@ -100,6 +100,9 @@
         void consume();
         return () => {
             disposed = true;
+            if (refreshTimer !== undefined) {
+                clearTimeout(refreshTimer);
+            }
         };
     });
 
@@ -246,7 +249,7 @@
 
 <svelte:window onpointerdown={handleWindowPointerDown} />
 
-<div class="mx-auto w-full max-w-l">
+<div class="max-w-l mx-auto w-full">
     <header class="mb-4 flex flex-wrap items-center justify-between gap-4">
         <div class="flex min-w-0 flex-col gap-1">
             <h1 class="m3-font-headline-small text-on-surface">Deployments</h1>

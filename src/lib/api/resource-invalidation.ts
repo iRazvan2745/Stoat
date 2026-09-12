@@ -1,4 +1,7 @@
-import { getLatestSuccessfulDeployment, listDeployments } from "#lib/api/deployments.remote";
+import {
+    getLatestSuccessfulDeployment,
+    listDeployments,
+} from "#lib/api/deployments.remote";
 import { listResourceFiles } from "#lib/api/resource-files.remote";
 import {
     getPostgresConnection,
@@ -26,7 +29,7 @@ type ReconnectableResourceQuery =
 
 const getResourceQueries = (
     resourceId: string,
-    workspaceId?: string,
+    workspaceId?: string
 ): RefreshableResourceQuery[] => {
     const queries: RefreshableResourceQuery[] = [
         getLatestSuccessfulDeployment(resourceId),
@@ -45,7 +48,9 @@ const getResourceQueries = (
     return queries;
 };
 
-const getResourceLiveQueries = (resourceId: string): ReconnectableResourceQuery[] => [
+const getResourceLiveQueries = (
+    resourceId: string
+): ReconnectableResourceQuery[] => [
     listDeployments(resourceId),
     streamResourceContainerLogs(resourceId),
 ];
@@ -53,10 +58,12 @@ const getResourceLiveQueries = (resourceId: string): ReconnectableResourceQuery[
 /** Refreshes every client-side remote query associated with a resource. */
 export const invalidateResource = async (
     resourceId: string,
-    workspaceId?: string,
+    workspaceId?: string
 ): Promise<void> => {
     await Promise.all([
-        ...getResourceQueries(resourceId, workspaceId).map((query) => query.refresh()),
+        ...getResourceQueries(resourceId, workspaceId).map((query) =>
+            query.refresh()
+        ),
         ...getResourceLiveQueries(resourceId).map((query) => query.reconnect()),
     ]);
 };

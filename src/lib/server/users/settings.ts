@@ -2,7 +2,8 @@ import { eq } from "drizzle-orm";
 
 import { db } from "#lib/db";
 import { userSettings } from "#lib/db/schema";
-import { mergeUserSettings, type UserSettings } from "#lib/domain/users/settings";
+import { mergeUserSettings } from "#lib/domain/users/settings";
+import type { UserSettings } from "#lib/domain/users/settings";
 
 export async function getUserSettings(userId: string): Promise<UserSettings> {
     const [row] = await db
@@ -15,7 +16,7 @@ export async function getUserSettings(userId: string): Promise<UserSettings> {
 
 export async function updateUserSettings(
     userId: string,
-    patch: UserSettings,
+    patch: UserSettings
 ): Promise<UserSettings> {
     const current = await getUserSettings(userId);
     const next = mergeUserSettings(current, patch);

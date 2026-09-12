@@ -26,7 +26,9 @@ describe("createUncloudClient", () => {
                 uncloudToken: "workspace-token",
                 uncloudUrl: `127.0.0.1:${port}`,
             });
-            const { data, response } = await client.GET("/api/v1/cluster/domain");
+            const { data, response } = await client.GET(
+                "/api/v1/cluster/domain"
+            );
 
             expect(response.status).toBe(200);
             expect(data?.domain).toBe("example.internal");

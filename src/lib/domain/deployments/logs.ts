@@ -19,7 +19,13 @@ export interface ParsedDeploymentProgress {
     target: string;
 }
 
-export type DeploymentLogSection = "complete" | "deploy" | "error" | "git" | "plan" | "prepare";
+export type DeploymentLogSection =
+    | "complete"
+    | "deploy"
+    | "error"
+    | "git"
+    | "plan"
+    | "prepare";
 
 export type DeploymentLogEntry =
     | {
@@ -41,7 +47,13 @@ export type DeploymentLogEntry =
           log: DeploymentLogRecord;
       };
 
-export type LogHighlightKind = "default" | "info" | "keyword" | "number" | "path" | "success";
+export type LogHighlightKind =
+    | "default"
+    | "info"
+    | "keyword"
+    | "number"
+    | "path"
+    | "success";
 
 export interface HighlightedLogSegment {
     kind: LogHighlightKind;
@@ -62,14 +74,16 @@ function classifyHighlight(text: string): LogHighlightKind {
 
     if (
         /complete|success|started|finished|ready|healthy|running|deployed|updated|removed|created|pulled|built|pushed|restarted|stopped/iu.test(
-            text,
+            text
         )
     ) {
         return "success";
     }
 
     if (
-        /deploying|pulling|creating|starting|stopping|removing|building|pushing|wrote/iu.test(text)
+        /deploying|pulling|creating|starting|stopping|removing|building|pushing|wrote/iu.test(
+            text
+        )
     ) {
         return "info";
     }
@@ -111,7 +125,9 @@ export function highlightLogMessage(message: string): HighlightedLogSegment[] {
         segments.push({ kind: "default", text: cleanMessage.slice(lastIndex) });
     }
 
-    return segments.length > 0 ? segments : [{ kind: "default", text: cleanMessage }];
+    return segments.length > 0
+        ? segments
+        : [{ kind: "default", text: cleanMessage }];
 }
 
 const DEBUG_LOG_PATTERNS: readonly RegExp[] = [
@@ -163,7 +179,8 @@ const BYTE_PROGRESS_PATTERN =
 const PROGRESS_META_PATTERN =
     /\|(?<meta>(?:p=(?:\d+(?:\.\d+)?|undefined))(?:\|c=(?:\d+(?:\.\d+)?|undefined))?(?:\|t=(?:\d+(?:\.\d+)?|undefined))?)$/u;
 
-const PROGRESS_LINE_PATTERN = /^Progress: (?<rest>.+?) phase=(?<phase>\w+) status=(?<status>.+)$/u;
+const PROGRESS_LINE_PATTERN =
+    /^Progress: (?<rest>.+?) phase=(?<phase>\w+) status=(?<status>.+)$/u;
 
 const BYTE_MULTIPLIERS: Record<string, number> = {
     B: 1,
@@ -186,7 +203,7 @@ interface ProgressDisplay {
 }
 
 export function isDebugDeploymentLog(
-    log: Pick<DeploymentLogRecord, "message" | "stream">,
+    log: Pick<DeploymentLogRecord, "message" | "stream">
 ): boolean {
     if (log.stream === "stderr") {
         return false;
@@ -196,7 +213,9 @@ export function isDebugDeploymentLog(
         return true;
     }
 
-    return DEBUG_LOG_PATTERNS.some((pattern) => pattern.test(stripAnsi(log.message)));
+    return DEBUG_LOG_PATTERNS.some((pattern) =>
+        pattern.test(stripAnsi(log.message))
+    );
 }
 
 function formatPlanAction(action: string): string {
@@ -267,7 +286,7 @@ export function formatDeployPlanMessage(
         image?: string;
         machine?: string;
         service?: string;
-    }[],
+    }[]
 ): string {
     if (operations.length === 0) {
         return "Deploy plan received with no operations";
@@ -275,7 +294,8 @@ export function formatDeployPlanMessage(
 
     const lines = operations.map((operation) => {
         const parts: string[] = [formatPlanAction(operation.action ?? "run")];
-        const target = operation.service ?? operation.container ?? operation.containerId;
+        const target =
+            operation.service ?? operation.container ?? operation.containerId;
 
         if (target) {
             parts.push(target);
@@ -296,7 +316,7 @@ export function formatDeployPlanMessage(
 }
 
 export function getDeploymentLogSection(
-    log: Pick<DeploymentLogRecord, "message" | "stream">,
+    log: Pick<DeploymentLogRecord, "message" | "stream">
 ): DeploymentLogSection {
     if (log.stream === "stderr") {
         return "error";
@@ -306,7 +326,7 @@ export function getDeploymentLogSection(
 
     if (
         /^Deployment queued|^Deployment started|^Parsed compose|^Preparing deployment|^Wrote compose/u.test(
-            message,
+            message
         )
     ) {
         return "prepare";
@@ -314,7 +334,7 @@ export function getDeploymentLogSection(
 
     if (
         /^\s+Pushed |^Added .+ to git index|^Changes detected:|^Changes: |^Checking git status|^Committed changes:|^Compose file is already up to date|^No changes to commit|^Nothing to push|^Pushed configuration|^Pushing changes|^Saved compose changes/u.test(
-            message,
+            message
         )
     ) {
         return "git";
@@ -326,7 +346,7 @@ export function getDeploymentLogSection(
 
     if (
         /^Deploy complete|^Deployed service|^Deployment completed|^Deployment finished/u.test(
-            message,
+            message
         )
     ) {
         return "complete";
@@ -335,7 +355,9 @@ export function getDeploymentLogSection(
     return "deploy";
 }
 
-export function insertLogSectionHeaders(entries: DeploymentLogEntry[]): DeploymentLogEntry[] {
+export function insertLogSectionHeaders(
+    entries: DeploymentLogEntry[]
+): DeploymentLogEntry[] {
     const grouped: DeploymentLogEntry[] = [];
     let currentSection: DeploymentLogSection | undefined;
 
@@ -345,7 +367,10 @@ export function insertLogSectionHeaders(entries: DeploymentLogEntry[]): Deployme
             continue;
         }
 
-        const section = entry.kind === "progress" ? "deploy" : getDeploymentLogSection(entry.log);
+        const section =
+            entry.kind === "progress"
+                ? "deploy"
+                : getDeploymentLogSection(entry.log);
 
         if (section !== currentSection) {
             currentSection = section;
@@ -437,7 +462,10 @@ function getProgressKind(target: string, parent?: string): ProgressKind {
 const IMAGE_TARGET_PATTERN = /^Image (?<name>.+?) on (?<machine>.+)$/u;
 const CONTAINER_TARGET_PATTERN = /^Container (?<name>.+?) on (?<machine>.+)$/u;
 
-const CONTAINER_STATUS_LABELS: Record<string, { done: string; pending: string }> = {
+const CONTAINER_STATUS_LABELS: Record<
+    string,
+    { done: string; pending: string }
+> = {
     created: { done: "Created container", pending: "Creating container" },
     dead: { done: "Container failed", pending: "Container failing" },
     exited: { done: "Stopped container", pending: "Stopping container" },
@@ -462,7 +490,11 @@ function formatImageDisplay(target: string, phase: string): ProgressDisplay {
     };
 }
 
-function formatContainerDisplay(target: string, status: string, phase: string): ProgressDisplay {
+function formatContainerDisplay(
+    target: string,
+    status: string,
+    phase: string
+): ProgressDisplay {
     const match = CONTAINER_TARGET_PATTERN.exec(target);
 
     if (!match?.groups?.name || !match.groups.machine) {
@@ -470,7 +502,10 @@ function formatContainerDisplay(target: string, status: string, phase: string): 
     }
 
     const labels = CONTAINER_STATUS_LABELS[status.toLowerCase()];
-    const action = labels ? (phase === "done" ? labels.done : labels.pending) : "Container";
+    let action = "Container";
+    if (labels) {
+        action = phase === "done" ? labels.done : labels.pending;
+    }
 
     return {
         detail: `Machine: ${match.groups.machine}`,
@@ -483,7 +518,7 @@ function formatProgressLabel(
     parent: string | undefined,
     status: string,
     kind: ProgressKind,
-    phase: string,
+    phase: string
 ): ProgressDisplay {
     if (kind === "image") {
         return formatImageDisplay(target, phase);
@@ -504,7 +539,7 @@ function parseStatusPercent(
     status: string,
     percent?: number,
     current?: number,
-    total?: number,
+    total?: number
 ): number | undefined {
     if (percent !== undefined && Number.isFinite(percent)) {
         return Math.min(100, Math.max(0, percent));
@@ -531,8 +566,14 @@ function parseStatusPercent(
         return undefined;
     }
 
-    const parsedCurrent = parseBytes(byteMatch.groups.current, byteMatch.groups.currentUnit);
-    const parsedTotal = parseBytes(byteMatch.groups.total, byteMatch.groups.totalUnit);
+    const parsedCurrent = parseBytes(
+        byteMatch.groups.current,
+        byteMatch.groups.currentUnit
+    );
+    const parsedTotal = parseBytes(
+        byteMatch.groups.total,
+        byteMatch.groups.totalUnit
+    );
 
     if (parsedTotal <= 0) {
         return undefined;
@@ -541,7 +582,9 @@ function parseStatusPercent(
     return Math.min(100, Math.max(0, (parsedCurrent / parsedTotal) * 100));
 }
 
-function aggregateImagePercent(layers: Map<string, LayerProgress> | undefined): number | undefined {
+function aggregateImagePercent(
+    layers: Map<string, LayerProgress> | undefined
+): number | undefined {
     if (!layers || layers.size === 0) {
         return undefined;
     }
@@ -561,7 +604,9 @@ function aggregateImagePercent(layers: Map<string, LayerProgress> | undefined): 
     return Math.min(100, Math.max(0, (current / total) * 100));
 }
 
-export function parseDeploymentProgress(message: string): ParsedDeploymentProgress | null {
+export function parseDeploymentProgress(
+    message: string
+): ParsedDeploymentProgress | null {
     const line = stripAnsi(message).split("\n")[0] ?? "";
     const progressMatch = PROGRESS_LINE_PATTERN.exec(line);
 
@@ -569,15 +614,31 @@ export function parseDeploymentProgress(message: string): ParsedDeploymentProgre
         return null;
     }
 
-    const { parent, target } = parseTargetAndParent(progressMatch.groups.rest ?? "");
+    const { parent, target } = parseTargetAndParent(
+        progressMatch.groups.rest ?? ""
+    );
     const phase = progressMatch.groups.phase ?? "unknown";
     const meta = parseProgressMeta(progressMatch.groups.status ?? "");
     const kind = getProgressKind(target, parent);
-    const percent = parseStatusPercent(meta.status, meta.percent, meta.current, meta.total);
-    const display = formatProgressLabel(target, parent, meta.status, kind, phase);
+    const percent = parseStatusPercent(
+        meta.status,
+        meta.percent,
+        meta.current,
+        meta.total
+    );
+    const display = formatProgressLabel(
+        target,
+        parent,
+        meta.status,
+        kind,
+        phase
+    );
     const isDone = phase === "done";
     const resolvedPercent =
-        percent ?? (isDone && (kind === "image" || kind === "container") ? 100 : undefined);
+        percent ??
+        (isDone && (kind === "image" || kind === "container")
+            ? 100
+            : undefined);
 
     return {
         detail: display.detail,
@@ -598,7 +659,7 @@ function updateLayerProgress(
     status: string,
     percent?: number,
     current?: number,
-    total?: number,
+    total?: number
 ): void {
     const parsedPercent = parseStatusPercent(status, percent, current, total);
 
@@ -606,7 +667,8 @@ function updateLayerProgress(
         return;
     }
 
-    const layers = layersByImage.get(parent) ?? new Map<string, LayerProgress>();
+    const layers =
+        layersByImage.get(parent) ?? new Map<string, LayerProgress>();
     const byteMatch = BYTE_PROGRESS_PATTERN.exec(status);
     const layerTotal =
         total ??
@@ -623,7 +685,9 @@ function updateLayerProgress(
     layersByImage.set(parent, layers);
 }
 
-export function buildDeploymentLogEntries(logs: DeploymentLogRecord[]): DeploymentLogEntry[] {
+export function buildDeploymentLogEntries(
+    logs: DeploymentLogRecord[]
+): DeploymentLogEntry[] {
     const entries: DeploymentLogEntry[] = [];
     const progressIndexes = new Map<string, number>();
     const layersByImage = new Map<string, Map<string, LayerProgress>>();
@@ -660,17 +724,25 @@ export function buildDeploymentLogEntries(logs: DeploymentLogRecord[]): Deployme
                 parsed.status,
                 meta.percent,
                 meta.current,
-                meta.total,
+                meta.total
             );
 
-            const aggregatePercent = aggregateImagePercent(layersByImage.get(parsed.parent));
-            const imageDisplay = formatImageDisplay(parsed.parent, parsed.phase);
+            const aggregatePercent = aggregateImagePercent(
+                layersByImage.get(parsed.parent)
+            );
+            const imageDisplay = formatImageDisplay(
+                parsed.parent,
+                parsed.phase
+            );
             const imageProgress: ParsedDeploymentProgress = {
                 detail: imageDisplay.detail,
-                indeterminate: aggregatePercent === undefined && parsed.phase !== "done",
+                indeterminate:
+                    aggregatePercent === undefined && parsed.phase !== "done",
                 label: imageDisplay.label,
                 parent: parsed.parent,
-                percent: aggregatePercent ?? (parsed.phase === "done" ? 100 : undefined),
+                percent:
+                    aggregatePercent ??
+                    (parsed.phase === "done" ? 100 : undefined),
                 phase: parsed.phase,
                 status: parsed.status,
                 target: parsed.parent,

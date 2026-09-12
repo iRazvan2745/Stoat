@@ -23,7 +23,7 @@ export interface DeployEventPayload {
 
 export function formatDeployStreamEvent(
     eventName: string,
-    payload: DeployEventPayload,
+    payload: DeployEventPayload
 ): { stream: "stdout" | "stderr"; message: string; isError: boolean } {
     if (eventName === "plan") {
         const operations = payload.operations ?? [];
@@ -41,9 +41,15 @@ export function formatDeployStreamEvent(
         const phase = payload.phase ?? "unknown";
         const statusText = payload.statusText ?? payload.status ?? "updated";
         const progressMeta = [
-            typeof payload.percent === "number" ? `p=${payload.percent}` : undefined,
-            typeof payload.current === "number" ? `c=${payload.current}` : undefined,
-            typeof payload.total === "number" ? `t=${payload.total}` : undefined,
+            typeof payload.percent === "number"
+                ? `p=${payload.percent}`
+                : undefined,
+            typeof payload.current === "number"
+                ? `c=${payload.current}`
+                : undefined,
+            typeof payload.total === "number"
+                ? `t=${payload.total}`
+                : undefined,
         ]
             .filter((value): value is string => value !== undefined)
             .join("|");
@@ -82,7 +88,7 @@ export function formatDeployStreamEvent(
 
 export async function consumeDeployStream(
     response: Response,
-    log: (stream: "stdout" | "stderr", message: string) => Promise<void>,
+    log: (stream: "stdout" | "stderr", message: string) => Promise<void>
 ): Promise<void> {
     if (!response.body) {
         throw new Error("Deploy response did not include a stream body");
@@ -105,7 +111,10 @@ export async function consumeDeployStream(
         try {
             payload = JSON.parse(payloadText) as DeployEventPayload;
         } catch {
-            await log("stderr", `Malformed deploy event payload: ${payloadText}`);
+            await log(
+                "stderr",
+                `Malformed deploy event payload: ${payloadText}`
+            );
             eventName = "message";
             dataLines = [];
             return;

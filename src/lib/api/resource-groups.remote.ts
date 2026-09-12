@@ -29,25 +29,42 @@ const UpdateResourcePositionInput = v.object({
     workspaceId: v.string(),
 });
 
-export const updateResourceGroup = command(UpdateResourceGroupInput, async (input) => {
-    await requireWorkspaceAccess(input.workspaceId);
-    await updateResourceGroupRecord(input.workspaceId, input.resourceId, input.groupName);
-    await listResourcesInWorkspace(input.workspaceId).refresh();
-});
+export const updateResourceGroup = command(
+    UpdateResourceGroupInput,
+    async (input) => {
+        await requireWorkspaceAccess(input.workspaceId);
+        await updateResourceGroupRecord(
+            input.workspaceId,
+            input.resourceId,
+            input.groupName
+        );
+        await listResourcesInWorkspace(input.workspaceId).refresh();
+    }
+);
 
-export const updateResourceGroupName = command(UpdateResourceGroupNameInput, async (input) => {
-    await requireWorkspaceAccess(input.workspaceId);
-    await updateResourceGroupNameRecord(input.workspaceId, input.groupName, input.newGroupName);
-    await listResourcesInWorkspace(input.workspaceId).refresh();
-});
+export const updateResourceGroupName = command(
+    UpdateResourceGroupNameInput,
+    async (input) => {
+        await requireWorkspaceAccess(input.workspaceId);
+        await updateResourceGroupNameRecord(
+            input.workspaceId,
+            input.groupName,
+            input.newGroupName
+        );
+        await listResourcesInWorkspace(input.workspaceId).refresh();
+    }
+);
 
-export const updateResourcePosition = command(UpdateResourcePositionInput, async (input) => {
-    await requireWorkspaceAccess(input.workspaceId);
-    await updateResourcePositionRecord(
-        input.workspaceId,
-        input.resourceId,
-        input.beforeResourceId,
-        input.groupName,
-    );
-    await listResourcesInWorkspace(input.workspaceId).refresh();
-});
+export const updateResourcePosition = command(
+    UpdateResourcePositionInput,
+    async (input) => {
+        await requireWorkspaceAccess(input.workspaceId);
+        await updateResourcePositionRecord(
+            input.workspaceId,
+            input.resourceId,
+            input.beforeResourceId,
+            input.groupName
+        );
+        await listResourcesInWorkspace(input.workspaceId).refresh();
+    }
+);

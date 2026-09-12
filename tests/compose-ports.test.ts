@@ -121,12 +121,14 @@ describe("findPublishedTcpPort", () => {
                     serviceName: "db",
                 },
             ],
-            5432,
+            5432
         );
 
         expect(published?.publishedPort).toBe(5434);
         expect(
-            findPublishedTcpPort([{ containerPort: 80, protocol: "http", serviceName: "web" }]),
+            findPublishedTcpPort([
+                { containerPort: 80, protocol: "http", serviceName: "web" },
+            ])
         ).toBeUndefined();
     });
 });

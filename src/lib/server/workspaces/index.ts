@@ -11,7 +11,10 @@ import {
     workspace,
     workspaceEnvironmentVariables,
 } from "#lib/db/schema";
-import { createWorkspaceFolder, workspacePath } from "#lib/server/data-sources/paths";
+import {
+    createWorkspaceFolder,
+    workspacePath,
+} from "#lib/server/data-sources/paths";
 import { uniqueSlug } from "#lib/server/shared/slugs";
 
 export const listWorkspaces = async (userId: string) => {
@@ -99,7 +102,9 @@ export const deleteWorkspace = async (id: string) => {
             .where(eq(resources.workspaceId, id));
         await tx
             .delete(environmentVariables)
-            .where(inArray(environmentVariables.resourceId, workspaceResources));
+            .where(
+                inArray(environmentVariables.resourceId, workspaceResources)
+            );
         await tx.delete(resources).where(eq(resources.workspaceId, id));
         // workspace_environment_variables.workspace_id is onDelete: "restrict",
         // so workspace-level variables must go before the workspace row.
@@ -107,7 +112,10 @@ export const deleteWorkspace = async (id: string) => {
             .delete(workspaceEnvironmentVariables)
             .where(eq(workspaceEnvironmentVariables.workspaceId, id));
 
-        return await tx.delete(workspace).where(eq(workspace.id, id)).returning();
+        return await tx
+            .delete(workspace)
+            .where(eq(workspace.id, id))
+            .returning();
     });
 
     await fs.rm(workspacePath(id), {

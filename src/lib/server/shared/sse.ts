@@ -2,14 +2,19 @@
 export const isAbortError = (error: unknown): boolean =>
     error instanceof Error && error.name === "AbortError";
 
-type SseEventHandler = (eventName: string, payload: unknown) => Promise<void> | void;
+type SseEventHandler = (
+    eventName: string,
+    payload: unknown
+) => Promise<void> | void;
 
 interface SseParseState {
     dataLines: string[];
     eventName: string;
 }
 
-const cancelReader = async (reader: ReadableStreamDefaultReader<Uint8Array>): Promise<void> => {
+const cancelReader = async (
+    reader: ReadableStreamDefaultReader<Uint8Array>
+): Promise<void> => {
     try {
         await reader.cancel();
     } catch {
@@ -19,7 +24,10 @@ const cancelReader = async (reader: ReadableStreamDefaultReader<Uint8Array>): Pr
     }
 };
 
-const flushEvent = async (state: SseParseState, onEvent: SseEventHandler): Promise<void> => {
+const flushEvent = async (
+    state: SseParseState,
+    onEvent: SseEventHandler
+): Promise<void> => {
     if (state.dataLines.length === 0) {
         state.eventName = "message";
         return;
@@ -45,7 +53,7 @@ const flushEvent = async (state: SseParseState, onEvent: SseEventHandler): Promi
 const applySseLine = async (
     state: SseParseState,
     line: string,
-    onEvent: SseEventHandler,
+    onEvent: SseEventHandler
 ): Promise<void> => {
     if (line.length === 0) {
         await flushEvent(state, onEvent);
@@ -68,7 +76,7 @@ const applySseLine = async (
 
 const readChunk = async (
     reader: ReadableStreamDefaultReader<Uint8Array>,
-    signal?: AbortSignal,
+    signal?: AbortSignal
 ): Promise<ReadableStreamReadResult<Uint8Array> | undefined> => {
     try {
         return await reader.read();
@@ -84,7 +92,7 @@ const readChunk = async (
 export async function consumeSseJsonStream(
     body: ReadableStream<Uint8Array>,
     onEvent: SseEventHandler,
-    signal?: AbortSignal,
+    signal?: AbortSignal
 ): Promise<void> {
     const reader = body.getReader();
     const decoder = new TextDecoder();

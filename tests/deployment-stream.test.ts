@@ -14,10 +14,11 @@ describe("formatDeployStreamEvent", () => {
                         service: "nginx-f7gzq-nginx",
                     },
                 ],
-            }),
+            })
         ).toEqual({
             isError: false,
-            message: "Plan: Start nginx-f7gzq-nginx on machine hazel (image nginx)",
+            message:
+                "Plan: Start nginx-f7gzq-nginx on machine hazel (image nginx)",
             stream: "stdout",
         });
     });
@@ -28,7 +29,7 @@ describe("formatDeployStreamEvent", () => {
                 id: "Container nginx-f7gzq-nginx-3xhi on hazel",
                 phase: "done",
                 status: "Running",
-            }),
+            })
         ).toEqual({
             isError: false,
             message:

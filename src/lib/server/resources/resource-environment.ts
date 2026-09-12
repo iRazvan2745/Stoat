@@ -15,7 +15,7 @@ export async function listEnvironmentVariables(resourceId: string) {
 
 export async function replaceEnvironmentVariables(
     resourceId: string,
-    variables: readonly EnvironmentVariable[],
+    variables: readonly EnvironmentVariable[]
 ) {
     const [resource] = await db
         .select({ id: resources.id })
@@ -42,14 +42,18 @@ export async function replaceEnvironmentVariables(
                     name: variable.name,
                     resourceId,
                     value: variable.value,
-                })),
+                }))
             )
             .returning();
     });
 }
 
-export async function deleteEnvironmentVariablesForResource(resourceId: string): Promise<void> {
-    await db.delete(environmentVariables).where(eq(environmentVariables.resourceId, resourceId));
+export async function deleteEnvironmentVariablesForResource(
+    resourceId: string
+): Promise<void> {
+    await db
+        .delete(environmentVariables)
+        .where(eq(environmentVariables.resourceId, resourceId));
 }
 
 // Deprecated alias for callers still migrating from the services naming.

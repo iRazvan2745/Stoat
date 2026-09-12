@@ -7,7 +7,7 @@ import { createAttachmentKey } from "svelte/attachments";
  * when unrelated props update.
  */
 export function createElementAttachment<T extends HTMLElement>(
-    setter: (element: T | null) => void | (() => void),
+    setter: (element: T | null) => void | (() => void)
 ) {
     const key = createAttachmentKey();
 

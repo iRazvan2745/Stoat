@@ -1,7 +1,10 @@
 import { expect, it } from "vite-plus/test";
 import YAML from "yaml";
 
-import { formatComposeFile, unformatComposeFile } from "#lib/server/deployments/deployment-compose";
+import {
+    formatComposeFile,
+    unformatComposeFile,
+} from "#lib/server/deployments/deployment-compose";
 import {
     assertRepositoryPath,
     canonicalComposePath,
@@ -29,19 +32,19 @@ volumes:
   data:
 `;
 const resource = {
-    id: "res",
-    name: "Web",
-    slug: "web-abc12",
     groupName: "Customer apps",
     icon: null,
-    value: raw,
+    id: "res",
+    name: "Web",
     settings: {},
+    slug: "web-abc12",
+    value: raw,
 };
 const workspace = {
+    dataSourceId: "cluster",
     id: "workspace",
     name: "Production",
     slug: "production-abc12",
-    dataSourceId: "cluster",
 };
 
 it("round-trips formatting and metadata while retaining unformatted app names and comments", () => {
@@ -50,21 +53,25 @@ it("round-trips formatting and metadata while retaining unformatted app names an
     expect(exported).toContain("web-abc12-data:/data");
     expect(exported).toContain('upstreams "web-abc12-db"');
     const decoded = readGitCompose(exported.replace("nginx:1", "nginx:2"));
-    expect(YAML.parse(decoded.raw)).toEqual(YAML.parse(raw.replace("nginx:1", "nginx:2")));
+    expect(YAML.parse(decoded.raw)).toEqual(
+        YAML.parse(raw.replace("nginx:1", "nginx:2"))
+    );
     expect(decoded.raw).toContain("# keep my jokes, clanker");
     expect(decoded.raw).not.toContain("x-stoat");
     expect(decoded.metadata).toMatchObject({
-        resourceId: "res",
         groupName: "Customer apps",
+        resourceId: "res",
         shouldPrefix: true,
     });
 });
 
 it("removes exactly one prefix, including from mapping dependencies, while retaining bind mounts", () => {
     const compose = `services:\n  app-web:\n    depends_on:\n      db: { condition: service_started }\n    volumes:\n      - type: bind\n        source: app-files\n        target: /files\n  db:\n    image: postgres\n`;
-    expect(YAML.parse(unformatComposeFile(formatComposeFile(compose, "app").yaml, "app"))).toEqual(
-        YAML.parse(compose),
-    );
+    expect(
+        YAML.parse(
+            unformatComposeFile(formatComposeFile(compose, "app").yaml, "app")
+        )
+    ).toEqual(YAML.parse(compose));
 });
 
 it("does not infer a prefix for a plain repository Compose", () => {
@@ -74,22 +81,24 @@ it("does not infer a prefix for a plain repository Compose", () => {
 });
 
 it("rejects collisions introduced by conflicting Git names", () => {
-    expect(() => unformatComposeFile("services:\n  app-web: {}\n  web: {}\n", "app")).toThrow(
-        "collide",
-    );
+    expect(() =>
+        unformatComposeFile("services:\n  app-web: {}\n  web: {}\n", "app")
+    ).toThrow("collide");
 });
 
 it("maps workspace, group and resource folders without allowing traversal", () => {
     const relativePath = canonicalComposePath(resource, workspace);
-    expect(relativePath).toBe("production-abc12/Customer%20apps/web-abc12/compose.yaml");
+    expect(relativePath).toBe(
+        "production-abc12/Customer%20apps/web-abc12/compose.yaml"
+    );
     expect(inferComposeLocation(relativePath, "Repository")).toEqual({
-        workspaceName: "production-abc12",
         groupName: "Customer apps",
         resourceName: "web-abc12",
+        workspaceName: "production-abc12",
     });
-    expect(canonicalComposePath({ ...resource, groupName: "../ops" }, workspace)).toContain(
-        "%2E%2E%2Fops",
-    );
+    expect(
+        canonicalComposePath({ ...resource, groupName: "../ops" }, workspace)
+    ).toContain("%2E%2E%2Fops");
     for (const invalid of [
         "../compose.yaml",
         "/compose.yaml",
@@ -97,16 +106,18 @@ it("maps workspace, group and resource folders without allowing traversal", () =
         "a/../compose.yaml",
         "a\\compose.yaml",
     ]) {
-        expect(() => assertRepositoryPath(invalid)).toThrow("Invalid repository path");
+        expect(() => assertRepositoryPath(invalid)).toThrow(
+            "Invalid repository path"
+        );
     }
 });
 
 it("distinguishes local edits, Git edits and conflicts against separate baselines", () => {
     const base = {
-        sourceId: "source",
-        path: "compose.yaml",
         appHash: "app-base",
+        path: "compose.yaml",
         repoHash: "repo-base",
+        sourceId: "source",
     };
     expect(syncDirection("app-base", "repo-base", base)).toBe("unchanged");
     expect(syncDirection("app-edit", "repo-base", base)).toBe("push");

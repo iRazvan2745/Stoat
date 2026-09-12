@@ -20,7 +20,7 @@ describe("parseResourceSettings", () => {
             parseResourceSettings({
                 extra: true,
                 shouldPrefix: false,
-            }),
+            })
         ).toEqual({
             extra: true,
             shouldPrefix: false,
@@ -33,7 +33,7 @@ describe("parseResourceSettings", () => {
                 extra: true,
                 prefix: "prod",
                 shouldPrefix: true,
-            }),
+            })
         ).toEqual({ extra: true });
     });
 });
@@ -52,7 +52,9 @@ describe("shouldPrefixResources", () => {
 
 describe("mergeResourceSettings", () => {
     it("stores an explicit off without dropping other settings", () => {
-        expect(mergeResourceSettings({ extra: 1 }, { shouldPrefix: false })).toEqual({
+        expect(
+            mergeResourceSettings({ extra: 1 }, { shouldPrefix: false })
+        ).toEqual({
             extra: 1,
             shouldPrefix: false,
         });
@@ -60,7 +62,10 @@ describe("mergeResourceSettings", () => {
 
     it("omits the flag when turning prefixing back on", () => {
         expect(
-            mergeResourceSettings({ extra: 1, shouldPrefix: false }, { shouldPrefix: true }),
+            mergeResourceSettings(
+                { extra: 1, shouldPrefix: false },
+                { shouldPrefix: true }
+            )
         ).toEqual({ extra: 1 });
     });
 });

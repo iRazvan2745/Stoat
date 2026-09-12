@@ -8,9 +8,12 @@ import {
 } from "../src/lib/server/deployments/log-stream";
 
 it("builds a bounded cursor response for the paginated remote query", () => {
-    const logs = Array.from({ length: DEPLOYMENT_LOG_BATCH_SIZE }, (_, index) => ({
-        id: index + 11,
-    }));
+    const logs = Array.from(
+        { length: DEPLOYMENT_LOG_BATCH_SIZE },
+        (_, index) => ({
+            id: index + 11,
+        })
+    );
 
     expect(createDeploymentLogBatch(logs, 10, true)).toEqual({
         done: false,
@@ -28,11 +31,14 @@ it("builds a bounded cursor response for the paginated remote query", () => {
 
 describe("deployment log batches", () => {
     it("drains terminal history in bounded cursor batches without polling again", async () => {
-        const records = Array.from({ length: DEPLOYMENT_LOG_BATCH_SIZE * 2 + 1 }, (_, index) => ({
-            id: index + 1,
-        }));
+        const records = Array.from(
+            { length: DEPLOYMENT_LOG_BATCH_SIZE * 2 + 1 },
+            (_, index) => ({
+                id: index + 1,
+            })
+        );
         const read = vi.fn(async (afterId: number, limit: number) =>
-            records.filter((record) => record.id > afterId).slice(0, limit),
+            records.filter((record) => record.id > afterId).slice(0, limit)
         );
         const batches = [];
         for await (const batch of streamLogBatches({

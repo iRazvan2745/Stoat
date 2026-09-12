@@ -4,7 +4,7 @@ import { withKeyedLock } from "#lib/server/shared/locks";
 /** Also serialize across app processes; a reserved connection owns the session lock. */
 export const withGitSourceLock = async <T>(
     sourceId: string,
-    operation: () => Promise<T>,
+    operation: () => Promise<T>
 ): Promise<T> =>
     // Bound Git work to one operation per process so reserved locks cannot exhaust the DB pool.
     await withKeyedLock("git-source-operations", async () => {

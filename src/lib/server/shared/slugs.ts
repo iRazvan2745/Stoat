@@ -11,14 +11,14 @@ export const toKebabCase = (name: string): string =>
 export const randomSlugSuffix = (): string =>
     Array.from(
         { length: 5 },
-        () => SLUG_ALPHABET[Math.floor(Math.random() * SLUG_ALPHABET.length)],
+        () => SLUG_ALPHABET[Math.floor(Math.random() * SLUG_ALPHABET.length)]
     ).join("");
 
 const MAX_SLUG_ATTEMPTS = 5;
 
 export const uniqueSlug = async (
     name: string,
-    exists: (slug: string) => Promise<boolean>,
+    exists: (slug: string) => Promise<boolean>
 ): Promise<string> => {
     const base = toKebabCase(name);
 
@@ -32,6 +32,6 @@ export const uniqueSlug = async (
     }
 
     throw new Error(
-        `Unable to generate a unique slug for "${name}" after ${MAX_SLUG_ATTEMPTS} attempts`,
+        `Unable to generate a unique slug for "${name}" after ${MAX_SLUG_ATTEMPTS} attempts`
     );
 };

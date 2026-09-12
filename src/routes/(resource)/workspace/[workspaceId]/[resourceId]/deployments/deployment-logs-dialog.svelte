@@ -53,7 +53,9 @@
             >
                 <LoadingIndicator aria-label="Loading logs" />
 
-                <p class="text-on-surface-variant m3-font-body-medium">Loading logs…</p>
+                <p class="text-on-surface-variant m3-font-body-medium">
+                    Loading logs…
+                </p>
             </div>
         {:else if error}
             <div
@@ -76,7 +78,9 @@
 
                 <p class="m3-font-label-large text-on-surface">No logs yet</p>
 
-                <p class="text-on-surface-variant m3-font-body-medium mt-1 max-w-m">
+                <p
+                    class="text-on-surface-variant m3-font-body-medium max-w-m mt-1"
+                >
                     Logs will appear here as the deployment runs.
                 </p>
             </div>

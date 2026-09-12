@@ -1,10 +1,23 @@
 // oxlint-disable func-style no-await-in-loop
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import {
+    createCipheriv,
+    createDecipheriv,
+    createHash,
+    randomBytes,
+} from "node:crypto";
 
 import { APP_SECRET, DATABASE_URL } from "$app/env/private";
 import { PgClient } from "@effect/sql-pg";
-import { and, eq, isNull } from "drizzle-orm";
-import { Effect, Layer, ManagedRuntime, Redacted, Schema } from "effect";
+import { and, desc, eq, isNull } from "drizzle-orm";
+import {
+    Effect,
+    Layer,
+    ManagedRuntime,
+    Redacted,
+    Schedule,
+    Schema,
+    Stream,
+} from "effect";
 import { Job, JobStore, Worker } from "effect-mq";
 import { DrizzleJobStore } from "effect-mq/drizzle-postgres";
 import { log as evlog } from "evlog";
@@ -21,12 +34,15 @@ import {
     effectMqJobs,
     effectMqQueues,
     effectMqSchedules,
+    resources,
+    workspace,
 } from "#lib/db/schema";
+import type { DeploymentListItem } from "#lib/domain/deployments/records";
 import { deploymentRecoveryReason } from "#lib/domain/deployments/recovery";
 import { prepareDeployment } from "#lib/server/deployments/deployment-prepare";
 
-import { captureDeploymentSnapshot } from "./deployment-snapshot";
 import type { DeploymentSnapshot } from "./deployment-snapshot";
+import { captureDeploymentSnapshot } from "./deployment-snapshot";
 
 const StartDeploymentInput = v.object({
     resource_id: v.string(),
@@ -55,13 +71,15 @@ interface DeploymentJob {
 }
 
 const jsonSafeSnapshot = (snapshot: DeploymentSnapshot): DeploymentSnapshot =>
-    JSON.parse(JSON.stringify(snapshot)) as DeploymentSnapshot;
+    structuredClone(snapshot);
 
 const DEPLOYMENT_SNAPSHOT_VERSION = "v1";
 
 const deploymentSnapshotKey = (): Buffer => {
     if (!APP_SECRET?.trim()) {
-        throw new Error("APP_SECRET is required to encrypt deployment snapshots");
+        throw new Error(
+            "APP_SECRET is required to encrypt deployment snapshots"
+        );
     }
 
     return createHash("sha256").update(APP_SECRET).digest();
@@ -71,7 +89,10 @@ const deploymentSnapshotKey = (): Buffer => {
 const encryptDeploymentSnapshot = (snapshot: DeploymentSnapshot): string => {
     const iv = randomBytes(12);
     const cipher = createCipheriv("aes-256-gcm", deploymentSnapshotKey(), iv);
-    const ciphertext = Buffer.concat([cipher.update(JSON.stringify(snapshot)), cipher.final()]);
+    const ciphertext = Buffer.concat([
+        cipher.update(JSON.stringify(snapshot)),
+        cipher.final(),
+    ]);
     const tag = cipher.getAuthTag();
 
     return [
@@ -83,7 +104,8 @@ const encryptDeploymentSnapshot = (snapshot: DeploymentSnapshot): string => {
 };
 
 const decryptDeploymentSnapshot = (encoded: string): DeploymentSnapshot => {
-    const [version, encodedIv, encodedTag, encodedCiphertext] = encoded.split(".");
+    const [version, encodedIv, encodedTag, encodedCiphertext] =
+        encoded.split(".");
 
     if (
         version !== DEPLOYMENT_SNAPSHOT_VERSION ||
@@ -98,14 +120,14 @@ const decryptDeploymentSnapshot = (encoded: string): DeploymentSnapshot => {
         const decipher = createDecipheriv(
             "aes-256-gcm",
             deploymentSnapshotKey(),
-            Buffer.from(encodedIv, "base64url"),
+            Buffer.from(encodedIv, "base64url")
         );
         decipher.setAuthTag(Buffer.from(encodedTag, "base64url"));
         const plaintext = Buffer.concat([
             decipher.update(Buffer.from(encodedCiphertext, "base64url")),
             decipher.final(),
         ]);
-        const snapshot: unknown = JSON.parse(plaintext.toString("utf8"));
+        const snapshot: unknown = JSON.parse(plaintext.toString("utf-8"));
 
         if (
             typeof snapshot !== "object" ||
@@ -121,17 +143,22 @@ const decryptDeploymentSnapshot = (encoded: string): DeploymentSnapshot => {
 
         return snapshot as DeploymentSnapshot;
     } catch (error) {
-        if (error instanceof Error && error.message === "Unsupported deployment snapshot") {
+        if (
+            error instanceof Error &&
+            error.message === "Unsupported deployment snapshot"
+        ) {
             throw error;
         }
 
-        throw new Error("Unable to decrypt deployment snapshot", { cause: error });
+        throw new Error("Unable to decrypt deployment snapshot", {
+            cause: error,
+        });
     }
 };
 
-const decodeDeploymentSnapshot = async (
-    encoded: unknown,
-): Promise<DeploymentSnapshot | undefined> => {
+const decodeDeploymentSnapshot = (
+    encoded: unknown
+): DeploymentSnapshot | undefined => {
     if (encoded === undefined) {
         return undefined;
     }
@@ -147,12 +174,17 @@ const decodeDeploymentSnapshot = async (
 };
 
 class DeploymentQueueJob extends Job.make("deployment", {
-    dedupe: ({ resource_id, git_commit }: { git_commit?: string; resource_id: string }) =>
-        git_commit ? `${resource_id}:${git_commit}` : resource_id,
+    dedupe: ({
+        resource_id,
+        git_commit,
+    }: {
+        git_commit?: string;
+        resource_id: string;
+    }) => (git_commit ? `${resource_id}:${git_commit}` : resource_id),
     defaults: { attempts: 1 },
     payload: {
-        git_commit: Schema.optionalKey(Schema.String),
         deployment_id: Schema.String,
+        git_commit: Schema.optionalKey(Schema.String),
         resource_id: Schema.String,
         snapshot: Schema.optionalKey(Schema.Unknown),
     },
@@ -177,31 +209,171 @@ async function isDeploymentTerminal(deploymentId: string): Promise<boolean> {
     return deployment === undefined || Boolean(deployment.finishedAt);
 }
 
+async function markDeploymentFailed(
+    deploymentId: string,
+    reason?: string
+): Promise<void> {
+    await db.transaction(async (tx) => {
+        const updated = await tx
+            .update(deployments)
+            .set({ finishedAt: new Date(), outcome: "failed" })
+            .where(
+                and(
+                    eq(deployments.id, deploymentId),
+                    isNull(deployments.finishedAt)
+                )
+            )
+            .returning({ id: deployments.id });
+
+        if (updated.length > 0 && reason) {
+            await tx.insert(deploymentLogs).values({
+                deploymentId,
+                message: reason,
+                stream: "stderr",
+            });
+        }
+    });
+}
+
+const shouldSkipDeployment = (
+    deployment: Awaited<ReturnType<typeof getDeploymentRecord>>
+): boolean =>
+    deployment === undefined ||
+    deployment.outcome === "cancelled" ||
+    Boolean(deployment.finishedAt);
+
+const skippedDeploymentReason = (
+    deployment: Awaited<ReturnType<typeof getDeploymentRecord>>
+): "already_finished" | "cancelled" | "missing" => {
+    if (deployment === undefined) {
+        return "missing";
+    }
+
+    return deployment.outcome === "cancelled"
+        ? "cancelled"
+        : "already_finished";
+};
+
+const prepareWorkerSnapshot = async (
+    resourceId: string,
+    deploymentId: string,
+    snapshot: DeploymentSnapshot | undefined
+): Promise<DeploymentSnapshot> => {
+    const captured = snapshot ?? (await captureDeploymentSnapshot(resourceId));
+    const shouldSyncGit = Boolean(captured.git.url && !captured.gitCommit);
+
+    if (shouldSyncGit) {
+        const { attachGitCommitToSnapshot } =
+            await import("#lib/server/git-sources/sync");
+        await attachGitCommitToSnapshot(captured);
+    }
+
+    if (snapshot === undefined || shouldSyncGit) {
+        await db
+            .update(deployments)
+            .set({
+                gitCommit: captured.gitCommit,
+                settings: captured.resource.settings,
+            })
+            .where(eq(deployments.id, deploymentId));
+    }
+
+    return captured;
+};
+
+const finishDeployment = async (
+    deploymentId: string,
+    message: string,
+    outcome: "failed" | "success",
+    stream: "debug" | "stderr"
+): Promise<void> => {
+    await db.transaction(async (tx) => {
+        const updated = await tx
+            .update(deployments)
+            .set({ finishedAt: new Date(), outcome })
+            .where(
+                and(
+                    eq(deployments.id, deploymentId),
+                    isNull(deployments.finishedAt)
+                )
+            )
+            .returning({ id: deployments.id });
+        if (updated.length > 0) {
+            await tx.insert(deploymentLogs).values({
+                deploymentId,
+                message,
+                stream,
+            });
+        }
+    });
+};
+
+const markDeploymentStarted = async (
+    deploymentId: string,
+    message: string
+): Promise<boolean> =>
+    await db.transaction(async (tx) => {
+        const updated = await tx
+            .update(deployments)
+            .set({ startedAt: new Date() })
+            .where(
+                and(
+                    eq(deployments.id, deploymentId),
+                    isNull(deployments.finishedAt)
+                )
+            )
+            .returning({ id: deployments.id });
+        if (updated.length === 0) {
+            return false;
+        }
+
+        await tx.insert(deploymentLogs).values({
+            deploymentId,
+            message,
+            stream: "debug",
+        });
+        return true;
+    });
+
+const prepareSnapshotOrFail = async (
+    deploymentId: string,
+    resourceId: string,
+    snapshot: DeploymentSnapshot | undefined
+): Promise<DeploymentSnapshot | null> => {
+    try {
+        return await prepareWorkerSnapshot(resourceId, deploymentId, snapshot);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        evlog.error({
+            action:
+                snapshot === undefined
+                    ? "deployment.prepare_failed"
+                    : "deployment.git_sync_failed",
+            deploymentId,
+            error: errorDetails(error),
+            outcome: "failed",
+            resourceId,
+        });
+        await markDeploymentFailed(deploymentId, message);
+        return null;
+    }
+};
+
 async function processDeployment(
     {
         deployment_id: deploymentId,
         resource_id: resourceId,
         snapshot: encodedSnapshot,
     }: DeploymentJob,
-    workerSignal?: AbortSignal,
+    workerSignal?: AbortSignal
 ): Promise<void> {
     const existing = await getDeploymentRecord(deploymentId);
 
-    if (!existing || existing.outcome === "cancelled" || existing.finishedAt) {
-        let reason: "already_finished" | "cancelled" | "missing";
-
-        if (existing === undefined) {
-            reason = "missing";
-        } else if (existing.outcome === "cancelled") {
-            reason = "cancelled";
-        } else {
-            reason = "already_finished";
-        }
-
+    if (shouldSkipDeployment(existing)) {
         evlog.info({
             action: "deployment.skipped",
             deploymentId,
-            reason,
+            reason: skippedDeploymentReason(existing),
             resourceId,
         });
         return;
@@ -209,7 +381,7 @@ async function processDeployment(
 
     let snapshot: DeploymentSnapshot | undefined;
     try {
-        snapshot = await decodeDeploymentSnapshot(encodedSnapshot);
+        snapshot = decodeDeploymentSnapshot(encodedSnapshot);
     } catch (error) {
         evlog.error({
             action: "deployment.snapshot_decrypt_failed",
@@ -218,7 +390,10 @@ async function processDeployment(
             outcome: "failed",
             resourceId,
         });
-        await markDeploymentFailed(deploymentId, "Deployment snapshot could not be read");
+        await markDeploymentFailed(
+            deploymentId,
+            "Deployment snapshot could not be read"
+        );
         return;
     }
 
@@ -232,95 +407,26 @@ async function processDeployment(
     // Manual deploys enqueue with a DB snapshot but no Git commit so the API
     // stays instant. Run Git sync here in the worker before uncloud deploy.
     // Snapshot-less jobs (previous instant path) fall back to capturing here.
-    if (!snapshot) {
-        try {
-            const fresh = await captureDeploymentSnapshot(resourceId);
-            if (fresh.git.url) {
-                const { attachGitCommitToSnapshot } = await import("#lib/server/git-sources/sync");
-                await attachGitCommitToSnapshot(fresh);
-            }
-            snapshot = fresh;
-            await db
-                .update(deployments)
-                .set({
-                    gitCommit: fresh.gitCommit,
-                    settings: fresh.resource.settings,
-                })
-                .where(eq(deployments.id, deploymentId));
-            if (await isDeploymentTerminal(deploymentId)) {
-                evlog.info({
-                    action: "deployment.skipped",
-                    deploymentId,
-                    reason: "finished_before_worker_started",
-                    resourceId,
-                });
-                return;
-            }
-        } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            evlog.error({
-                action: "deployment.prepare_failed",
-                deploymentId,
-                error: errorDetails(error),
-                outcome: "failed",
-                resourceId,
-            });
-            await markDeploymentFailed(deploymentId, message);
-            return;
-        }
-    } else if (snapshot.git.url && !snapshot.gitCommit) {
-        try {
-            const { attachGitCommitToSnapshot } = await import("#lib/server/git-sources/sync");
-            await attachGitCommitToSnapshot(snapshot);
-            await db
-                .update(deployments)
-                .set({
-                    gitCommit: snapshot.gitCommit,
-                    settings: snapshot.resource.settings,
-                })
-                .where(eq(deployments.id, deploymentId));
-            if (await isDeploymentTerminal(deploymentId)) {
-                evlog.info({
-                    action: "deployment.skipped",
-                    deploymentId,
-                    reason: "finished_before_worker_started",
-                    resourceId,
-                });
-                return;
-            }
-        } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            evlog.error({
-                action: "deployment.git_sync_failed",
-                deploymentId,
-                error: errorDetails(error),
-                outcome: "failed",
-                resourceId,
-            });
-            await markDeploymentFailed(deploymentId, message);
-            return;
-        }
+    const workerSnapshot = await prepareSnapshotOrFail(
+        deploymentId,
+        resourceId,
+        snapshot
+    );
+    if (!workerSnapshot) {
+        return;
     }
-    const resource = snapshot.resource;
-    const started = await db.transaction(async (tx) => {
-        const updated = await tx
-            .update(deployments)
-            .set({
-                startedAt: new Date(),
-            })
-            .where(and(eq(deployments.id, deploymentId), isNull(deployments.finishedAt)))
-            .returning({ id: deployments.id });
-        if (updated.length === 0) {
-            return false;
-        }
 
-        await tx.insert(deploymentLogs).values({
+    if (await isDeploymentTerminal(deploymentId)) {
+        evlog.info({
+            action: "deployment.skipped",
             deploymentId,
-            message: startedMessage,
-            stream: "debug",
+            reason: "finished_before_worker_started",
+            resourceId,
         });
-        return true;
-    });
+        return;
+    }
+
+    const started = await markDeploymentStarted(deploymentId, startedMessage);
     if (!started) {
         evlog.info({
             action: "deployment.skipped",
@@ -344,11 +450,18 @@ async function processDeployment(
         // registering the in-process abort controller. Check the durable
         // terminal state after registration so a cancelled deployment never
         // starts Git or Uncloud work.
-        if (controller.signal.aborted || (await isDeploymentTerminal(deploymentId))) {
+        if (
+            controller.signal.aborted ||
+            (await isDeploymentTerminal(deploymentId))
+        ) {
             return;
         }
 
-        await prepareDeployment(snapshot, deploymentId, controller.signal);
+        await prepareDeployment(
+            workerSnapshot,
+            deploymentId,
+            controller.signal
+        );
 
         if (await isDeploymentTerminal(deploymentId)) {
             evlog.info({
@@ -359,26 +472,18 @@ async function processDeployment(
             return;
         }
 
-        const finishedMessage = `Deployment completed for resource ${resource?.slug}`;
-        await db.transaction(async (tx) => {
-            const updated = await tx
-                .update(deployments)
-                .set({ finishedAt: new Date(), outcome: "success" })
-                .where(and(eq(deployments.id, deploymentId), isNull(deployments.finishedAt)))
-                .returning({ id: deployments.id });
-            if (updated.length > 0) {
-                await tx.insert(deploymentLogs).values({
-                    deploymentId,
-                    message: finishedMessage,
-                    stream: "debug",
-                });
-            }
-        });
+        const finishedMessage = `Deployment completed for resource ${workerSnapshot.resource?.slug}`;
+        await finishDeployment(
+            deploymentId,
+            finishedMessage,
+            "success",
+            "debug"
+        );
         evlog.info({
             action: "deployment.completed",
             deploymentId,
             resourceId,
-            resourceSlug: resource?.slug,
+            resourceSlug: workerSnapshot.resource?.slug,
         });
     } catch (error) {
         if (await isDeploymentTerminal(deploymentId)) {
@@ -398,27 +503,82 @@ async function processDeployment(
             outcome: "failed",
             resourceId,
         });
-        await db.transaction(async (tx) => {
-            const updated = await tx
-                .update(deployments)
-                .set({ finishedAt: new Date(), outcome: "failed" })
-                .where(and(eq(deployments.id, deploymentId), isNull(deployments.finishedAt)))
-                .returning({ id: deployments.id });
-            if (updated.length > 0) {
-                await tx.insert(deploymentLogs).values({
-                    deploymentId,
-                    message,
-                    stream: "stderr",
-                });
-            }
-        });
+        await finishDeployment(deploymentId, message, "failed", "stderr");
     } finally {
         workerSignal?.removeEventListener("abort", abort);
         activeDeployments.delete(deploymentId);
     }
 }
 
-const JobStoreLive = DrizzleJobStore.layer({
+const reconcileLastRunAt = new Map<string, number>();
+
+export async function reconcileFailedDeployments(
+    resourceId: string
+): Promise<void> {
+    const now = Date.now();
+    const lastRun = reconcileLastRunAt.get(resourceId);
+
+    if (lastRun !== undefined && now - lastRun < RECONCILE_MIN_INTERVAL_MS) {
+        return;
+    }
+
+    reconcileLastRunAt.set(resourceId, now);
+
+    const unfinished = await db
+        .select({
+            createdAt: deployments.createdAt,
+            id: deployments.id,
+            queueState: effectMqJobs.state,
+        })
+        .from(deployments)
+        .leftJoin(effectMqJobs, eq(effectMqJobs.id, deployments.jobId))
+        .where(
+            and(
+                eq(deployments.resourceId, resourceId),
+                isNull(deployments.finishedAt)
+            )
+        );
+
+    for (const deployment of unfinished) {
+        const reason = deploymentRecoveryReason(
+            deployment.queueState ?? undefined,
+            deployment.createdAt,
+            now
+        );
+        if (reason) {
+            await markDeploymentFailed(deployment.id, reason);
+        }
+    }
+}
+
+let reconciliationTimer: ReturnType<typeof setTimeout> | undefined;
+let workerDisposed = false;
+
+async function reconcileWorkerDeployments(): Promise<void> {
+    try {
+        const unfinishedResources = await db
+            .selectDistinct({ resourceId: deployments.resourceId })
+            .from(deployments)
+            .where(isNull(deployments.finishedAt));
+        for (const { resourceId } of unfinishedResources) {
+            await reconcileFailedDeployments(resourceId);
+        }
+    } catch (error) {
+        evlog.warn({
+            action: "deployment.reconciliation_failed",
+            error: errorDetails(error),
+        });
+    } finally {
+        if (!workerDisposed) {
+            reconciliationTimer = setTimeout(() => {
+                void reconcileWorkerDeployments();
+            }, RECONCILE_MIN_INTERVAL_MS);
+            reconciliationTimer.unref();
+        }
+    }
+}
+
+export const JobStoreLive = DrizzleJobStore.layer({
     attempts: effectMqJobAttempts,
     dedupe: effectMqDedupe,
     flowChildren: effectMqFlowChildren,
@@ -429,8 +589,11 @@ const JobStoreLive = DrizzleJobStore.layer({
 }).pipe(Layer.provide(PgClient.layer({ url: Redacted.make(DATABASE_URL) })));
 
 const DeploymentQueueLive = DeploymentQueueJob.toLayer(
-    (payload) => Effect.promise((signal) => processDeployment(payload as DeploymentJob, signal)),
-    { concurrency: 1 },
+    (payload) =>
+        Effect.promise((signal) =>
+            processDeployment(payload as DeploymentJob, signal)
+        ),
+    { concurrency: 1 }
 ).pipe(Layer.provideMerge(Worker.layer()), Layer.provideMerge(JobStoreLive));
 
 const deploymentQueueRuntime = ManagedRuntime.make(DeploymentQueueLive);
@@ -456,7 +619,10 @@ async function initializeQueue(): Promise<void> {
 }
 
 export async function ensureDeploymentWorker(): Promise<void> {
-    const ready = (queueReady ??= initializeQueue());
+    if (queueReady === undefined) {
+        queueReady = initializeQueue();
+    }
+    const ready = queueReady;
 
     try {
         await ready;
@@ -475,21 +641,23 @@ export async function ensureDeploymentWorker(): Promise<void> {
 
 export async function enqueueDeployment(
     snapshot: DeploymentSnapshot,
-    options: { deploymentId?: string } = {},
+    options: { deploymentId?: string } = {}
 ) {
     await ensureDeploymentWorker();
     const resource_id = snapshot.resource.id;
     const deploymentId = options.deploymentId ?? crypto.randomUUID();
     const existing = await getDeploymentRecord(deploymentId);
-    if (existing?.finishedAt) return { deploymentId, jobId: existing.jobId ?? deploymentId };
+    if (existing?.finishedAt) {
+        return { deploymentId, jobId: existing.jobId ?? deploymentId };
+    }
 
     const deployment = await db.transaction(async (tx) => {
         const [createdDeployment] = await tx
             .insert(deployments)
             .values({
+                gitCommit: snapshot.gitCommit,
                 id: deploymentId,
                 jobId: deploymentId,
-                gitCommit: snapshot.gitCommit,
                 queuedAt: new Date(),
                 resourceId: resource_id,
                 settings: snapshot.resource.settings,
@@ -497,7 +665,9 @@ export async function enqueueDeployment(
             .onConflictDoNothing()
             .returning({ id: deployments.id });
 
-        if (!createdDeployment && existing) return { id: existing.id };
+        if (!createdDeployment && existing) {
+            return { id: existing.id };
+        }
         if (!createdDeployment) {
             throw new Error("Unable to create deployment");
         }
@@ -524,16 +694,22 @@ export async function enqueueDeployment(
             DeploymentQueueJob.enqueue(
                 {
                     deployment_id: deployment.id,
-                    ...(snapshot.gitCommit ? { git_commit: snapshot.gitCommit } : {}),
+                    ...(snapshot.gitCommit
+                        ? { git_commit: snapshot.gitCommit }
+                        : {}),
                     resource_id,
-                    snapshot: encryptDeploymentSnapshot(jsonSafeSnapshot(snapshot)),
+                    snapshot: encryptDeploymentSnapshot(
+                        jsonSafeSnapshot(snapshot)
+                    ),
                 },
-                { jobId: deployment.id },
-            ),
+                { jobId: deployment.id }
+            )
         );
 
         if (jobId !== deployment.id) {
-            await db.delete(deployments).where(eq(deployments.id, deployment.id));
+            await db
+                .delete(deployments)
+                .where(eq(deployments.id, deployment.id));
             throw new Error("A deployment is already queued for this resource");
         }
 
@@ -551,7 +727,9 @@ export async function enqueueDeployment(
     }
 }
 
-export async function startDeployment({ resource_id }: v.InferOutput<typeof StartDeploymentInput>) {
+export async function startDeployment({
+    resource_id,
+}: v.InferOutput<typeof StartDeploymentInput>) {
     // Instant: capture a DB-only snapshot and enqueue. Git sync + uncloud
     // deploy run in the worker, so the API returns in ms.
     const snapshot = await captureDeploymentSnapshot(resource_id);
@@ -586,7 +764,12 @@ export async function cancelDeployment(deploymentId: string): Promise<void> {
         const updated = await tx
             .update(deployments)
             .set({ finishedAt: new Date(), outcome: "cancelled" })
-            .where(and(eq(deployments.id, deploymentId), isNull(deployments.finishedAt)))
+            .where(
+                and(
+                    eq(deployments.id, deploymentId),
+                    isNull(deployments.finishedAt)
+                )
+            )
             .returning({ id: deployments.id });
         if (updated.length > 0) {
             await tx.insert(deploymentLogs).values({
@@ -604,7 +787,7 @@ export async function cancelDeployment(deploymentId: string): Promise<void> {
     if (deployment.jobId) {
         try {
             await deploymentQueueRuntime.runPromise(
-                DeploymentQueueJob.cancel(JobStore.JobId(deployment.jobId)),
+                DeploymentQueueJob.cancel(JobStore.JobId(deployment.jobId))
             );
         } catch (error) {
             evlog.warn({
@@ -627,88 +810,56 @@ export async function deleteDeployment(deploymentId: string): Promise<void> {
     }
 
     if (!deployment.finishedAt) {
-        throw new Error("Deployment is still running — cancel it before deleting");
+        throw new Error(
+            "Deployment is still running — cancel it before deleting"
+        );
     }
 
     await db.delete(deployments).where(eq(deployments.id, deploymentId));
     evlog.info({ action: "deployment.deleted", deploymentId });
 }
-
-async function markDeploymentFailed(deploymentId: string, reason?: string): Promise<void> {
-    await db.transaction(async (tx) => {
-        const updated = await tx
-            .update(deployments)
-            .set({ finishedAt: new Date(), outcome: "failed" })
-            .where(and(eq(deployments.id, deploymentId), isNull(deployments.finishedAt)))
-            .returning({ id: deployments.id });
-
-        if (updated.length > 0 && reason) {
-            await tx.insert(deploymentLogs).values({
-                deploymentId,
-                message: reason,
-                stream: "stderr",
-            });
-        }
-    });
-}
-
-const reconcileLastRunAt = new Map<string, number>();
-
-export async function reconcileFailedDeployments(resourceId: string): Promise<void> {
-    const now = Date.now();
-    const lastRun = reconcileLastRunAt.get(resourceId);
-
-    if (lastRun !== undefined && now - lastRun < RECONCILE_MIN_INTERVAL_MS) {
-        return;
-    }
-
-    reconcileLastRunAt.set(resourceId, now);
-
-    const unfinished = await db
+const listOrganizationDeployments = async (
+    organizationId: string
+): Promise<DeploymentListItem[]> =>
+    await db
         .select({
             createdAt: deployments.createdAt,
+            finishedAt: deployments.finishedAt,
+            gitCommit: deployments.gitCommit,
             id: deployments.id,
-            queueState: effectMqJobs.state,
+            jobId: deployments.jobId,
+            outcome: deployments.outcome,
+            queuedAt: deployments.queuedAt,
+            resourceId: resources.id,
+            resourceName: resources.name,
+            resourceSlug: resources.slug,
+            startedAt: deployments.startedAt,
+            updatedAt: deployments.updatedAt,
+            workspaceId: workspace.id,
+            workspaceName: workspace.name,
+            workspaceSlug: workspace.slug,
         })
         .from(deployments)
-        .leftJoin(effectMqJobs, eq(effectMqJobs.id, deployments.jobId))
-        .where(and(eq(deployments.resourceId, resourceId), isNull(deployments.finishedAt)));
+        .innerJoin(resources, eq(resources.id, deployments.resourceId))
+        .innerJoin(workspace, eq(workspace.id, resources.workspaceId))
+        .where(eq(workspace.organizationId, organizationId))
+        .orderBy(desc(deployments.createdAt), desc(deployments.id));
 
-    for (const deployment of unfinished) {
-        const reason = deploymentRecoveryReason(
-            deployment.queueState ?? undefined,
-            deployment.createdAt,
-            now,
-        );
-        if (reason) {
-            await markDeploymentFailed(deployment.id, reason);
-        }
-    }
-}
-
-let reconciliationTimer: ReturnType<typeof setTimeout> | undefined;
-let workerDisposed = false;
-
-async function reconcileWorkerDeployments(): Promise<void> {
-    try {
-        const unfinishedResources = await db
-            .selectDistinct({ resourceId: deployments.resourceId })
-            .from(deployments)
-            .where(isNull(deployments.finishedAt));
-        for (const { resourceId } of unfinishedResources) {
-            await reconcileFailedDeployments(resourceId);
-        }
-    } catch (error) {
-        evlog.warn({
-            action: "deployment.reconciliation_failed",
-            error: errorDetails(error),
-        });
-    } finally {
-        if (!workerDisposed) {
-            reconciliationTimer = setTimeout(() => {
-                void reconcileWorkerDeployments();
-            }, RECONCILE_MIN_INTERVAL_MS);
-            reconciliationTimer.unref();
-        }
-    }
-}
+export const deploymentsStream = (organizationId: string) =>
+    Stream.repeat(
+        Stream.fromEffect(
+            Effect.tryPromise({
+                catch: (cause) =>
+                    new Error("Unable to list organization deployments", {
+                        cause,
+                    }),
+                try: () => listOrganizationDeployments(organizationId),
+            })
+        ),
+        Schedule.spaced("500 millis")
+    ).pipe(
+        Stream.changesWith(
+            (previous, current) =>
+                JSON.stringify(previous) === JSON.stringify(current)
+        )
+    );

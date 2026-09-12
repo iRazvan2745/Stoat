@@ -32,8 +32,10 @@ describe("uniqueSlug", () => {
     });
 
     it("throws instead of returning a known-duplicate slug", async () => {
-        await expect(uniqueSlug("My App", () => Promise.resolve(true))).rejects.toThrow(
-            'Unable to generate a unique slug for "My App" after 5 attempts',
+        await expect(
+            uniqueSlug("My App", () => Promise.resolve(true))
+        ).rejects.toThrow(
+            'Unable to generate a unique slug for "My App" after 5 attempts'
         );
     });
 });

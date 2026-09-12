@@ -10,7 +10,10 @@ export type DescendantInfo<T extends DescendantBase = DescendantBase> = {
     order: number;
 };
 
-function compareDocumentOrder(a: Element | null | undefined, b: Element | null | undefined) {
+function compareDocumentOrder(
+    a: Element | null | undefined,
+    b: Element | null | undefined
+) {
     if (!a || !b || a === b || !a.isConnected || !b.isConnected) return null;
 
     const position = a.compareDocumentPosition(b);
@@ -82,11 +85,16 @@ export class DescendantsState<T extends DescendantBase> {
     }
 
     #sync() {
-        this.descendants = Array.from(this.#descendants.values()).sort((a, b) => {
-            const byElement = compareDocumentOrder(a.props.element, b.props.element);
-            if (byElement !== null) return byElement;
-            return a.order - b.order;
-        });
+        this.descendants = Array.from(this.#descendants.values()).sort(
+            (a, b) => {
+                const byElement = compareDocumentOrder(
+                    a.props.element,
+                    b.props.element
+                );
+                if (byElement !== null) return byElement;
+                return a.order - b.order;
+            }
+        );
     }
 }
 
@@ -96,13 +104,17 @@ export function createDescendantsState<T extends DescendantBase>() {
     return new DescendantsState<T>();
 }
 
-export function setDescendantsContext<T extends DescendantBase>(value: DescendantsState<T>) {
+export function setDescendantsContext<T extends DescendantBase>(
+    value: DescendantsState<T>
+) {
     setContext(DESCENDANTS_CONTEXT_KEY, value);
     return value;
 }
 
 export function useDescendantsContext<T extends DescendantBase>() {
-    const context = getContext<DescendantsState<T> | undefined>(DESCENDANTS_CONTEXT_KEY);
+    const context = getContext<DescendantsState<T> | undefined>(
+        DESCENDANTS_CONTEXT_KEY
+    );
 
     if (!context) {
         throw new Error("Flow descendants context is missing");

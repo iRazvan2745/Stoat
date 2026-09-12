@@ -12,7 +12,9 @@ import {
 
 describe("data source Compose discovery", () => {
     it("finds valid Compose files recursively and skips ignored directories", async () => {
-        const root = await mkdtemp(path.join(tmpdir(), "stoat-compose-discovery-"));
+        const root = await mkdtemp(
+            path.join(tmpdir(), "stoat-compose-discovery-")
+        );
 
         try {
             await mkdir(path.join(root, "apps", "web"), { recursive: true });
@@ -21,11 +23,11 @@ describe("data source Compose discovery", () => {
             });
             await writeFile(
                 path.join(root, "apps", "web", "docker-compose.yml"),
-                "services:\n  web:\n    image: nginx\n",
+                "services:\n  web:\n    image: nginx\n"
             );
             await writeFile(
                 path.join(root, "node_modules", "ignored", "compose.yaml"),
-                "services:\n  ignored:\n    image: nginx\n",
+                "services:\n  ignored:\n    image: nginx\n"
             );
 
             const result = await discoverComposeFiles(root);
@@ -44,11 +46,19 @@ describe("data source Compose discovery", () => {
     });
 
     it("reports invalid Compose candidates without stopping discovery", async () => {
-        const root = await mkdtemp(path.join(tmpdir(), "stoat-compose-discovery-"));
+        const root = await mkdtemp(
+            path.join(tmpdir(), "stoat-compose-discovery-")
+        );
 
         try {
-            await writeFile(path.join(root, "broken.yml"), "services:\n  web:\n");
-            await writeFile(path.join(root, "docker-compose.yml"), "not-compose: true\n");
+            await writeFile(
+                path.join(root, "broken.yml"),
+                "services:\n  web:\n"
+            );
+            await writeFile(
+                path.join(root, "docker-compose.yml"),
+                "not-compose: true\n"
+            );
 
             const result = await discoverComposeFiles(root);
 
@@ -67,14 +77,18 @@ describe("data source Compose discovery", () => {
 
 describe("discovered Compose names", () => {
     it("uses the containing directory for nested manifests", () => {
-        expect(composeServiceName("forgejo/runners/docker-compose.yml")).toBe("runners");
+        expect(composeServiceName("forgejo/runners/docker-compose.yml")).toBe(
+            "runners"
+        );
         expect(composeServiceName("compose.yaml")).toBe("compose");
     });
 
     it("extracts repository names from common Git URL forms", () => {
-        expect(repositoryName("ssh://git.example.com:2222/team/infrastructure.git")).toBe(
-            "infrastructure",
+        expect(
+            repositoryName("ssh://git.example.com:2222/team/infrastructure.git")
+        ).toBe("infrastructure");
+        expect(repositoryName("git@example.com:team/infrastructure.git")).toBe(
+            "infrastructure"
         );
-        expect(repositoryName("git@example.com:team/infrastructure.git")).toBe("infrastructure");
     });
 });

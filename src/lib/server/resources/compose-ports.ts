@@ -52,7 +52,9 @@ const isIpAddress = (value: string): boolean => {
     );
 };
 
-const splitProtocol = (spec: string): { protocol: ComposePortProtocol; rest: string } => {
+const splitProtocol = (
+    spec: string
+): { protocol: ComposePortProtocol; rest: string } => {
     const separatorIndex = spec.lastIndexOf("/");
 
     if (separatorIndex === -1) {
@@ -68,13 +70,16 @@ const splitProtocol = (spec: string): { protocol: ComposePortProtocol; rest: str
     return { protocol, rest: spec.slice(0, separatorIndex) };
 };
 
-const withPublishedPort = (port: ComposePort, publishedPort: number | undefined): ComposePort =>
+const withPublishedPort = (
+    port: ComposePort,
+    publishedPort: number | undefined
+): ComposePort =>
     publishedPort === undefined ? port : { ...port, publishedPort };
 
 const parseSinglePort = (
     value: string,
     protocol: ComposePortProtocol,
-    serviceName: string,
+    serviceName: string
 ): ComposePort | undefined => {
     const containerPort = parsePortNumber(value);
 
@@ -86,7 +91,7 @@ const parseSinglePort = (
 
     return withPublishedPort(
         { containerPort, protocol, serviceName },
-        shouldPublish ? containerPort : undefined,
+        shouldPublish ? containerPort : undefined
     );
 };
 
@@ -94,7 +99,7 @@ const parseMappedPort = (
     left: string,
     right: string,
     protocol: ComposePortProtocol,
-    serviceName: string,
+    serviceName: string
 ): ComposePort | undefined => {
     const containerPort = parsePortNumber(right);
 
@@ -126,7 +131,7 @@ const parseHostBoundPort = (
     middle: string,
     right: string,
     protocol: ComposePortProtocol,
-    serviceName: string,
+    serviceName: string
 ): ComposePort | undefined => {
     const containerPort = parsePortNumber(right);
 
@@ -138,11 +143,14 @@ const parseHostBoundPort = (
 
     return withPublishedPort(
         { containerPort, protocol, serviceName, ...host },
-        parsePortNumber(middle),
+        parsePortNumber(middle)
     );
 };
 
-export function parseComposePortSpec(spec: string, serviceName: string): ComposePort | undefined {
+export function parseComposePortSpec(
+    spec: string,
+    serviceName: string
+): ComposePort | undefined {
     const trimmed = spec.trim();
 
     if (trimmed === "") {
@@ -182,7 +190,7 @@ const readNumber = (value: unknown): number | undefined => {
 
 const parseLongPort = (
     value: Record<string, unknown>,
-    serviceName: string,
+    serviceName: string
 ): ComposePort | undefined => {
     const containerPort = readNumber(value.target ?? value.containerPort);
 
@@ -190,10 +198,15 @@ const parseLongPort = (
         return undefined;
     }
 
-    const protocolValue = typeof value.protocol === "string" ? value.protocol.toLowerCase() : "tcp";
+    const protocolValue =
+        typeof value.protocol === "string"
+            ? value.protocol.toLowerCase()
+            : "tcp";
     const protocol = isPortProtocol(protocolValue) ? protocolValue : "tcp";
-    const hostIp = typeof value.host_ip === "string" ? value.host_ip : undefined;
-    const hostname = typeof value.hostname === "string" ? value.hostname : undefined;
+    const hostIp =
+        typeof value.host_ip === "string" ? value.host_ip : undefined;
+    const hostname =
+        typeof value.hostname === "string" ? value.hostname : undefined;
     const publishedPort = readNumber(value.published ?? value.publishedPort);
 
     return {
@@ -239,7 +252,10 @@ const collectPortValues = (value: unknown): unknown[] => {
     return [value];
 };
 
-const parsePortValue = (value: unknown, serviceName: string): ComposePort | undefined => {
+const parsePortValue = (
+    value: unknown,
+    serviceName: string
+): ComposePort | undefined => {
     if (typeof value === "string" || typeof value === "number") {
         return parseComposePortSpec(String(value), serviceName);
     }
@@ -267,7 +283,11 @@ export function listComposePorts(compose: string): ComposePort[] {
     const ports: ComposePort[] = [];
 
     for (const pair of serviceMap.items) {
-        if (!isScalar(pair.key) || typeof pair.key.value !== "string" || !isMap(pair.value)) {
+        if (
+            !isScalar(pair.key) ||
+            typeof pair.key.value !== "string" ||
+            !isMap(pair.value)
+        ) {
             continue;
         }
 
@@ -292,13 +312,16 @@ export function listComposePorts(compose: string): ComposePort[] {
 
 export function findPublishedTcpPort(
     ports: readonly ComposePort[],
-    containerPort = 5432,
+    containerPort = 5432
 ): ComposePort | undefined {
     const matching = ports.filter(
         (port) =>
             (port.protocol === "tcp" || port.protocol === "udp") &&
-            port.publishedPort !== undefined,
+            port.publishedPort !== undefined
     );
 
-    return matching.find((port) => port.containerPort === containerPort) ?? matching[0];
+    return (
+        matching.find((port) => port.containerPort === containerPort) ??
+        matching[0]
+    );
 }

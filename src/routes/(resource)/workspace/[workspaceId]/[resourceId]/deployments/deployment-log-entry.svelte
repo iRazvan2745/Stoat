@@ -63,9 +63,7 @@
     <div
         class="bg-surface-container-lowest/95 sticky top-0 z-10 px-4 pt-3 pb-1.5 first:pt-1"
     >
-        <p
-            class="m3-font-label-small text-on-surface-variant uppercase"
-        >
+        <p class="m3-font-label-small text-on-surface-variant uppercase">
             {entry.title}
         </p>
     </div>

@@ -46,12 +46,18 @@ export const composeServiceName = (relativePath: string): string => {
         return path.posix.basename(directory);
     }
 
-    return path.posix.basename(normalizedPath, path.posix.extname(normalizedPath));
+    return path.posix.basename(
+        normalizedPath,
+        path.posix.extname(normalizedPath)
+    );
 };
 
 export const repositoryName = (repoUrl: string): string => {
     const withoutQuery = repoUrl.trim().split(/[?#]/u, 1)[0] ?? repoUrl.trim();
-    const segments = withoutQuery.replaceAll(/\/+$/gu, "").split(/[/:]/u).filter(Boolean);
+    const segments = withoutQuery
+        .replaceAll(/\/+$/gu, "")
+        .split(/[/:]/u)
+        .filter(Boolean);
     const name = segments.at(-1)?.replace(/\.git$/iu, "");
 
     return name || "Repository";
@@ -61,17 +67,24 @@ const visitDirectory = async (
     rootPath: string,
     currentPath: string,
     files: DiscoveredComposeFile[],
-    skipped: SkippedComposeFile[],
+    skipped: SkippedComposeFile[]
 ): Promise<void> => {
     const entries = await fs.readdir(currentPath, { withFileTypes: true });
 
-    for (const entry of entries.toSorted((left, right) => left.name.localeCompare(right.name))) {
+    for (const entry of entries.toSorted((left, right) =>
+        left.name.localeCompare(right.name)
+    )) {
         if (entry.isDirectory()) {
             if (IGNORED_DIRECTORY_NAMES.has(entry.name)) {
                 continue;
             }
 
-            await visitDirectory(rootPath, path.join(currentPath, entry.name), files, skipped);
+            await visitDirectory(
+                rootPath,
+                path.join(currentPath, entry.name),
+                files,
+                skipped
+            );
             continue;
         }
 
@@ -88,7 +101,10 @@ const visitDirectory = async (
             compose = await fs.readFile(filePath, "utf-8");
         } catch (error) {
             skipped.push({
-                reason: error instanceof Error ? error.message : "Unable to read the Compose file",
+                reason:
+                    error instanceof Error
+                        ? error.message
+                        : "Unable to read the Compose file",
                 relativePath,
             });
             continue;
@@ -122,7 +138,9 @@ const visitDirectory = async (
     }
 };
 
-export const discoverComposeFiles = async (rootPath: string): Promise<ComposeDiscovery> => {
+export const discoverComposeFiles = async (
+    rootPath: string
+): Promise<ComposeDiscovery> => {
     const root = path.resolve(rootPath);
     const files: DiscoveredComposeFile[] = [];
     const skipped: SkippedComposeFile[] = [];

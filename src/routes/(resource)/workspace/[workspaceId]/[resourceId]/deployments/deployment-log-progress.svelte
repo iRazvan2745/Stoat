@@ -128,7 +128,9 @@
         </div>
 
         {#if progress.percent != null && !isComplete}
-            <p class="text-on-surface-variant m3-font-label-small mt-1.5 tabular-nums">
+            <p
+                class="text-on-surface-variant m3-font-label-small mt-1.5 tabular-nums"
+            >
                 {Math.round(progress.percent)}%
             </p>
         {/if}

@@ -23,7 +23,7 @@ export function getLabelPosition(
         isBottom = false,
         single = false,
         orientation = "vertical",
-    }: PathProps = {},
+    }: PathProps = {}
 ) {
     if (orientation === "horizontal") {
         if (Math.abs(y2 - y1) <= FLAT_THRESHOLD) {
@@ -51,11 +51,11 @@ export function createRoundedPath(
         isBottom = false,
         single = false,
         orientation = "vertical",
-    }: PathProps = {},
+    }: PathProps = {}
 ) {
     const cornerRadius = Math.min(
         maxCornerRadius,
-        Math.abs(orientation === "horizontal" ? (y2 - y1) / 2 : (x2 - x1) / 2),
+        Math.abs(orientation === "horizontal" ? (y2 - y1) / 2 : (x2 - x1) / 2)
     );
 
     if (orientation === "horizontal") {

@@ -3,7 +3,7 @@ import type { Attachment } from "svelte/attachments";
 
 export function attachFollowScroll(
     shouldFollow: () => boolean,
-    scrollToBottom?: (scroller: HTMLElement) => void,
+    scrollToBottom?: (scroller: HTMLElement) => void
 ): Attachment<HTMLElement> {
     return (content) => {
         const scroller = content.parentElement;

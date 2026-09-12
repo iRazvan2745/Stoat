@@ -18,16 +18,16 @@
     import CodeMirror from "svelte-codemirror-editor";
 
     import {
-        getResource,
-        updateResourceSettings,
-    } from "#lib/api/resources.remote";
-    import {
         createResourceFile,
         deleteResourceFile,
         listResourceConfigReferences,
         listResourceFiles,
         updateResourceFile,
     } from "#lib/api/resource-files.remote";
+    import {
+        getResource,
+        updateResourceSettings,
+    } from "#lib/api/resources.remote";
     import {
         parseResourceSettings,
         shouldSyncResourceFilesToGit,
@@ -54,11 +54,9 @@
     );
     const selectedId = $derived(selected?.id);
 
-    // svelte-ignore state_referenced_locally
-    let content = $state(selected?.content ?? "");
-    // svelte-ignore state_referenced_locally
-    let pathDraft = $state(selected?.path ?? "");
-    let lastSelection = $state<string | undefined>(selected?.id);
+    let content = $state("");
+    let pathDraft = $state("");
+    let lastSelection = $state<string | undefined | null>(null);
     let newPath = $state("");
     let saving = $state(false);
     let creating = $state(false);
@@ -338,9 +336,7 @@
                 <h2 class="m3-font-title-small text-on-surface m-0">
                     Resource files
                 </h2>
-                <span
-                    class="m3-font-label-small text-on-surface-variant"
-                >
+                <span class="m3-font-label-small text-on-surface-variant">
                     {savedFiles.length}
                 </span>
             </div>
@@ -477,7 +473,7 @@
                 </div>
 
                 <div
-                    class="editor relative -mx-4 -mb-4 mt-2 min-h-0 flex-1 overflow-hidden rounded-b-md bg-transparent!"
+                    class="editor relative -mx-4 mt-2 -mb-4 min-h-0 flex-1 overflow-hidden rounded-b-md bg-transparent!"
                     aria-busy={editorLoading || (saving && dirty)}
                     aria-label={`${selected.path} editor`}
                 >
@@ -503,7 +499,9 @@
                             class="absolute inset-0 z-10 flex items-center justify-center bg-transparent!"
                             role="status"
                         >
-                            <LoadingIndicator aria-label="Loading file editor" />
+                            <LoadingIndicator
+                                aria-label="Loading file editor"
+                            />
                         </div>
                     {/if}
                 </div>

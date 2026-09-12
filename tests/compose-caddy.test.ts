@@ -171,29 +171,38 @@ describe("interpolateComposeVariables", () => {
     const lookup = (name: string) => variables.get(name);
 
     it("resolves plain, braced, and default forms", () => {
-        expect(interpolateComposeVariables("$SEAFILE_SERVER_HOSTNAME", lookup)).toBe(
-            "files.example.com",
+        expect(
+            interpolateComposeVariables("$SEAFILE_SERVER_HOSTNAME", lookup)
+        ).toBe("files.example.com");
+        expect(
+            interpolateComposeVariables(`\${SEAFILE_SERVER_HOSTNAME}`, lookup)
+        ).toBe("files.example.com");
+        expect(
+            interpolateComposeVariables(`\${MISSING:-fallback}`, lookup)
+        ).toBe("fallback");
+        expect(interpolateComposeVariables(`\${EMPTY:-fallback}`, lookup)).toBe(
+            "fallback"
         );
-        expect(interpolateComposeVariables(`\${SEAFILE_SERVER_HOSTNAME}`, lookup)).toBe(
-            "files.example.com",
+        expect(interpolateComposeVariables(`\${EMPTY-fallback}`, lookup)).toBe(
+            ""
         );
-        expect(interpolateComposeVariables(`\${MISSING:-fallback}`, lookup)).toBe("fallback");
-        expect(interpolateComposeVariables(`\${EMPTY:-fallback}`, lookup)).toBe("fallback");
-        expect(interpolateComposeVariables(`\${EMPTY-fallback}`, lookup)).toBe("");
     });
 
     it("resolves nested defaults and required markers", () => {
         expect(
             interpolateComposeVariables(
                 `\${SEADOC_SERVER_URL:-\${PROTOCOL:-http}://\${SEAFILE_SERVER_HOSTNAME:?not set}/sdoc-server}`,
-                lookup,
-            ),
+                lookup
+            )
         ).toBe("http://files.example.com/sdoc-server");
     });
 
     it("keeps escaped dollar signs", () => {
         expect(
-            interpolateComposeVariables('redis-server --requirepass "$$REDIS_PASSWORD"', lookup),
+            interpolateComposeVariables(
+                'redis-server --requirepass "$$REDIS_PASSWORD"',
+                lookup
+            )
         ).toBe('redis-server --requirepass "$REDIS_PASSWORD"');
     });
 });

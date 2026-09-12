@@ -52,7 +52,9 @@ describe("compose ingress routes", () => {
             protocol: "https",
         });
 
-        expect(updated).toContain("x-ports:\n      - worker.example.com:8080/https");
+        expect(updated).toContain(
+            "x-ports:\n      - worker.example.com:8080/https"
+        );
     });
 
     it("preserves a scalar x-ports value when adding the first editable route", () => {
@@ -62,7 +64,7 @@ describe("compose ingress routes", () => {
                 composeService: "web",
                 containerPort: 3000,
                 protocol: "https",
-            },
+            }
         );
 
         expect(updated).toContain("- 25001:3000/tcp");
@@ -75,7 +77,7 @@ describe("compose ingress routes", () => {
                 composeService: "worker",
                 containerPort: 53,
                 protocol: "udp",
-            }),
+            })
         ).toThrow("Published port is required");
 
         const updated = addComposeIngressRoute(COMPOSE, {
@@ -91,7 +93,10 @@ describe("compose ingress routes", () => {
 
     it("updates and moves a route without touching unrelated ports", () => {
         const [route] = listEditableComposeIngressRoutes(COMPOSE);
-        const updated = updateComposeIngressRoute(COMPOSE, route!.id, {
+        if (!route) {
+            throw new Error("Expected an editable route");
+        }
+        const updated = updateComposeIngressRoute(COMPOSE, route.id, {
             composeService: "worker",
             containerPort: 8080,
             hostname: "worker.example.com",
@@ -105,11 +110,14 @@ describe("compose ingress routes", () => {
 
     it("deletes a route and rejects a stale route reference", () => {
         const [, route] = listEditableComposeIngressRoutes(COMPOSE);
-        const updated = deleteComposeIngressRoute(COMPOSE, route!.id);
+        if (!route) {
+            throw new Error("Expected an editable route");
+        }
+        const updated = deleteComposeIngressRoute(COMPOSE, route.id);
 
         expect(updated).not.toContain("api.example.com:3001/http");
-        expect(() => deleteComposeIngressRoute(updated, route!.id)).toThrow(
-            "changed since the page was loaded",
+        expect(() => deleteComposeIngressRoute(updated, route.id)).toThrow(
+            "changed since the page was loaded"
         );
     });
 });

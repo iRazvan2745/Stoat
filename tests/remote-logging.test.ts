@@ -16,9 +16,10 @@ afterEach(() => {
     initLogger({ env: { service: "app" }, redact: true });
 });
 
-const streamDeploymentLogs = async function* streamDeploymentLogs(): AsyncGenerator<string> {
-    yield "deployment started";
-};
+const streamDeploymentLogs =
+    async function* streamDeploymentLogs(): AsyncGenerator<string> {
+        yield "deployment started";
+    };
 
 describe("summarizeRemoteInput", () => {
     it("keeps identifiers and shape while omitting payload values", () => {
@@ -55,7 +56,7 @@ describe("parseRemoteInvocation", () => {
             {
                 headers: { "content-type": "application/json" },
                 method: "POST",
-            },
+            }
         );
 
         expect(parseRemoteInvocation(request, "/cluster/services")).toEqual({
@@ -72,7 +73,7 @@ describe("parseRemoteInvocation", () => {
     it("does not expose keyed remote arguments", () => {
         const request = new Request(
             "https://stoat.example/_app/remote/abc123/deleteWorkspace/%22workspace-123%22",
-            { method: "GET" },
+            { method: "GET" }
         );
 
         expect(parseRemoteInvocation(request)).toMatchObject({
@@ -80,7 +81,9 @@ describe("parseRemoteInvocation", () => {
             hasAdditionalArguments: true,
             transport: "get",
         });
-        expect(parseRemoteInvocation(request)).not.toHaveProperty("workspace-123");
+        expect(parseRemoteInvocation(request)).not.toHaveProperty(
+            "workspace-123"
+        );
     });
 });
 
@@ -129,7 +132,7 @@ describe("withRemoteLogging", () => {
             "resources.getResource",
             "query",
             (resourceId: string) => resourceId,
-            { inputKey: "resourceId" },
+            { inputKey: "resourceId" }
         );
         const event = {
             locals: {},
@@ -188,7 +191,7 @@ describe("withRemoteLogging", () => {
             (resourceId: string) => {
                 throw new Error(`Unable to delete ${resourceId}`);
             },
-            { inputKey: "resourceId" },
+            { inputKey: "resourceId" }
         );
         const event = {
             locals: {},
@@ -203,7 +206,7 @@ describe("withRemoteLogging", () => {
                     await run("resource-123");
                     return new Response("ok");
                 },
-            }),
+            })
         ).rejects.toThrow("Unable to delete resource-123");
 
         expect(events[0]?.level).toBe("error");
@@ -217,7 +220,7 @@ describe("withRemoteLogging", () => {
                     phase: "failed",
                     type: "command",
                 }),
-            ]),
+            ])
         );
     });
 
@@ -236,7 +239,7 @@ describe("withRemoteLogging", () => {
         const run = withRemoteLiveLogging(
             "deployments.streamDeploymentLogs",
             () => streamDeploymentLogs(),
-            { inputKey: "deploymentId" },
+            { inputKey: "deploymentId" }
         );
         let iterator: AsyncGenerator<string> | undefined;
         const event = {
@@ -259,7 +262,11 @@ describe("withRemoteLogging", () => {
                             return;
                         }
 
-                        controller.enqueue(new TextEncoder().encode(`data: ${result.value}\n\n`));
+                        controller.enqueue(
+                            new TextEncoder().encode(
+                                `data: ${result.value}\n\n`
+                            )
+                        );
                     },
                 });
 
@@ -289,7 +296,7 @@ describe("withRemoteLogging", () => {
                     phase: "completed",
                     type: "query.live",
                 }),
-            ]),
+            ])
         );
     });
 });

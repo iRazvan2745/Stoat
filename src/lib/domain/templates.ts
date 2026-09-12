@@ -44,7 +44,8 @@ export function ensureSvgNamespace(svg: string): string {
 
 const MIN_SECRET_LENGTH = 1;
 const MAX_SECRET_LENGTH = 256;
-const BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+const BASE64_ALPHABET =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 const randomBase64 = (length: number): string => {
     const bytes = new Uint8Array(length);
@@ -75,17 +76,17 @@ export function expandTemplateSecrets(source: string): string {
                 length > MAX_SECRET_LENGTH
             ) {
                 throw new Error(
-                    `Invalid secret placeholder ${placeholder}: length must be between ${MIN_SECRET_LENGTH} and ${MAX_SECRET_LENGTH}`,
+                    `Invalid secret placeholder ${placeholder}: length must be between ${MIN_SECRET_LENGTH} and ${MAX_SECRET_LENGTH}`
                 );
             }
 
             return randomBase64(length);
-        },
+        }
     );
 }
 
 export function expandTemplateVariables(
-    variables: readonly EnvironmentVariable[],
+    variables: readonly EnvironmentVariable[]
 ): EnvironmentVariable[] {
     return variables.map((variable) => ({
         name: variable.name,

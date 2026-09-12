@@ -68,18 +68,26 @@ export interface DeploymentSnapshot {
     resourceFiles: SnapshotConfigFile[];
 }
 
-type DeploymentSnapshotRecord = Omit<DeploymentSnapshot, "environment" | "resourceFiles">;
+type DeploymentSnapshotRecord = Omit<
+    DeploymentSnapshot,
+    "environment" | "resourceFiles"
+>;
 
 /** Copy the rows captured in one transaction into a queue-safe snapshot. */
 export const createDeploymentSnapshot = (
     record: DeploymentSnapshotRecord,
     environment: DeploymentSnapshot["environment"],
-    files: readonly SnapshotConfigFile[] = [],
+    files: readonly SnapshotConfigFile[] = []
 ): DeploymentSnapshot => ({
     environment: environment.map(({ name, value }) => ({ name, value })),
     git: { ...record.git },
     ...(record.gitFiles
-        ? { gitFiles: record.gitFiles.map(({ content, path }) => ({ content, path })) }
+        ? {
+              gitFiles: record.gitFiles.map(({ content, path }) => ({
+                  content,
+                  path,
+              })),
+          }
         : {}),
     resource: {
         ...record.resource,
@@ -90,7 +98,9 @@ export const createDeploymentSnapshot = (
     workspace: { ...record.workspace },
 });
 
-export const captureDeploymentSnapshot = async (resourceId: string): Promise<DeploymentSnapshot> =>
+export const captureDeploymentSnapshot = async (
+    resourceId: string
+): Promise<DeploymentSnapshot> =>
     await db.transaction(
         async (tx) => {
             const [record] = await tx
@@ -136,11 +146,16 @@ export const captureDeploymentSnapshot = async (resourceId: string): Promise<Dep
                 })
                 .from(resources)
                 .innerJoin(workspace, eq(workspace.id, resources.workspaceId))
-                .innerJoin(dataSource, eq(dataSource.id, workspace.dataSourceId))
+                .innerJoin(
+                    dataSource,
+                    eq(dataSource.id, workspace.dataSourceId)
+                )
                 .innerJoin(gitSource, eq(gitSource.id, dataSource.gitSourceId))
                 .where(eq(resources.id, resourceId));
             if (!record?.resource.value) {
-                throw new Error("Resource or valid compose configuration not found");
+                throw new Error(
+                    "Resource or valid compose configuration not found"
+                );
             }
             const resourceVars = await tx
                 .select({
@@ -156,7 +171,12 @@ export const captureDeploymentSnapshot = async (resourceId: string): Promise<Dep
                     value: workspaceEnvironmentVariables.value,
                 })
                 .from(workspaceEnvironmentVariables)
-                .where(eq(workspaceEnvironmentVariables.workspaceId, record.workspace.id))
+                .where(
+                    eq(
+                        workspaceEnvironmentVariables.workspaceId,
+                        record.workspace.id
+                    )
+                )
                 .orderBy(asc(workspaceEnvironmentVariables.name));
             const files = await tx
                 .select({
@@ -169,8 +189,8 @@ export const captureDeploymentSnapshot = async (resourceId: string): Promise<Dep
             return createDeploymentSnapshot(
                 record,
                 mergeEnvironmentVariables(workspaceVars, resourceVars),
-                files,
+                files
             );
         },
-        { accessMode: "read only", isolationLevel: "repeatable read" },
+        { accessMode: "read only", isolationLevel: "repeatable read" }
     );

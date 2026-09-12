@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { mergeEnvironmentVariables, validateEnvironmentVariables } from "#lib/domain/environment";
+import {
+    mergeEnvironmentVariables,
+    validateEnvironmentVariables,
+} from "#lib/domain/environment";
 import { inlineEnvironmentVariables } from "#lib/server/deployments/deployment-compose";
 
 describe("mergeEnvironmentVariables", () => {
@@ -14,19 +17,23 @@ describe("mergeEnvironmentVariables", () => {
             { name: "WORKSPACE_ONLY", value: "1" },
         ];
 
-        expect(mergeEnvironmentVariables(workspaceVars, [])).toEqual(workspaceVars);
+        expect(mergeEnvironmentVariables(workspaceVars, [])).toEqual(
+            workspaceVars
+        );
     });
 
     it("returns resource variables when the workspace has none", () => {
         const resourceVars = [{ name: "RESOURCE_ONLY", value: "1" }];
 
-        expect(mergeEnvironmentVariables([], resourceVars)).toEqual(resourceVars);
+        expect(mergeEnvironmentVariables([], resourceVars)).toEqual(
+            resourceVars
+        );
     });
 
     it("lets resource values win on name collisions", () => {
         const merged = mergeEnvironmentVariables(
             [{ name: "SHARED", value: "workspace" }],
-            [{ name: "SHARED", value: "resource" }],
+            [{ name: "SHARED", value: "resource" }]
         );
 
         expect(merged).toEqual([{ name: "SHARED", value: "resource" }]);
@@ -42,7 +49,7 @@ describe("mergeEnvironmentVariables", () => {
             [
                 { name: "SHARED", value: "resource" },
                 { name: "RESOURCE_ONLY", value: "s1" },
-            ],
+            ]
         );
 
         expect(merged).toEqual([
@@ -70,7 +77,7 @@ describe("workspace environment validation", () => {
             validateEnvironmentVariables([
                 { name: "FOO", value: "1" },
                 { name: "FOO", value: "2" },
-            ]),
+            ])
         ).toEqual(['Duplicate name "FOO"']);
     });
 
@@ -79,7 +86,7 @@ describe("workspace environment validation", () => {
             validateEnvironmentVariables([
                 { name: "FOO", value: "1" },
                 { name: "BAR", value: "2" },
-            ]),
+            ])
         ).toEqual([]);
         expect(validateEnvironmentVariables([])).toEqual([]);
     });
@@ -92,7 +99,7 @@ describe("inlineEnvironmentVariables with merged workspace input", () => {
                 { name: "SHARED", value: "workspace" },
                 { name: "WORKSPACE_ONLY", value: "w1" },
             ],
-            [{ name: "SHARED", value: "resource" }],
+            [{ name: "SHARED", value: "resource" }]
         );
         const yaml = inlineEnvironmentVariables(
             `services:
@@ -101,7 +108,7 @@ describe("inlineEnvironmentVariables with merged workspace input", () => {
   worker:
     image: nginx
 `,
-            effective,
+            effective
         );
 
         expect(yaml).toContain("SHARED: resource");
@@ -112,7 +119,10 @@ describe("inlineEnvironmentVariables with merged workspace input", () => {
     });
 
     it("removes env_file from every service when inlining merged variables", () => {
-        const effective = mergeEnvironmentVariables([{ name: "SHARED", value: "workspace" }], []);
+        const effective = mergeEnvironmentVariables(
+            [{ name: "SHARED", value: "workspace" }],
+            []
+        );
         const yaml = inlineEnvironmentVariables(
             `services:
   web:
@@ -122,7 +132,7 @@ describe("inlineEnvironmentVariables with merged workspace input", () => {
     image: nginx
     env_file: .env.production
 `,
-            effective,
+            effective
         );
 
         expect(yaml).toContain("SHARED: workspace");

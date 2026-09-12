@@ -1,7 +1,11 @@
 import { command, query } from "$app/server";
 import * as v from "valibot";
 
-import { requireDataSourceAccess, requireSession, requireWorkspaceAccess } from "#lib/api/guard";
+import {
+    requireDataSourceAccess,
+    requireSession,
+    requireWorkspaceAccess,
+} from "#lib/api/guard";
 import { withRemoteLogging } from "#lib/api/remote-logging";
 import { ENV_NAME_PATTERN } from "#lib/domain/environment";
 import {
@@ -36,15 +40,15 @@ const UpdateWorkspaceEnvironmentInput = v.pipe(
         (input) =>
             new Set(input.variables.map((variable) => variable.name)).size ===
             input.variables.length,
-        "Environment variable names must be unique",
-    ),
+        "Environment variable names must be unique"
+    )
 );
 
 export const listWorkspaces = query(
     withRemoteLogging("workspaces.listWorkspaces", "query", async () => {
         const session = requireSession();
         return await listWorkspaceRecords(session.user.id);
-    }),
+    })
 );
 
 export const getWorkspace = query(
@@ -56,8 +60,8 @@ export const getWorkspace = query(
             await requireWorkspaceAccess(workspaceId);
             return await getWorkspaceRecord(workspaceId);
         },
-        { inputKey: "workspaceId" },
-    ),
+        { inputKey: "workspaceId" }
+    )
 );
 
 export const listWorkspaceEnvironmentVariables = query(
@@ -69,8 +73,8 @@ export const listWorkspaceEnvironmentVariables = query(
             await requireWorkspaceAccess(workspaceId);
             return await listWorkspaceEnvironmentVariableRecords(workspaceId);
         },
-        { inputKey: "workspaceId" },
-    ),
+        { inputKey: "workspaceId" }
+    )
 );
 
 export const createWorkspace = command(
@@ -81,8 +85,8 @@ export const createWorkspace = command(
         async (input: v.InferOutput<typeof CreateWorkspaceInput>) => {
             await requireDataSourceAccess(input.dataSourceId);
             return await createWorkspaceRecord(input);
-        },
-    ),
+        }
+    )
 );
 
 export const deleteWorkspace = command(
@@ -94,8 +98,8 @@ export const deleteWorkspace = command(
             await requireWorkspaceAccess(workspaceId);
             return await deleteWorkspaceRecord(workspaceId);
         },
-        { inputKey: "workspaceId" },
-    ),
+        { inputKey: "workspaceId" }
+    )
 );
 
 export const updateWorkspaceEnvironmentVariables = command(
@@ -103,13 +107,15 @@ export const updateWorkspaceEnvironmentVariables = command(
     withRemoteLogging(
         "workspaces.updateWorkspaceEnvironmentVariables",
         "command",
-        async (input: v.InferOutput<typeof UpdateWorkspaceEnvironmentInput>) => {
+        async (
+            input: v.InferOutput<typeof UpdateWorkspaceEnvironmentInput>
+        ) => {
             await requireWorkspaceAccess(input.workspaceId);
             return await replaceWorkspaceEnvironmentVariableRecords(
                 input.workspaceId,
-                input.variables,
+                input.variables
             );
         },
-        { inputKey: "workspaceId" },
-    ),
+        { inputKey: "workspaceId" }
+    )
 );

@@ -13,14 +13,22 @@ import type {
     GitSourceSummary,
     UpdateGitSourceInputOutput,
 } from "#lib/domain/data-sources";
+import type { GitSyncResult } from "#lib/domain/git-sync";
 import {
     composeServiceName,
     discoverComposeFiles,
     repositoryName,
 } from "#lib/server/data-sources/discovery";
-import { createWorkspaceFolder, workspacePath } from "#lib/server/data-sources/paths";
+import {
+    createWorkspaceFolder,
+    workspacePath,
+} from "#lib/server/data-sources/paths";
 import { withGitRepo } from "#lib/server/shared/git";
-import { gitAuthenticationFromSource, validateGitSource } from "#lib/server/shared/git-auth";
+import {
+    gitAuthenticationFromSource,
+    validateGitSource,
+} from "#lib/server/shared/git-auth";
+import type { GitAuthentication } from "#lib/server/shared/git-auth";
 import { uniqueSlug } from "#lib/server/shared/slugs";
 import { normalizeUncloudUrl } from "#lib/server/uncloud";
 
@@ -41,7 +49,7 @@ export interface UncloudDataSource {
 
 export interface OrganizationGitSource extends GitSourceSummary {
     syncEnabled: boolean;
-    syncResult: import("#lib/domain/git-sync").GitSyncResult | null;
+    syncResult: GitSyncResult | null;
     organizationId: string;
 }
 
@@ -82,7 +90,7 @@ export interface CreateGitSourceRecordInput extends CreateGitSourceInputOutput {
     organizationId: string;
 }
 
-export interface UpdateGitSourceRecordInput extends UpdateGitSourceInputOutput {}
+export type UpdateGitSourceRecordInput = UpdateGitSourceInputOutput;
 
 type GitSourceRow = typeof gitSource.$inferSelect;
 
@@ -97,12 +105,14 @@ const toGitSourceConnection = (source: GitSourceRow): GitSourceConnection => ({
 
 const toGitSourceSummary = (source: GitSourceRow): OrganizationGitSource => ({
     ...gitSourceSummary(toGitSourceConnection(source)),
+    organizationId: source.organizationId,
     syncEnabled: source.syncEnabled,
     syncResult: source.syncResult,
-    organizationId: source.organizationId,
 });
 
-const cleanSecret = (value: string | null | undefined): string | null | undefined => {
+const cleanSecret = (
+    value: string | null | undefined
+): string | null | undefined => {
     if (value === undefined) {
         return undefined;
     }
@@ -116,7 +126,7 @@ const cleanSecret = (value: string | null | undefined): string | null | undefine
  * stripping as first-class Git Sources before it reaches Git or the database.
  */
 const legacyGitSource = (
-    gitUrl: string | null | undefined,
+    gitUrl: string | null | undefined
 ): { name: string; url: string | null } => {
     const rawUrl = gitUrl?.trim() || null;
 
@@ -132,16 +142,60 @@ const legacyGitSource = (
     return { name: repositoryName(validated.url), url: validated.url };
 };
 
-const assertGitAuthMethod: (authMethod: string) => asserts authMethod is GitAuthMethod = (
-    authMethod,
-) => {
+const assertGitAuthMethod: (
+    authMethod: string
+) => asserts authMethod is GitAuthMethod = (authMethod) => {
     if (!(GIT_AUTH_METHODS as readonly string[]).includes(authMethod)) {
         throw new Error(`Unsupported Git authentication method: ${authMethod}`);
     }
 };
 
+const credentialValuesFor = (
+    authentication: GitAuthentication
+): {
+    password: string | null;
+    sshKnownHosts: string | null;
+    sshPassphrase: string | null;
+    sshPrivateKey: string | null;
+    token: string | null;
+    username: string | null;
+} => ({
+    password:
+        authentication.method === "basic"
+            ? (authentication.password ?? null)
+            : null,
+    sshKnownHosts:
+        authentication.method === "ssh"
+            ? (authentication.knownHosts ?? null)
+            : null,
+    sshPassphrase:
+        authentication.method === "ssh"
+            ? (authentication.passphrase ?? null)
+            : null,
+    sshPrivateKey:
+        authentication.method === "ssh"
+            ? (authentication.privateKey ?? null)
+            : null,
+    token:
+        authentication.method === "token"
+            ? (authentication.token ?? null)
+            : null,
+    username:
+        authentication.method === "none"
+            ? null
+            : (authentication.username ?? null),
+});
+
+const retainExistingValue = <Value>(
+    next: Value | undefined,
+    existing: Value
+): Value => (next === undefined ? existing : next);
+
 const getGitSourceRow = async (gitSourceId: string): Promise<GitSourceRow> => {
-    const [source] = await db.select().from(gitSource).where(eq(gitSource.id, gitSourceId));
+    const [source] = await db
+        .select()
+        .from(gitSource)
+        .where(eq(gitSource.id, gitSourceId));
 
     if (!source) {
         throw new Error("Git Source not found");
@@ -152,12 +206,17 @@ const getGitSourceRow = async (gitSourceId: string): Promise<GitSourceRow> => {
 
 export const getGitSourceForOrganization = async (
     gitSourceId: string,
-    organizationId: string,
+    organizationId: string
 ): Promise<OrganizationGitSource> => {
     const [source] = await db
         .select()
         .from(gitSource)
-        .where(and(eq(gitSource.id, gitSourceId), eq(gitSource.organizationId, organizationId)));
+        .where(
+            and(
+                eq(gitSource.id, gitSourceId),
+                eq(gitSource.organizationId, organizationId)
+            )
+        );
 
     if (!source) {
         throw new Error("Git Source not found for organization");
@@ -166,11 +225,13 @@ export const getGitSourceForOrganization = async (
     return toGitSourceSummary(source);
 };
 
-export const getGitSourceConnection = async (gitSourceId: string): Promise<GitSourceConnection> =>
+export const getGitSourceConnection = async (
+    gitSourceId: string
+): Promise<GitSourceConnection> =>
     toGitSourceConnection(await getGitSourceRow(gitSourceId));
 
 export const listGitSourcesForOrganization = async (
-    organizationId: string,
+    organizationId: string
 ): Promise<OrganizationGitSource[]> => {
     const rows = await db
         .select()
@@ -214,16 +275,8 @@ export const createGitSource = async ({
             authMethod,
             name: name.trim(),
             organizationId,
-            password: authentication.method === "basic" ? (authentication.password ?? null) : null,
-            sshKnownHosts:
-                authentication.method === "ssh" ? (authentication.knownHosts ?? null) : null,
-            sshPassphrase:
-                authentication.method === "ssh" ? (authentication.passphrase ?? null) : null,
-            sshPrivateKey:
-                authentication.method === "ssh" ? (authentication.privateKey ?? null) : null,
-            token: authentication.method === "token" ? (authentication.token ?? null) : null,
+            ...credentialValuesFor(authentication),
             url: validated.url,
-            username: authentication.method === "none" ? null : (authentication.username ?? null),
         })
         .returning();
 
@@ -251,13 +304,22 @@ export const updateGitSource = async ({
     assertGitAuthMethod(nextAuthMethod);
     const validated = validateGitSource({
         authentication: {
-            knownHosts: sshKnownHosts === undefined ? existing.sshKnownHosts : sshKnownHosts,
+            knownHosts: retainExistingValue(
+                sshKnownHosts,
+                existing.sshKnownHosts
+            ),
             method: nextAuthMethod,
-            passphrase: sshPassphrase === undefined ? existing.sshPassphrase : sshPassphrase,
-            password: password === undefined ? existing.password : password,
-            privateKey: sshPrivateKey === undefined ? existing.sshPrivateKey : sshPrivateKey,
-            token: token === undefined ? existing.token : token,
-            username: username === undefined ? existing.username : username,
+            passphrase: retainExistingValue(
+                sshPassphrase,
+                existing.sshPassphrase
+            ),
+            password: retainExistingValue(password, existing.password),
+            privateKey: retainExistingValue(
+                sshPrivateKey,
+                existing.sshPrivateKey
+            ),
+            token: retainExistingValue(token, existing.token),
+            username: retainExistingValue(username, existing.username),
         },
         url: url ?? existing.url,
     });
@@ -268,16 +330,8 @@ export const updateGitSource = async ({
         .set({
             authMethod: nextAuthMethod,
             ...(name === undefined ? {} : { name: name.trim() }),
-            password: authentication.method === "basic" ? (authentication.password ?? null) : null,
-            sshKnownHosts:
-                authentication.method === "ssh" ? (authentication.knownHosts ?? null) : null,
-            sshPassphrase:
-                authentication.method === "ssh" ? (authentication.passphrase ?? null) : null,
-            sshPrivateKey:
-                authentication.method === "ssh" ? (authentication.privateKey ?? null) : null,
-            token: authentication.method === "token" ? (authentication.token ?? null) : null,
+            ...credentialValuesFor(authentication),
             url: validated.url,
-            username: authentication.method === "none" ? null : (authentication.username ?? null),
         })
         .where(eq(gitSource.id, gitSourceId))
         .returning();
@@ -296,13 +350,17 @@ export const deleteGitSource = async (gitSourceId: string) => {
         .where(eq(dataSource.gitSourceId, gitSourceId));
 
     if (linkedDataSources.length > 0) {
-        const noun = linkedDataSources.length === 1 ? "data source" : "data sources";
+        const noun =
+            linkedDataSources.length === 1 ? "data source" : "data sources";
         throw new Error(
-            `Git Source has ${linkedDataSources.length} linked ${noun}; reassign them before deleting the Git Source`,
+            `Git Source has ${linkedDataSources.length} linked ${noun}; reassign them before deleting the Git Source`
         );
     }
 
-    const [deleted] = await db.delete(gitSource).where(eq(gitSource.id, gitSourceId)).returning();
+    const [deleted] = await db
+        .delete(gitSource)
+        .where(eq(gitSource.id, gitSourceId))
+        .returning();
 
     if (!deleted) {
         throw new Error("Git Source not found");
@@ -311,7 +369,9 @@ export const deleteGitSource = async (gitSourceId: string) => {
     return [toGitSourceSummary(deleted)];
 };
 
-export const getResourceDataSource = async (resourceId: string): Promise<UncloudDataSource> => {
+export const getResourceDataSource = async (
+    resourceId: string
+): Promise<UncloudDataSource> => {
     const [source] = await db
         .select({
             uncloudToken: dataSource.uncloudToken,
@@ -358,16 +418,16 @@ const toOrganizationDataSourceConnection = ({
     ...toOrganizationDataSource({ git, source }),
     gitSource: {
         ...toGitSourceConnection(git),
+        organizationId: source.organizationId,
         syncEnabled: git.syncEnabled,
         syncResult: git.syncResult,
-        organizationId: source.organizationId,
     },
     uncloudToken: source.uncloudToken,
     uncloudUrl: source.uncloudUrl,
 });
 
 export const listDataSourcesForOrganization = async (
-    organizationId: string,
+    organizationId: string
 ): Promise<OrganizationDataSource[]> => {
     const rows = await db
         .select({ git: gitSource, source: dataSource })
@@ -380,7 +440,7 @@ export const listDataSourcesForOrganization = async (
 };
 
 export const listDataSourceConnectionsForOrganization = async (
-    organizationId: string,
+    organizationId: string
 ): Promise<OrganizationDataSourceConnection[]> => {
     const rows = await db
         .select({ git: gitSource, source: dataSource })
@@ -409,8 +469,8 @@ export const createDataSource = async ({
                 .where(
                     and(
                         eq(gitSource.id, assignedGitSourceId),
-                        eq(gitSource.organizationId, organizationId),
-                    ),
+                        eq(gitSource.organizationId, organizationId)
+                    )
                 );
 
             if (!assignedSource) {
@@ -462,13 +522,17 @@ export const updateDataSource = async ({
     uncloudUrl,
 }: UpdateDataSourceOptions) => {
     const [updated] = await db.transaction(async (tx) => {
-        const [existing] = await tx.select().from(dataSource).where(eq(dataSource.id, id));
+        const [existing] = await tx
+            .select()
+            .from(dataSource)
+            .where(eq(dataSource.id, id));
 
         if (!existing) {
             throw new Error("Data source not found");
         }
 
-        let assignedGitSourceId = gitSourceId === undefined ? existing.gitSourceId : gitSourceId;
+        let assignedGitSourceId =
+            gitSourceId === undefined ? existing.gitSourceId : gitSourceId;
 
         if (assignedGitSourceId === null || assignedGitSourceId.trim() === "") {
             const legacy = legacyGitSource(gitUrl);
@@ -493,8 +557,8 @@ export const updateDataSource = async ({
                 .where(
                     and(
                         eq(gitSource.id, assignedGitSourceId),
-                        eq(gitSource.organizationId, existing.organizationId),
-                    ),
+                        eq(gitSource.organizationId, existing.organizationId)
+                    )
                 );
 
             if (!assignedSource) {
@@ -516,7 +580,9 @@ export const updateDataSource = async ({
                     .returning({ id: gitSource.id });
 
                 if (!createdGitSource) {
-                    throw new Error("Unable to create Git Source for data source");
+                    throw new Error(
+                        "Unable to create Git Source for data source"
+                    );
                 }
 
                 assignedGitSourceId = createdGitSource.id;
@@ -552,11 +618,14 @@ export const deleteDataSource = async (id: string) => {
     if (linkedWorkspaces.length > 0) {
         const noun = linkedWorkspaces.length === 1 ? "workspace" : "workspaces";
         throw new Error(
-            `Data source has ${linkedWorkspaces.length} ${noun}; delete them before deleting the data source`,
+            `Data source has ${linkedWorkspaces.length} ${noun}; delete them before deleting the data source`
         );
     }
 
-    const [deleted] = await db.delete(dataSource).where(eq(dataSource.id, id)).returning();
+    const [deleted] = await db
+        .delete(dataSource)
+        .where(eq(dataSource.id, id))
+        .returning();
 
     if (!deleted) {
         throw new Error("Data source not found");
@@ -565,7 +634,9 @@ export const deleteDataSource = async (id: string) => {
     return [deleted];
 };
 
-export const discoverDataSource = async (id: string): Promise<DataSourceDiscoveryResult> => {
+export const discoverDataSource = async (
+    id: string
+): Promise<DataSourceDiscoveryResult> => {
     const [source] = await db
         .select({ git: gitSource, source: dataSource })
         .from(dataSource)
@@ -589,8 +660,8 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
             and(
                 eq(workspace.dataSourceId, source.source.id),
                 eq(workspace.name, name),
-                eq(workspace.organizationId, source.source.organizationId),
-            ),
+                eq(workspace.organizationId, source.source.organizationId)
+            )
         )
         .limit(1);
 
@@ -632,7 +703,7 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
             repoPath,
             repoUrl: source.git.url,
         },
-        async () => {},
+        () => Promise.resolve()
     );
 
     const discovery = await discoverComposeFiles(repoPath);
@@ -640,7 +711,9 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
     if (discovery.files.length === 0) {
         // Roll back a workspace that was only created for this discovery run.
         if (createdWorkspaceId) {
-            await db.delete(workspace).where(eq(workspace.id, createdWorkspaceId));
+            await db
+                .delete(workspace)
+                .where(eq(workspace.id, createdWorkspaceId));
             await fs.rm(repoPath, { force: true, recursive: true });
         }
 
@@ -668,12 +741,12 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
         linkedResources.flatMap(({ resource, workspaceId, workspaceSlug }) => [
             `${workspaceSlug}/${resource.slug ?? resource.id}/compose.yaml`,
             `${workspaceId}/${resource.slug ?? resource.id}/compose.yaml`,
-        ]),
+        ])
     );
     const importedSourcePaths = new Set(
         linkedResources.flatMap(({ resource }) =>
-            resource.settings?.sourcePath ? [resource.settings.sourcePath] : [],
-        ),
+            resource.settings?.sourcePath ? [resource.settings.sourcePath] : []
+        )
     );
 
     let existing = 0;
@@ -717,7 +790,11 @@ export const discoverDataSource = async (id: string): Promise<DataSourceDiscover
             throw new Error(`Unable to import ${file.relativePath}`);
         }
 
-        await createWorkspaceFolder(repoPath, targetWorkspace.slug, createdResource.slug ?? slug);
+        await createWorkspaceFolder(
+            repoPath,
+            targetWorkspace.slug,
+            createdResource.slug ?? slug
+        );
         importedSourcePaths.add(file.relativePath);
         imported += 1;
     }

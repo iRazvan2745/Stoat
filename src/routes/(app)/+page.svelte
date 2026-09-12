@@ -130,11 +130,9 @@
     const summaryMetric = `flex min-w-0 items-center gap-3 border-l border-outline-variant p-4 text-inherit no-underline transition-colors max-[74rem]:first:border-l-0 max-[56rem]:nth-[3]:border-l-0 max-[56rem]:nth-[n+3]:border-t max-[40rem]:border-t max-[40rem]:border-l-0 ${interactiveRow}`;
 </script>
 
-<div class="mx-auto max-w-l pt-2 pb-8">
+<div class="max-w-l mx-auto pt-2 pb-8">
     <header class="flex flex-wrap items-start justify-between gap-4">
-        <h1 class="m3-font-headline-medium text-on-surface mt-1">
-            Overview
-        </h1>
+        <h1 class="m3-font-headline-medium text-on-surface mt-1">Overview</h1>
 
         <Button
             variant="tonal"
@@ -191,7 +189,7 @@
                                 Connect your first cluster
                             </h2>
                             <p
-                                class="text-on-surface-variant m3-font-body-medium mt-1 max-w-m"
+                                class="text-on-surface-variant m3-font-body-medium max-w-m mt-1"
                             >
                                 Add a data source, create a workspace, then
                                 deploy a resource.
@@ -248,7 +246,11 @@
                             Everything looks good
                         {/if}
                     </strong>
-                    <Icon icon={arrowForwardIcon} size={20} aria-hidden="true" />
+                    <Icon
+                        icon={arrowForwardIcon}
+                        size={20}
+                        aria-hidden="true"
+                    />
                 </a>
 
                 <div
@@ -261,12 +263,11 @@
                             <Icon icon={workspacesIcon} size={20} />
                         </span>
                         <span class="flex min-w-0 flex-col">
-                            <strong
-                                class="m3-font-title-large"
+                            <strong class="m3-font-title-large"
                                 >{summary.workspaces.length}</strong
                             >
                             <span
-                                class="text-on-surface-variant mt-1 truncate m3-font-body-small"
+                                class="text-on-surface-variant m3-font-body-small mt-1 truncate"
                                 >{plural(
                                     summary.workspaces.length,
                                     "Workspace"
@@ -282,13 +283,15 @@
                             <Icon icon={deployedCodeIcon} size={20} />
                         </span>
                         <span class="flex min-w-0 flex-col">
-                            <strong
-                                class="m3-font-title-large"
+                            <strong class="m3-font-title-large"
                                 >{summary.resourceCount}</strong
                             >
                             <span
-                                class="text-on-surface-variant mt-1 truncate m3-font-body-small"
-                                >{plural(summary.resourceCount, "Resource")}</span
+                                class="text-on-surface-variant m3-font-body-small mt-1 truncate"
+                                >{plural(
+                                    summary.resourceCount,
+                                    "Resource"
+                                )}</span
                             >
                         </span>
                     </a>
@@ -300,12 +303,11 @@
                             <Icon icon={databaseIcon} size={20} />
                         </span>
                         <span class="flex min-w-0 flex-col">
-                            <strong
-                                class="m3-font-title-large"
+                            <strong class="m3-font-title-large"
                                 >{summary.dataSourceCount}</strong
                             >
                             <span
-                                class="text-on-surface-variant mt-1 truncate m3-font-body-small"
+                                class="text-on-surface-variant m3-font-body-small mt-1 truncate"
                                 >{plural(
                                     summary.dataSourceCount,
                                     "Data source"
@@ -326,13 +328,12 @@
                                     aria-label="Loading machine count"
                                 />
                             {:else}
-                                <strong
-                                    class="m3-font-title-large"
+                                <strong class="m3-font-title-large"
                                     >{onlineMachineCount}/{machineItems.length}</strong
                                 >
                             {/if}
                             <span
-                                class="text-on-surface-variant mt-1 truncate m3-font-body-small"
+                                class="text-on-surface-variant m3-font-body-small mt-1 truncate"
                                 >Machines online</span
                             >
                         </span>
@@ -350,7 +351,9 @@
                         <h2 id="attention-title" class="m3-font-title-large">
                             Needs attention
                         </h2>
-                        <p class="text-on-surface-variant mt-0.5 m3-font-body-small">
+                        <p
+                            class="text-on-surface-variant m3-font-body-small mt-0.5"
+                        >
                             Problems worth checking now
                         </p>
                     </div>
@@ -362,7 +365,9 @@
                             <LoadingIndicator
                                 aria-label="Checking cluster health"
                             />
-                            <p class="text-on-surface-variant m3-font-body-medium">
+                            <p
+                                class="text-on-surface-variant m3-font-body-medium"
+                            >
                                 Checking cluster health…
                             </p>
                         </div>
@@ -378,12 +383,16 @@
                                     >Cluster health unavailable</span
                                 >
                                 <span
-                                    class="text-on-surface-variant block truncate m3-font-body-small"
+                                    class="text-on-surface-variant m3-font-body-small block truncate"
                                 >
                                     {machines.error.message}
                                 </span>
                             </span>
-                            <Icon icon={arrowForwardIcon} size={18} aria-hidden="true" />
+                            <Icon
+                                icon={arrowForwardIcon}
+                                size={18}
+                                aria-hidden="true"
+                            />
                         </a>
                     {:else if attentionCount === 0}
                         <div class={emptyRow}>
@@ -397,7 +406,7 @@
                                     Everything looks good
                                 </p>
                                 <p
-                                    class="text-on-surface-variant mt-0.5 m3-font-body-small"
+                                    class="text-on-surface-variant m3-font-body-small mt-0.5"
                                 >
                                     No failed deployments or cluster problems
                                     found.
@@ -421,11 +430,15 @@
                                         )} with a failed deployment
                                     </span>
                                     <span
-                                        class="text-on-surface-variant block m3-font-body-small"
+                                        class="text-on-surface-variant m3-font-body-small block"
                                         >Review recent deployment activity</span
                                     >
                                 </span>
-                                <Icon icon={arrowForwardIcon} size={18} aria-hidden="true" />
+                                <Icon
+                                    icon={arrowForwardIcon}
+                                    size={18}
+                                    aria-hidden="true"
+                                />
                             </a>
                         {/if}
 
@@ -442,13 +455,17 @@
                                         >{source.label}</span
                                     >
                                     <span
-                                        class="text-on-surface-variant block truncate m3-font-body-small"
+                                        class="text-on-surface-variant m3-font-body-small block truncate"
                                     >
                                         {source.error ??
                                             "Data source is unreachable"}
                                     </span>
                                 </span>
-                                <Icon icon={arrowForwardIcon} size={18} aria-hidden="true" />
+                                <Icon
+                                    icon={arrowForwardIcon}
+                                    size={18}
+                                    aria-hidden="true"
+                                />
                             </a>
                         {/each}
 
@@ -465,12 +482,16 @@
                                         >{item.machine.name}</span
                                     >
                                     <span
-                                        class="text-on-surface-variant block m3-font-body-small"
+                                        class="text-on-surface-variant m3-font-body-small block"
                                     >
                                         Machine is {item.machine.state.toLowerCase()}
                                     </span>
                                 </span>
-                                <Icon icon={arrowForwardIcon} size={18} aria-hidden="true" />
+                                <Icon
+                                    icon={arrowForwardIcon}
+                                    size={18}
+                                    aria-hidden="true"
+                                />
                             </a>
                         {/each}
                     {/if}
@@ -483,7 +504,9 @@
                         <h2 id="activity-title" class="m3-font-title-large">
                             Recent activity
                         </h2>
-                        <p class="text-on-surface-variant mt-0.5 m3-font-body-small">
+                        <p
+                            class="text-on-surface-variant m3-font-body-small mt-0.5"
+                        >
                             Latest deployments across your workspaces
                             {#if summary.activeDeploymentCount > 0}
                                 · {summary.activeDeploymentCount} active
@@ -505,7 +528,7 @@
                                     No deployments yet
                                 </p>
                                 <p
-                                    class="text-on-surface-variant mt-0.5 m3-font-body-small"
+                                    class="text-on-surface-variant m3-font-body-small mt-0.5"
                                 >
                                     Deployment activity will appear here.
                                 </p>
@@ -539,7 +562,7 @@
                                             "Unnamed resource"}
                                     </span>
                                     <span
-                                        class="text-on-surface-variant block truncate m3-font-body-small"
+                                        class="text-on-surface-variant m3-font-body-small block truncate"
                                     >
                                         {deployment.workspaceName ??
                                             "Workspace"} · {formatTime(
@@ -567,13 +590,19 @@
                     <h2 id="workspaces-title" class="m3-font-title-large">
                         Workspaces
                     </h2>
-                    <p class="text-on-surface-variant mt-0.5 m3-font-body-small">
+                    <p
+                        class="text-on-surface-variant m3-font-body-small mt-0.5"
+                    >
                         Your most recently updated environments
                     </p>
                 </div>
                 <Button href="/workspace" variant="text" iconType="left">
                     View all
-                    <Icon icon={arrowForwardIcon} size={18} aria-hidden="true" />
+                    <Icon
+                        icon={arrowForwardIcon}
+                        size={18}
+                        aria-hidden="true"
+                    />
                 </Button>
             </div>
 
@@ -588,7 +617,9 @@
                         <h3 class="m3-font-title-medium mt-3">
                             Create your first workspace
                         </h3>
-                        <p class="text-on-surface-variant m3-font-body-medium mt-1">
+                        <p
+                            class="text-on-surface-variant m3-font-body-medium mt-1"
+                        >
                             Workspaces organize the resources deployed to a data
                             source.
                         </p>
@@ -617,13 +648,11 @@
                                 <Icon icon={workspacesIcon} size={20} />
                             </span>
                             <span class="flex min-w-0 flex-col overflow-hidden">
-                                <span
-                                    class="m3-font-label-large truncate"
-                                >
+                                <span class="m3-font-label-large truncate">
                                     {item.name ?? item.slug}
                                 </span>
                                 <span
-                                    class="text-on-surface-variant mt-0.5 flex min-w-0 items-center gap-1.5 m3-font-body-small"
+                                    class="text-on-surface-variant m3-font-body-small mt-0.5 flex min-w-0 items-center gap-1.5"
                                 >
                                     <span>
                                         {item.resourceCount}
@@ -642,7 +671,11 @@
                                     </span>
                                 </span>
                             </span>
-                            <Icon icon={arrowForwardIcon} size={18} aria-hidden="true" />
+                            <Icon
+                                icon={arrowForwardIcon}
+                                size={18}
+                                aria-hidden="true"
+                            />
                         </a>
                     {/each}
                 </Card>

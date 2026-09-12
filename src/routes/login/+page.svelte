@@ -106,7 +106,9 @@
                     height="80"
                     class="size-20 rounded-xl object-cover"
                 />
-                <h1 class="m3-font-headline-medium text-on-surface mt-4">Stoat</h1>
+                <h1 class="m3-font-headline-medium text-on-surface mt-4">
+                    Stoat
+                </h1>
                 <p class="m3-font-body-medium text-on-surface-variant mt-1">
                     {isRegister
                         ? "Create an account to get started"
@@ -183,7 +185,9 @@
                 </div>
 
                 {#if errorMessage}
-                    <p class="m3-font-body-small text-error" role="alert">{errorMessage}</p>
+                    <p class="m3-font-body-small text-error" role="alert">
+                        {errorMessage}
+                    </p>
                 {/if}
 
                 <div class="submit">

@@ -124,7 +124,7 @@
     aria-label="Find in editor"
 >
     <div
-        class="flex flex-[1_1_30rem] flex-wrap gap-2 min-w-[min(100%,30rem)] max-[60rem]:min-w-full max-[60rem]:basis-full max-[40rem]:w-full"
+        class="flex min-w-[min(100%,30rem)] flex-[1_1_30rem] flex-wrap gap-2 max-[60rem]:min-w-full max-[60rem]:basis-full max-[40rem]:w-full"
     >
         <div class="search-field min-w-[min(15rem,100%)] flex-[1_1_15rem]">
             <TextFieldOutlined
@@ -139,9 +139,7 @@
         </div>
 
         {#if !readOnly}
-            <div
-                class="search-field min-w-[min(15rem,100%)] flex-[1_1_15rem]"
-            >
+            <div class="search-field min-w-[min(15rem,100%)] flex-[1_1_15rem]">
                 <TextFieldOutlined
                     label="Replace"
                     name="replace"
@@ -196,7 +194,7 @@
     </div>
 
     <div
-        class="flex flex-[0_1_auto] flex-wrap items-center gap-y-1 gap-x-3 max-[40rem]:w-full"
+        class="flex flex-[0_1_auto] flex-wrap items-center gap-x-3 gap-y-1 max-[40rem]:w-full"
         role="group"
         aria-label="Search options"
     >

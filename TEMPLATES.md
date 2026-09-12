@@ -17,12 +17,12 @@ Stoat lists every valid app under this directory in the **Add service → Templa
 
 ## Layout
 
-| Path                                                | Required | Purpose                                                                                          |
-| --------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------ |
-| `templates/<appid>/manifest.json`                   | yes      | Display name, description, and service type                                                      |
-| `templates/<appid>/logo.svg` or `logo.png`          | no       | Icon on the template card. Copy from [svgl.app](https://svgl.app), or set `icon` in the manifest |
-| `templates/<appid>/versions/<version>/compose.yaml` | yes      | Compose file deployed for this version (`compose.yml` is also accepted)                          |
-| `templates/<appid>/versions/<version>/.env`         | no       | Environment variables seeded onto the service                                                    |
+| Path | Required | Purpose |
+| --- | --- | --- |
+| `templates/<appid>/manifest.json` | yes | Display name, description, and service type |
+| `templates/<appid>/logo.svg` or `logo.png` | no | Icon on the template card. Copy from [svgl.app](https://svgl.app), or set `icon` in the manifest |
+| `templates/<appid>/versions/<version>/compose.yaml` | yes | Compose file deployed for this version (`compose.yml` is also accepted) |
+| `templates/<appid>/versions/<version>/.env` | no | Environment variables seeded onto the service |
 
 `<appid>` and `<version>` must match `^[A-Za-z0-9][A-Za-z0-9._-]*$`. Versions are sorted newest-first using numeric comparison (`18` > `16`, `1.10` > `1.9`).
 
@@ -40,13 +40,13 @@ Apps with a missing or invalid manifest, or with no version folders, are skipped
 }
 ```
 
-| Field         | Required | Notes                                                                                                                                |
-| ------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `name`        | yes      | Shown on the template card and used as the default service name                                                                      |
-| `description` | yes      | Short summary under the name. Long text is truncated in the picker                                                                   |
-| `type`        | yes      | Stored on the created service. Use `compose` for a generic app. Use `postgresql` to get the connection URL panel on the service page |
-| `icon`        | no       | [SVGL](https://svgl.app) slug, without `.svg` (for example `postgresql`). Used when `logo.svg` / `logo.png` is missing               |
-| `tags`        | no       | Category pills on the template card (`database`, `cache`, `proxy`, …)                                                                |
+| Field | Required | Notes |
+| --- | --- | --- |
+| `name` | yes | Shown on the template card and used as the default service name |
+| `description` | yes | Short summary under the name. Long text is truncated in the picker |
+| `type` | yes | Stored on the created service. Use `compose` for a generic app. Use `postgresql` to get the connection URL panel on the service page |
+| `icon` | no | [SVGL](https://svgl.app) slug, without `.svg` (for example `postgresql`). Used when `logo.svg` / `logo.png` is missing |
+| `tags` | no | Category pills on the template card (`database`, `cache`, `proxy`, …) |
 
 ## Logo
 
@@ -69,10 +69,10 @@ For PostgreSQL, include `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`.
 
 Placeholders in `.env` values and in `compose.yaml` are expanded **once**, when the service is created. Each placeholder generates a new value.
 
-| Placeholder  | Result                                                              |
-| ------------ | ------------------------------------------------------------------- |
-| `{{ UUID }}` | A random UUID (`xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`)              |
-| `{{ 32 }}`   | A random 32-character base64 string (`A–Z`, `a–z`, `0–9`, `+`, `/`) |
+| Placeholder | Result |
+| --- | --- |
+| `{{ UUID }}` | A random UUID (`xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`) |
+| `{{ 32 }}` | A random 32-character base64 string (`A–Z`, `a–z`, `0–9`, `+`, `/`) |
 
 Spaces inside the braces are optional (`{{UUID}}` and `{{32}}` work). `{{ N }}` accepts any length from 1 to 256.
 

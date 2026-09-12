@@ -31,7 +31,7 @@ const writeTemplate = async (
         tags?: string[];
         type?: string;
         versions?: string[];
-    },
+    }
 ): Promise<void> => {
     const appPath = path.join(root, appId);
     await mkdir(appPath, { recursive: true });
@@ -43,13 +43,13 @@ const writeTemplate = async (
             name: options.name ?? "PostgreSQL",
             tags: options.tags,
             type: options.type ?? "postgresql",
-        }),
+        })
     );
 
     if (options.logo !== false) {
         await writeFile(
             path.join(appPath, "logo.svg"),
-            "<svg xmlns='http://www.w3.org/2000/svg'></svg>",
+            "<svg xmlns='http://www.w3.org/2000/svg'></svg>"
         );
     }
 
@@ -58,11 +58,13 @@ const writeTemplate = async (
         await mkdir(versionPath, { recursive: true });
         await writeFile(
             path.join(versionPath, "compose.yaml"),
-            options.compose ?? "services:\n  postgres:\n    image: postgres:18\n",
+            options.compose ??
+                "services:\n  postgres:\n    image: postgres:18\n"
         );
         await writeFile(
             path.join(versionPath, ".env"),
-            options.env ?? "POSTGRES_USER=postgres\nPOSTGRES_PASSWORD=postgres\nPOSTGRES_DB=app\n",
+            options.env ??
+                "POSTGRES_USER=postgres\nPOSTGRES_PASSWORD=postgres\nPOSTGRES_DB=app\n"
         );
     }
 };
@@ -70,15 +72,20 @@ const writeTemplate = async (
 describe("listTemplates", () => {
     it("reads the project postgresql template", async () => {
         const templates = await listTemplates();
-        const postgres = templates.find((template) => template.appId === "postgresql");
+        const postgres = templates.find(
+            (template) => template.appId === "postgresql"
+        );
 
         expect(postgres).toMatchObject({
-            description: "Relational database for apps that need durable SQL storage.",
+            description:
+                "Relational database for apps that need durable SQL storage.",
             name: "PostgreSQL",
             tags: ["database"],
             type: "postgresql",
         });
-        expect(postgres?.versions.map((version) => version.version)).toContain("18");
+        expect(postgres?.versions.map((version) => version.version)).toContain(
+            "18"
+        );
         expect(postgres?.logoSrc).toBe("/templates/postgresql/logo");
     });
 
@@ -88,7 +95,10 @@ describe("listTemplates", () => {
         try {
             await writeTemplate(root, "postgresql", { versions: ["18", "16"] });
             await mkdir(path.join(root, "broken"), { recursive: true });
-            await writeFile(path.join(root, "broken", "manifest.json"), "{not json");
+            await writeFile(
+                path.join(root, "broken", "manifest.json"),
+                "{not json"
+            );
             await writeTemplate(root, "empty", { versions: [] });
             await mkdir(path.join(root, "empty", "versions"), {
                 recursive: true,
@@ -96,8 +106,12 @@ describe("listTemplates", () => {
 
             const templates = await listTemplates(root);
 
-            expect(templates.map((template) => template.appId)).toEqual(["postgresql"]);
-            expect(templates[0]?.versions.map((version) => version.version)).toEqual(["18", "16"]);
+            expect(templates.map((template) => template.appId)).toEqual([
+                "postgresql",
+            ]);
+            expect(
+                templates[0]?.versions.map((version) => version.version)
+            ).toEqual(["18", "16"]);
         } finally {
             await rm(root, { force: true, recursive: true });
         }
@@ -160,13 +174,15 @@ describe("readTemplateVersion", () => {
     });
 
     it("rejects path-like template ids", async () => {
-        await expect(readTemplateVersion("../etc", "18")).rejects.toThrow("Invalid template");
+        await expect(readTemplateVersion("../etc", "18")).rejects.toThrow(
+            "Invalid template"
+        );
     });
 
     it("keeps secret placeholders until the resource is created", async () => {
         const version = await readTemplateVersion("postgresql", "18");
         const password = version.variables.find(
-            (variable) => variable.name === "POSTGRES_PASSWORD",
+            (variable) => variable.name === "POSTGRES_PASSWORD"
         );
 
         expect(password?.value).toBe("{{ UUID }}");
@@ -175,19 +191,27 @@ describe("readTemplateVersion", () => {
 
 describe("svglIconUrl", () => {
     it("builds the SVGL API URL and strips a trailing .svg", () => {
-        expect(svglIconUrl("postgresql")).toBe("https://api.svgl.app/svg/postgresql.svg");
-        expect(svglIconUrl("postgresql.svg")).toBe("https://api.svgl.app/svg/postgresql.svg");
+        expect(svglIconUrl("postgresql")).toBe(
+            "https://api.svgl.app/svg/postgresql.svg"
+        );
+        expect(svglIconUrl("postgresql.svg")).toBe(
+            "https://api.svgl.app/svg/postgresql.svg"
+        );
     });
 });
 
 describe("ensureSvgNamespace", () => {
     it("adds xmlns so SVG files can render in img tags", () => {
-        expect(ensureSvgNamespace('<svg xml:space="preserve" viewBox="0 0 1 1"></svg>')).toBe(
-            '<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" viewBox="0 0 1 1"></svg>',
+        expect(
+            ensureSvgNamespace(
+                '<svg xml:space="preserve" viewBox="0 0 1 1"></svg>'
+            )
+        ).toBe(
+            '<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" viewBox="0 0 1 1"></svg>'
         );
-        expect(ensureSvgNamespace('<svg xmlns="http://www.w3.org/2000/svg"></svg>')).toBe(
-            '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
-        );
+        expect(
+            ensureSvgNamespace('<svg xmlns="http://www.w3.org/2000/svg"></svg>')
+        ).toBe('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
     });
 });
 
@@ -200,7 +224,7 @@ describe("readTemplateIconValue", () => {
 
         const encoded = icon?.slice(prefix.length) ?? "";
         expect(Buffer.from(encoded, "base64").toString("utf-8")).toContain(
-            'xmlns="http://www.w3.org/2000/svg"',
+            'xmlns="http://www.w3.org/2000/svg"'
         );
     });
 
@@ -215,9 +239,9 @@ describe("readTemplateIconValue", () => {
                 type: "compose",
             });
 
-            await expect(readTemplateIconValue("redis", "redis", root)).resolves.toBe(
-                svglIconUrl("redis"),
-            );
+            await expect(
+                readTemplateIconValue("redis", "redis", root)
+            ).resolves.toBe(svglIconUrl("redis"));
         } finally {
             await rm(root, { force: true, recursive: true });
         }
@@ -230,7 +254,7 @@ describe("readTemplateLogo", () => {
 
         expect(logo?.contentType).toBe("image/svg+xml");
         expect(new TextDecoder().decode(logo?.body)).toContain(
-            'xmlns="http://www.w3.org/2000/svg"',
+            'xmlns="http://www.w3.org/2000/svg"'
         );
     });
 });
@@ -238,7 +262,9 @@ describe("readTemplateLogo", () => {
 describe("expandTemplateSecrets", () => {
     it("replaces UUID placeholders with unique UUIDs", () => {
         const expanded = expandTemplateSecrets("id={{ UUID }} other={{uuid}}");
-        const uuids = expanded.match(/[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}/giu);
+        const uuids = expanded.match(
+            /[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}/giu
+        );
 
         expect(expanded).not.toContain("{{");
         expect(uuids).toHaveLength(2);
@@ -255,8 +281,12 @@ describe("expandTemplateSecrets", () => {
 
     it("leaves unknown placeholders alone and rejects invalid lengths", () => {
         expect(expandTemplateSecrets("keep={{ FOO }}")).toBe("keep={{ FOO }}");
-        expect(() => expandTemplateSecrets("{{ 0 }}")).toThrow("length must be between");
-        expect(() => expandTemplateSecrets("{{ 257 }}")).toThrow("length must be between");
+        expect(() => expandTemplateSecrets("{{ 0 }}")).toThrow(
+            "length must be between"
+        );
+        expect(() => expandTemplateSecrets("{{ 257 }}")).toThrow(
+            "length must be between"
+        );
     });
 });
 

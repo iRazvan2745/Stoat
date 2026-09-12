@@ -33,9 +33,9 @@ describe("fetchUncloud", () => {
         const server = await listen();
 
         try {
-            await expect(fetchUncloud(new Request(server.url), 50)).rejects.toThrow(
-                "Uncloud API timed out.",
-            );
+            await expect(
+                fetchUncloud(new Request(server.url), 50)
+            ).rejects.toThrow("Uncloud API timed out.");
         } finally {
             await server.close();
         }
@@ -47,9 +47,9 @@ describe("fetchUncloudStream", () => {
         const server = await listen();
 
         try {
-            await expect(fetchUncloudStream(new Request(server.url), 50)).rejects.toThrow(
-                "Uncloud API timed out.",
-            );
+            await expect(
+                fetchUncloudStream(new Request(server.url), 50)
+            ).rejects.toThrow("Uncloud API timed out.");
         } finally {
             await server.close();
         }
@@ -70,7 +70,10 @@ describe("fetchUncloudStream", () => {
         const { port } = server.address() as AddressInfo;
 
         try {
-            const response = await fetchUncloudStream(new Request(`http://127.0.0.1:${port}/`), 50);
+            const response = await fetchUncloudStream(
+                new Request(`http://127.0.0.1:${port}/`),
+                50
+            );
             const body = await response.text();
 
             expect(body).toBe("first\nsecond\n");

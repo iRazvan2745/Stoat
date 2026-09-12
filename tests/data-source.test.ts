@@ -11,9 +11,15 @@ describe("workspace folders", () => {
         const root = await mkdtemp(path.join(tmpdir(), "stoat-data-source-"));
 
         try {
-            const folder = await createWorkspaceFolder(root, "my-workspace", "my-resource-abc12");
+            const folder = await createWorkspaceFolder(
+                root,
+                "my-workspace",
+                "my-resource-abc12"
+            );
 
-            expect(folder).toBe(path.join(root, "my-workspace", "my-resource-abc12"));
+            expect(folder).toBe(
+                path.join(root, "my-workspace", "my-resource-abc12")
+            );
             await expect(access(folder)).resolves.toBeUndefined();
         } finally {
             await rm(root, { force: true, recursive: true });
@@ -24,9 +30,9 @@ describe("workspace folders", () => {
         const root = await mkdtemp(path.join(tmpdir(), "stoat-data-source-"));
 
         try {
-            await expect(createWorkspaceFolder(root, "..", "outside")).rejects.toThrow(
-                "inside the workspace",
-            );
+            await expect(
+                createWorkspaceFolder(root, "..", "outside")
+            ).rejects.toThrow("inside the workspace");
         } finally {
             await rm(root, { force: true, recursive: true });
         }

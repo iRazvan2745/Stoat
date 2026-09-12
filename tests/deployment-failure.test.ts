@@ -51,7 +51,7 @@ describe("detectDeploymentFailure", () => {
                     message: "Wrote compose file to /tmp/compose.yaml",
                     stream: "stdout",
                 },
-            ]),
+            ])
         ).toBeNull();
     });
 });

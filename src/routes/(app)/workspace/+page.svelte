@@ -148,7 +148,9 @@
         </div>
     {:else}
         {#if workspaces.length === 0}
-            <div class="text-on-surface-variant m3-font-body-medium px-5 py-10 text-center">
+            <div
+                class="text-on-surface-variant m3-font-body-medium px-5 py-10 text-center"
+            >
                 No workspaces yet.
             </div>
         {/if}

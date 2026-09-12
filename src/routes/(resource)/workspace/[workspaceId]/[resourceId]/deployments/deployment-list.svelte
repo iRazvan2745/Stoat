@@ -40,7 +40,9 @@
     </Card>
 {:else if error}
     <Card variant="elevated">
-        <p class="text-error m3-font-body-medium p-6" role="alert">{error.message}</p>
+        <p class="text-error m3-font-body-medium p-6" role="alert">
+            {error.message}
+        </p>
     </Card>
 {:else if deployments.length === 0}
     <Card variant="elevated">
@@ -55,7 +57,9 @@
                 No deployments yet
             </p>
 
-            <p class="text-on-surface-variant m3-font-body-medium mx-auto mt-1 max-w-m">
+            <p
+                class="text-on-surface-variant m3-font-body-medium max-w-m mx-auto mt-1"
+            >
                 Deployments for this resource will appear here once one has been
                 created.
             </p>

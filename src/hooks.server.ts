@@ -35,7 +35,7 @@ const isGuardedPath = (pathname: string): boolean =>
     !(
         pathname.startsWith("/_app/") ||
         PUBLIC_PATH_PREFIXES.some(
-            (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+            (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
         )
     );
 
@@ -84,7 +84,10 @@ const handleRemoteLogging: Handle = async ({ event, resolve }) => {
             logger?.set({ user: { id: event.locals.session.user.id } });
         }
 
-        const inspection = await inspectRemoteResponse(response, !hasRemoteHandlerRun(logger));
+        const inspection = await inspectRemoteResponse(
+            response,
+            !hasRemoteHandlerRun(logger)
+        );
         const operation = invocation?.functionName ?? "unknown";
 
         if (inspection.outcome === "error" && !hasRemoteFailure(logger)) {
@@ -92,9 +95,9 @@ const handleRemoteLogging: Handle = async ({ event, resolve }) => {
                 logger,
                 operation,
                 new Error(
-                    `Remote function ${operation} failed: ${inspection.message ?? "Unknown error"}`,
+                    `Remote function ${operation} failed: ${inspection.message ?? "Unknown error"}`
                 ),
-                inspection.status,
+                inspection.status
             );
         }
 
@@ -113,7 +116,7 @@ export const handle: Handle = sequence(
     evlogHooks.handle,
     handleBetterAuth,
     handleRemoteLogging,
-    handleSession,
+    handleSession
 );
 export const { handleError } = evlogHooks;
 
@@ -122,12 +125,14 @@ export const init: ServerInit = async () => {
         return;
     }
 
-    const { ensureGitSyncWorker } = await import("#lib/server/git-sources/worker");
+    const { ensureGitSyncWorker } =
+        await import("#lib/server/git-sources/worker");
     ensureGitSyncWorker();
 
     // Start the deployment worker at boot so jobs queued before a restart are
     // picked up without waiting for someone to trigger a new deployment.
-    const { ensureDeploymentWorker } = await import("#lib/server/deployments/deployments");
+    const { ensureDeploymentWorker } =
+        await import("#lib/server/deployments/deployments");
 
     try {
         await ensureDeploymentWorker();

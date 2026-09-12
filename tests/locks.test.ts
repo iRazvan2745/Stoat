@@ -5,7 +5,7 @@ import { withKeyedLock } from "#lib/server/shared/locks";
 describe("withKeyedLock", () => {
     it("serializes work for the same key", async () => {
         const order: number[] = [];
-        const firstGate = Promise.withResolvers<void>();
+        const firstGate = Promise.withResolvers<boolean>();
 
         const first = withKeyedLock("same", async () => {
             order.push(1);
@@ -20,13 +20,13 @@ describe("withKeyedLock", () => {
         await Promise.resolve();
         expect(order).toEqual([1]);
 
-        firstGate.resolve();
+        firstGate.resolve(true);
         await Promise.all([first, second]);
         expect(order).toEqual([1, 2, 3]);
     });
 
     it("runs different keys concurrently", async () => {
-        const gate = Promise.withResolvers<void>();
+        const gate = Promise.withResolvers<boolean>();
         let otherStarted = false;
 
         const held = withKeyedLock("a", async () => {
@@ -40,7 +40,7 @@ describe("withKeyedLock", () => {
         await Promise.resolve();
         expect(otherStarted).toBe(true);
 
-        gate.resolve();
+        gate.resolve(true);
         await Promise.all([held, other]);
     });
 });

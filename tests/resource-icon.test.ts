@@ -11,21 +11,25 @@ import {
 describe("resourceIconSrc", () => {
     it("returns http(s) and relative URLs", () => {
         expect(resourceIconSrc("https://api.svgl.app/svg/postgresql.svg")).toBe(
-            "https://api.svgl.app/svg/postgresql.svg",
+            "https://api.svgl.app/svg/postgresql.svg"
         );
-        expect(resourceIconSrc("/templates/postgresql/logo")).toBe("/templates/postgresql/logo");
+        expect(resourceIconSrc("/templates/postgresql/logo")).toBe(
+            "/templates/postgresql/logo"
+        );
     });
 
     it("keeps data URIs and wraps raw base64", () => {
         const dataUri = "data:image/svg+xml;base64,PHN2Zy8+";
         expect(resourceIconSrc(dataUri)).toBe(dataUri);
         expect(
-            resourceIconSrc("PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjwvc3ZnPg=="),
+            resourceIconSrc(
+                "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjwvc3ZnPg=="
+            )
         ).toBe(
-            "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjwvc3ZnPg==",
+            "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjwvc3ZnPg=="
         );
         expect(resourceIconSrc("iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB")).toBe(
-            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB",
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"
         );
     });
 
@@ -39,8 +43,12 @@ describe("resourceIconSrc", () => {
 
 describe("resolveResourceIcon", () => {
     it("prefers a stored icon over the postgres fallback", () => {
-        expect(resolveResourceIcon("/custom.svg", "postgresql")).toBe("/custom.svg");
-        expect(resolveResourceIcon(null, "postgresql")).toBe("/templates/postgresql/logo");
+        expect(resolveResourceIcon("/custom.svg", "postgresql")).toBe(
+            "/custom.svg"
+        );
+        expect(resolveResourceIcon(null, "postgresql")).toBe(
+            "/templates/postgresql/logo"
+        );
         expect(resolveResourceIcon(null, "compose")).toBeNull();
     });
 });
@@ -53,20 +61,22 @@ describe("normalizeResourceIcon", () => {
     });
 
     it("keeps safe URLs and data URIs", () => {
-        expect(normalizeResourceIcon("https://api.svgl.app/svg/postgresql.svg")).toBe(
-            "https://api.svgl.app/svg/postgresql.svg",
-        );
+        expect(
+            normalizeResourceIcon("https://api.svgl.app/svg/postgresql.svg")
+        ).toBe("https://api.svgl.app/svg/postgresql.svg");
         expect(normalizeResourceIcon("data:image/png;base64,iVBORw0KGgo")).toBe(
-            "data:image/png;base64,iVBORw0KGgo",
+            "data:image/png;base64,iVBORw0KGgo"
         );
     });
 
     it("rejects unsafe values and oversized icons", () => {
         expect(() => normalizeResourceIcon(`javascript${":"}alert(1)`)).toThrow(
-            "Invalid resource icon",
+            "Invalid resource icon"
         );
         expect(() =>
-            normalizeResourceIcon(`data:image/png;base64,${"A".repeat(MAX_RESOURCE_ICON_LENGTH)}`),
+            normalizeResourceIcon(
+                `data:image/png;base64,${"A".repeat(MAX_RESOURCE_ICON_LENGTH)}`
+            )
         ).toThrow("Resource icon is too large");
     });
 });
@@ -77,7 +87,9 @@ describe("resourceIconFromFile", () => {
             type: "image/png",
         });
 
-        await expect(resourceIconFromFile(file)).resolves.toMatch(/^data:image\/png;base64,/u);
+        await expect(resourceIconFromFile(file)).resolves.toMatch(
+            /^data:image\/png;base64,/u
+        );
     });
 
     it("rejects an unsupported type", async () => {
@@ -85,6 +97,8 @@ describe("resourceIconFromFile", () => {
             type: "text/plain",
         });
 
-        await expect(resourceIconFromFile(file)).rejects.toThrow("PNG, JPEG, GIF, WebP, or SVG");
+        await expect(resourceIconFromFile(file)).rejects.toThrow(
+            "PNG, JPEG, GIF, WebP, or SVG"
+        );
     });
 });

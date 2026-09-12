@@ -3,7 +3,12 @@ import { useLogger } from "evlog/sveltekit";
 
 export type RemoteFunctionType = "command" | "query" | "query.live" | "unknown";
 
-type RemoteLogPhase = "completed" | "failed" | "requested" | "responded" | "started";
+type RemoteLogPhase =
+    | "completed"
+    | "failed"
+    | "requested"
+    | "responded"
+    | "started";
 type RemoteTransport = "form" | "get" | "json" | "other";
 
 export interface RemoteInputSummary {
@@ -13,7 +18,14 @@ export interface RemoteInputSummary {
     length?: number;
     nestedKeys?: Record<string, string[]>;
     stringLengths?: Record<string, number>;
-    type: "array" | "boolean" | "null" | "number" | "object" | "string" | "undefined";
+    type:
+        | "array"
+        | "boolean"
+        | "null"
+        | "number"
+        | "object"
+        | "string"
+        | "undefined";
 }
 
 export interface RemoteInvocation {
@@ -52,13 +64,16 @@ const SAFE_IDENTIFIER_KEYS = new Set([
     "version",
     "workspaceId",
 ]);
-const SENSITIVE_KEY_PATTERN = /authorization|cookie|credential|password|private|secret|token/iu;
+const SENSITIVE_KEY_PATTERN =
+    /authorization|cookie|credential|password|private|secret|token/iu;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null && !Array.isArray(value);
 
 const clippedIdentifier = (value: string): string =>
-    value.length <= MAX_IDENTIFIER_LENGTH ? value : `${value.slice(0, 32)}…${value.slice(-16)}`;
+    value.length <= MAX_IDENTIFIER_LENGTH
+        ? value
+        : `${value.slice(0, 32)}…${value.slice(-16)}`;
 
 const decodePathSegment = (value: string): string => {
     try {
@@ -76,7 +91,9 @@ const getPathname = (requestUrl: string): string => {
     }
 };
 
-const getTransport = (request: Pick<Request, "headers" | "method">): RemoteTransport => {
+const getTransport = (
+    request: Pick<Request, "headers" | "method">
+): RemoteTransport => {
     if (request.method === "GET") {
         return "get";
     }
@@ -100,7 +117,7 @@ const getTransport = (request: Pick<Request, "headers" | "method">): RemoteTrans
 const addSummaryField = <Key extends keyof RemoteInputSummary>(
     summary: RemoteInputSummary,
     key: Key,
-    value: RemoteInputSummary[Key],
+    value: RemoteInputSummary[Key]
 ): void => {
     if (
         value === undefined ||
@@ -190,7 +207,7 @@ export const summarizeRemoteInput = (input: unknown): RemoteInputSummary => {
 
 export const parseRemoteInvocation = (
     request: Pick<Request, "headers" | "method" | "url">,
-    pagePath?: string,
+    pagePath?: string
 ): RemoteInvocation | null => {
     const pathname = getPathname(request.url);
     const markerIndex = pathname.lastIndexOf(REMOTE_PATH_MARKER);
@@ -240,7 +257,9 @@ export const hasRemoteFailure = (logger: RemoteLogger | undefined): boolean => {
     );
 };
 
-export const hasRemoteHandlerRun = (logger: RemoteLogger | undefined): boolean => {
+export const hasRemoteHandlerRun = (
+    logger: RemoteLogger | undefined
+): boolean => {
     const remoteCalls = logger?.getContext().remoteCalls;
 
     return (
@@ -251,13 +270,15 @@ export const hasRemoteHandlerRun = (logger: RemoteLogger | undefined): boolean =
 
 const getInputSummary = <Input>(
     input: Input,
-    inputKey: string | undefined,
+    inputKey: string | undefined
 ): RemoteInputSummary | undefined => {
     if (input === undefined && inputKey === undefined) {
         return undefined;
     }
 
-    return summarizeRemoteInput(inputKey === undefined ? input : { [inputKey]: input });
+    return summarizeRemoteInput(
+        inputKey === undefined ? input : { [inputKey]: input }
+    );
 };
 
 const normalizeError = (caught: unknown): Error => {
@@ -286,10 +307,15 @@ interface RemoteLogEntry {
     type: RemoteFunctionType;
 }
 
-const responseStatusFields = (responseStatus: number | undefined): { responseStatus?: number } =>
+const responseStatusFields = (
+    responseStatus: number | undefined
+): { responseStatus?: number } =>
     responseStatus === undefined ? {} : { responseStatus };
 
-const logRemoteEntry = (logger: RemoteLogger | undefined, entry: RemoteLogEntry): void => {
+const logRemoteEntry = (
+    logger: RemoteLogger | undefined,
+    entry: RemoteLogEntry
+): void => {
     if (!logger) {
         return;
     }
@@ -322,7 +348,7 @@ const logRemoteEntry = (logger: RemoteLogger | undefined, entry: RemoteLogEntry)
 
 export const logRemoteRequest = (
     logger: RemoteLogger | undefined,
-    invocation: RemoteInvocation,
+    invocation: RemoteInvocation
 ): void => {
     if (!logger) {
         return;
@@ -346,7 +372,7 @@ export const logRemoteRequest = (
 export const logRemoteResponse = (
     logger: RemoteLogger | undefined,
     operation: string,
-    response: RemoteResponseInspection,
+    response: RemoteResponseInspection
 ): void => {
     if (!logger) {
         return;
@@ -374,7 +400,7 @@ export const logRemoteError = (
     logger: RemoteLogger | undefined,
     operation: string,
     error: unknown,
-    responseStatus?: number,
+    responseStatus?: number
 ): void => {
     logRemoteEntry(logger, {
         error,
@@ -389,19 +415,19 @@ export function withRemoteLogging<Output>(
     operation: string,
     type: Exclude<RemoteFunctionType, "unknown">,
     fn: () => MaybePromise<Output>,
-    options?: RemoteLoggingOptions,
+    options?: RemoteLoggingOptions
 ): () => Promise<Output>;
 export function withRemoteLogging<Input, Output>(
     operation: string,
     type: Exclude<RemoteFunctionType, "unknown">,
     fn: (input: Input) => MaybePromise<Output>,
-    options?: RemoteLoggingOptions,
+    options?: RemoteLoggingOptions
 ): (input: Input) => Promise<Output>;
 export function withRemoteLogging<Input, Output>(
     operation: string,
     type: Exclude<RemoteFunctionType, "unknown">,
     fn: (input: Input) => MaybePromise<Output>,
-    options?: RemoteLoggingOptions,
+    options?: RemoteLoggingOptions
 ): (input: Input) => Promise<Output> {
     return async (input: Input): Promise<Output> => {
         const logger = getRemoteLogger();
@@ -440,8 +466,10 @@ export function withRemoteLogging<Input, Output>(
 export const withRemoteLiveLogging =
     <Input, Output>(
         operation: string,
-        fn: (input: Input) => AsyncIterable<Output> | PromiseLike<AsyncIterable<Output>>,
-        options?: RemoteLoggingOptions,
+        fn: (
+            input: Input
+        ) => AsyncIterable<Output> | PromiseLike<AsyncIterable<Output>>,
+        options?: RemoteLoggingOptions
     ): ((input: Input) => AsyncGenerator<Output>) =>
     (input: Input): AsyncGenerator<Output> => {
         // SvelteKit starts consuming query.live generators from a stream pull,
@@ -488,7 +516,7 @@ export const withRemoteLiveLogging =
 
 export const inspectRemoteResponse = async (
     response: Response,
-    inspectProtocolBody = true,
+    inspectProtocolBody = true
 ): Promise<RemoteResponseInspection> => {
     const { status: responseStatus, statusText } = response;
     const contentType = response.headers.get("content-type")?.toLowerCase();
@@ -499,7 +527,10 @@ export const inspectRemoteResponse = async (
 
             if (isRecord(payload) && payload.type === "error") {
                 const { error: payloadError, status: payloadStatus } = payload;
-                const status = typeof payloadStatus === "number" ? payloadStatus : responseStatus;
+                const status =
+                    typeof payloadStatus === "number"
+                        ? payloadStatus
+                        : responseStatus;
                 let message = "Remote function returned an error.";
 
                 if (typeof payloadError === "string") {

@@ -4,6 +4,8 @@ import tailwindcss from "@tailwindcss/vite";
 import { functionsMixins } from "vite-plugin-functions-mixins";
 import { defineConfig, lazyPlugins } from "vite-plus";
 
+import formatConfig from "./oxfmt.config";
+
 const functionsMixinsPre = {
     ...functionsMixins({ deps: ["m3-svelte"] }),
     enforce: "pre" as const,
@@ -19,9 +21,11 @@ const functionsMixinsPost = {
 };
 
 export default defineConfig({
-    fmt: { ignorePatterns: ["**/schema.d.ts"] },
+    fmt: formatConfig,
     lint: {
-        jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
+        jsPlugins: [
+            { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
+        ],
         options: { typeAware: true, typeCheck: true },
         rules: { "vite-plus/prefer-vite-plus-imports": "error" },
     },
@@ -59,7 +63,9 @@ export default defineConfig({
                 experimental: { async: true },
                 // Force runes mode for the project, except for libraries. Can be removed in svelte 6.
                 runes: ({ filename }) =>
-                    filename.split(/[/\\]/u).includes("node_modules") ? undefined : true,
+                    filename.split(/[/\\]/u).includes("node_modules")
+                        ? undefined
+                        : true,
             },
             experimental: {
                 explicitEnvironmentVariables: true,
@@ -76,7 +82,7 @@ export default defineConfig({
         "*": "vp check --fix",
     },
     test: {
-        include: ["tests/**/*.test.ts", "src/**/*.test.ts"],
         exclude: ["tests/integration/**"],
+        include: ["tests/**/*.test.ts", "src/**/*.test.ts"],
     },
 });

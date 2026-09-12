@@ -65,7 +65,9 @@
         gitSourceId: string,
         resolution?: "app" | "git"
     ): Promise<void> => {
-        if (syncingGitSourceId) return;
+        if (syncingGitSourceId) {
+            return;
+        }
         syncingGitSourceId = gitSourceId;
         try {
             const result = resolution
@@ -89,10 +91,12 @@
         gitSourceId: string,
         enabled: boolean
     ): Promise<void> => {
-        if (updatingSyncId) return;
+        if (updatingSyncId) {
+            return;
+        }
         updatingSyncId = gitSourceId;
         try {
-            await updateGitSourceSync({ gitSourceId, enabled });
+            await updateGitSourceSync({ enabled, gitSourceId });
             await gitSources.refresh();
             snackbar(
                 enabled
@@ -549,13 +553,13 @@
     onkeydown={closeActionsMenuOnEscape}
 />
 
-<main class="mx-auto w-full max-w-l px-6 py-10 max-m:px-4 max-m:py-6">
+<main class="max-w-l max-m:px-4 max-m:py-6 mx-auto w-full px-6 py-10">
     <header class="flex flex-wrap items-end justify-between gap-4">
         <div>
             <h1 class="m3-font-headline-medium text-on-surface">
                 Data sources
             </h1>
-            <p class="text-on-surface-variant m3-font-body-medium mt-2 max-w-m">
+            <p class="text-on-surface-variant m3-font-body-medium max-w-m mt-2">
                 Cluster connections select where services deploy. Git
                 repositories store Compose configuration and provide discovery;
                 assign one to each connection.
@@ -613,12 +617,18 @@
                 <Card variant="filled" id="data-sources-list">
                     {#each dataSources.current ?? [] as ds (ds.id)}
                         {@const presentation = presentDataSource(ds)}
-                        <div class="grid min-h-18 grid-cols-[auto_minmax(0,1.2fr)_minmax(12rem,0.8fr)_auto] items-center gap-3.5 border-b border-outline-variant py-3 pr-3.5 pl-4 transition-colors first:rounded-t-2xl last:rounded-b-2xl last:border-b-0 only:rounded-2xl hover:bg-surface-container max-[44rem]:grid-cols-[auto_minmax(0,1fr)_auto] max-[44rem]:gap-x-3 max-[44rem]:gap-y-2.5 max-[44rem]:[&>:last-child]:col-start-3 max-[44rem]:[&>:last-child]:row-start-1 max-[44rem]:[&>:last-child]:row-span-2">
-                            <span class="bg-primary-container text-on-primary-container inline-flex size-9 items-center justify-center rounded-full">
+                        <div
+                            class="border-outline-variant hover:bg-surface-container grid min-h-18 grid-cols-[auto_minmax(0,1.2fr)_minmax(12rem,0.8fr)_auto] items-center gap-3.5 border-b py-3 pr-3.5 pl-4 transition-colors first:rounded-t-2xl last:rounded-b-2xl last:border-b-0 only:rounded-2xl max-[44rem]:grid-cols-[auto_minmax(0,1fr)_auto] max-[44rem]:gap-x-3 max-[44rem]:gap-y-2.5 max-[44rem]:[&>:last-child]:col-start-3 max-[44rem]:[&>:last-child]:row-span-2 max-[44rem]:[&>:last-child]:row-start-1"
+                        >
+                            <span
+                                class="bg-primary-container text-on-primary-container inline-flex size-9 items-center justify-center rounded-full"
+                            >
                                 <Icon icon={cloudIcon} size={20} />
                             </span>
                             <span class="flex min-w-0 flex-col overflow-hidden">
-                                <span class="m3-font-title-small text-on-surface overflow-hidden text-ellipsis whitespace-nowrap">
+                                <span
+                                    class="m3-font-title-small text-on-surface overflow-hidden text-ellipsis whitespace-nowrap"
+                                >
                                     {connectionLabel(presentation.uncloudUrl)}
                                 </span>
                                 <span
@@ -628,8 +638,11 @@
                                     {presentation.uncloudUrl}
                                 </span>
                             </span>
-                            <span class="flex min-w-0 flex-col overflow-hidden max-[44rem]:col-start-2">
-                                <span class="m3-font-title-small text-on-surface overflow-hidden text-ellipsis whitespace-nowrap"
+                            <span
+                                class="flex min-w-0 flex-col overflow-hidden max-[44rem]:col-start-2"
+                            >
+                                <span
+                                    class="m3-font-title-small text-on-surface overflow-hidden text-ellipsis whitespace-nowrap"
                                     >{presentation.gitSource}</span
                                 >
                                 <span
@@ -714,7 +727,7 @@
             headline="Add cluster connection"
         >
             <div
-                class="flex min-w-[min(30rem,calc(100vw-3rem))] flex-col gap-5 max-m:min-w-0"
+                class="max-m:min-w-0 flex min-w-[min(30rem,calc(100vw-3rem))] flex-col gap-5"
             >
                 <div
                     class="bg-primary-container-subtle flex items-start gap-3 rounded-xl p-3.5"
@@ -743,9 +756,7 @@
                     {#if gitSources.loading}
                         <LoadingIndicator aria-label="Loading Git Sources" />
                     {:else if gitSourceOptions.length === 0}
-                        <p
-                            class="text-on-surface-variant m3-font-body-small"
-                        >
+                        <p class="text-on-surface-variant m3-font-body-small">
                             Add a Git Source first, then assign it to this data
                             source.
                         </p>
@@ -833,7 +844,9 @@
                     <h3 class="m3-font-title-medium text-on-surface mt-3">
                         No Git Sources yet
                     </h3>
-                    <p class="text-on-surface-variant m3-font-body-medium mt-1 max-w-m">
+                    <p
+                        class="text-on-surface-variant m3-font-body-medium max-w-m mt-1"
+                    >
                         Add a public repository or connect with an HTTPS token,
                         basic credentials, or an SSH private key.
                     </p>
@@ -854,16 +867,28 @@
                         {@const repositoryUrl =
                             presentDataSource({ gitUrl: source.url })
                                 .gitRepository ?? "No repository URL"}
-                        <div class="grid min-h-18 grid-cols-[auto_minmax(0,1.2fr)_minmax(12rem,0.8fr)_auto] items-center gap-3.5 border-b border-outline-variant py-3 pr-3.5 pl-4 transition-colors first:rounded-t-2xl last:rounded-b-2xl last:border-b-0 only:rounded-2xl hover:bg-surface-container max-[44rem]:grid-cols-[auto_minmax(0,1fr)_auto] max-[44rem]:gap-x-3 max-[44rem]:gap-y-2.5 max-[44rem]:[&>:last-child]:col-start-3 max-[44rem]:[&>:last-child]:row-start-1 max-[44rem]:[&>:last-child]:row-span-2">
-                            <span class="bg-secondary-container text-on-secondary-container inline-flex size-9 items-center justify-center rounded-full">
+                        <div
+                            class="border-outline-variant hover:bg-surface-container grid min-h-18 grid-cols-[auto_minmax(0,1.2fr)_minmax(12rem,0.8fr)_auto] items-center gap-3.5 border-b py-3 pr-3.5 pl-4 transition-colors first:rounded-t-2xl last:rounded-b-2xl last:border-b-0 only:rounded-2xl max-[44rem]:grid-cols-[auto_minmax(0,1fr)_auto] max-[44rem]:gap-x-3 max-[44rem]:gap-y-2.5 max-[44rem]:[&>:last-child]:col-start-3 max-[44rem]:[&>:last-child]:row-span-2 max-[44rem]:[&>:last-child]:row-start-1"
+                        >
+                            <span
+                                class="bg-secondary-container text-on-secondary-container inline-flex size-9 items-center justify-center rounded-full"
+                            >
                                 <Icon icon={keyIcon} size={20} />
                             </span>
                             <span class="flex min-w-0 flex-col overflow-hidden">
-                                <span class="m3-font-title-small text-on-surface overflow-hidden text-ellipsis whitespace-nowrap">{source.name}</span>
-                                <span class="m3-font-body-small text-on-surface-variant mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap" title={repositoryUrl}>
+                                <span
+                                    class="m3-font-title-small text-on-surface overflow-hidden text-ellipsis whitespace-nowrap"
+                                    >{source.name}</span
+                                >
+                                <span
+                                    class="m3-font-body-small text-on-surface-variant mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap"
+                                    title={repositoryUrl}
+                                >
                                     {repositoryUrl}
                                 </span>
-                                <span class="m3-font-body-small text-on-surface-variant mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
+                                <span
+                                    class="m3-font-body-small text-on-surface-variant mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap"
+                                >
                                     {source.syncEnabled
                                         ? "Auto deploy: every minute"
                                         : "Auto deploy paused"}
@@ -879,7 +904,10 @@
                                     {/if}
                                 </span>
                                 {#if (source.syncResult?.issues ?? []).length > 0}
-                                    <span role="alert" class="flex flex-col gap-1">
+                                    <span
+                                        role="alert"
+                                        class="flex flex-col gap-1"
+                                    >
                                         {#each source.syncResult?.issues ?? [] as issue}
                                             <span
                                                 class="text-error m3-font-body-small whitespace-normal"
@@ -889,8 +917,12 @@
                                     </span>
                                 {/if}
                             </span>
-                            <span class="flex min-w-0 flex-col overflow-hidden max-[44rem]:col-start-2">
-                                <span class="m3-font-label-medium text-on-surface inline-flex items-center gap-1.5">
+                            <span
+                                class="flex min-w-0 flex-col overflow-hidden max-[44rem]:col-start-2"
+                            >
+                                <span
+                                    class="m3-font-label-medium text-on-surface inline-flex items-center gap-1.5"
+                                >
                                     <Icon
                                         icon={source.authMethod === "ssh"
                                             ? terminalIcon
@@ -901,7 +933,9 @@
                                     />
                                     {authMethodLabel(source.authMethod)}
                                 </span>
-                                <span class="m3-font-body-small text-on-surface-variant mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
+                                <span
+                                    class="m3-font-body-small text-on-surface-variant mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap"
+                                >
                                     {#if source.username}{source.username} ·
                                     {/if}{linkedCount}
                                     {linkedCount === 1
@@ -1055,7 +1089,7 @@
     headline="Edit cluster connection"
 >
     <div
-        class="flex min-w-[min(30rem,calc(100vw-3rem))] flex-col gap-5 max-m:min-w-0"
+        class="max-m:min-w-0 flex min-w-[min(30rem,calc(100vw-3rem))] flex-col gap-5"
     >
         <div class="flex flex-col gap-3">
             <span class="m3-font-label-large text-on-surface"
@@ -1139,7 +1173,7 @@
     onclose={closeCreateGitSourceDialog}
 >
     <div
-        class="flex min-w-[min(30rem,calc(100vw-3rem))] flex-col gap-5 max-m:min-w-0"
+        class="max-m:min-w-0 flex min-w-[min(30rem,calc(100vw-3rem))] flex-col gap-5"
     >
         <div class="flex flex-col gap-3">
             <span class="m3-font-label-large text-on-surface">Repository</span>
@@ -1237,7 +1271,7 @@
     onclose={closeEditGitSourceDialog}
 >
     <div
-        class="flex min-w-[min(30rem,calc(100vw-3rem))] flex-col gap-5 max-m:min-w-0"
+        class="max-m:min-w-0 flex min-w-[min(30rem,calc(100vw-3rem))] flex-col gap-5"
     >
         <div class="flex flex-col gap-3">
             <span class="m3-font-label-large text-on-surface">Repository</span>

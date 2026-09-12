@@ -40,11 +40,19 @@ export async function listResourceFiles(resourceId: string) {
         .orderBy(asc(resourceFiles.path));
 }
 
-export async function getResourceFile(resourceId: string, fileIdOrPath: string) {
+export async function getResourceFile(
+    resourceId: string,
+    fileIdOrPath: string
+) {
     const [byId] = await db
         .select()
         .from(resourceFiles)
-        .where(and(eq(resourceFiles.resourceId, resourceId), eq(resourceFiles.id, fileIdOrPath)));
+        .where(
+            and(
+                eq(resourceFiles.resourceId, resourceId),
+                eq(resourceFiles.id, fileIdOrPath)
+            )
+        );
 
     if (byId) {
         return byId;
@@ -53,19 +61,34 @@ export async function getResourceFile(resourceId: string, fileIdOrPath: string) 
     const [byPath] = await db
         .select()
         .from(resourceFiles)
-        .where(and(eq(resourceFiles.resourceId, resourceId), eq(resourceFiles.path, fileIdOrPath)));
+        .where(
+            and(
+                eq(resourceFiles.resourceId, resourceId),
+                eq(resourceFiles.path, fileIdOrPath)
+            )
+        );
 
     return byPath;
 }
 
-export async function createResourceFile(resourceId: string, input: CreateResourceFileInput) {
-    const path = assertSafeResourceFilePath(normalizeResourceFilePath(input.path));
+export async function createResourceFile(
+    resourceId: string,
+    input: CreateResourceFileInput
+) {
+    const path = assertSafeResourceFilePath(
+        normalizeResourceFilePath(input.path)
+    );
     const content = assertSafeResourceFileContent(input.content);
 
     const [existing] = await db
         .select({ id: resourceFiles.id })
         .from(resourceFiles)
-        .where(and(eq(resourceFiles.resourceId, resourceId), eq(resourceFiles.path, path)));
+        .where(
+            and(
+                eq(resourceFiles.resourceId, resourceId),
+                eq(resourceFiles.path, path)
+            )
+        );
 
     if (existing) {
         throw toDuplicatePathError(path);
@@ -94,12 +117,17 @@ export async function createResourceFile(resourceId: string, input: CreateResour
 export async function updateResourceFile(
     resourceId: string,
     fileId: string,
-    patch: UpdateResourceFileInput,
+    patch: UpdateResourceFileInput
 ) {
     const [existing] = await db
         .select()
         .from(resourceFiles)
-        .where(and(eq(resourceFiles.resourceId, resourceId), eq(resourceFiles.id, fileId)));
+        .where(
+            and(
+                eq(resourceFiles.resourceId, resourceId),
+                eq(resourceFiles.id, fileId)
+            )
+        );
 
     if (!existing) {
         throw new Error("Resource file not found");
@@ -108,7 +136,9 @@ export async function updateResourceFile(
     const next: { path?: string; content?: string } = {};
 
     if (patch.path !== undefined) {
-        next.path = assertSafeResourceFilePath(normalizeResourceFilePath(patch.path));
+        next.path = assertSafeResourceFilePath(
+            normalizeResourceFilePath(patch.path)
+        );
     }
 
     if (patch.content !== undefined) {
@@ -124,7 +154,10 @@ export async function updateResourceFile(
             .select({ id: resourceFiles.id })
             .from(resourceFiles)
             .where(
-                and(eq(resourceFiles.resourceId, resourceId), eq(resourceFiles.path, next.path)),
+                and(
+                    eq(resourceFiles.resourceId, resourceId),
+                    eq(resourceFiles.path, next.path)
+                )
             );
 
         if (conflict) {
@@ -136,7 +169,12 @@ export async function updateResourceFile(
         const [updated] = await db
             .update(resourceFiles)
             .set(next)
-            .where(and(eq(resourceFiles.resourceId, resourceId), eq(resourceFiles.id, fileId)))
+            .where(
+                and(
+                    eq(resourceFiles.resourceId, resourceId),
+                    eq(resourceFiles.id, fileId)
+                )
+            )
             .returning();
 
         if (!updated) {
@@ -156,7 +194,12 @@ export async function updateResourceFile(
 export async function deleteResourceFile(resourceId: string, fileId: string) {
     const [deleted] = await db
         .delete(resourceFiles)
-        .where(and(eq(resourceFiles.resourceId, resourceId), eq(resourceFiles.id, fileId)))
+        .where(
+            and(
+                eq(resourceFiles.resourceId, resourceId),
+                eq(resourceFiles.id, fileId)
+            )
+        )
         .returning();
 
     if (!deleted) {
@@ -166,13 +209,17 @@ export async function deleteResourceFile(resourceId: string, fileId: string) {
     return deleted;
 }
 
-export async function deleteResourceFilesForResource(resourceId: string): Promise<void> {
-    await db.delete(resourceFiles).where(eq(resourceFiles.resourceId, resourceId));
+export async function deleteResourceFilesForResource(
+    resourceId: string
+): Promise<void> {
+    await db
+        .delete(resourceFiles)
+        .where(eq(resourceFiles.resourceId, resourceId));
 }
 
 export async function replaceResourceFiles(
     resourceId: string,
-    files: readonly CreateResourceFileInput[],
+    files: readonly CreateResourceFileInput[]
 ) {
     const normalized = files.map((file) => ({
         content: assertSafeResourceFileContent(file.content),
@@ -185,7 +232,9 @@ export async function replaceResourceFiles(
     }
 
     return await db.transaction(async (tx) => {
-        await tx.delete(resourceFiles).where(eq(resourceFiles.resourceId, resourceId));
+        await tx
+            .delete(resourceFiles)
+            .where(eq(resourceFiles.resourceId, resourceId));
 
         if (normalized.length === 0) {
             return [];
@@ -205,19 +254,23 @@ export interface ResourceConfigReference {
 
 /** Compose `configs:` references for UI hints. Never throws: invalid YAML yields []. */
 export async function listResourceConfigReferences(
-    resourceId: string,
+    resourceId: string
 ): Promise<ResourceConfigReference[]> {
     const [resource] = await db
         .select({ value: resources.value })
         .from(resources)
         .where(eq(resources.id, resourceId));
 
-    if (!resource?.value) return [];
+    if (!resource?.value) {
+        return [];
+    }
 
     try {
         return listComposeConfigReferences(resource.value).map((reference) => ({
             config: reference.config,
-            file: reference.file ? normalizeConfigFilePath(reference.file) : null,
+            file: reference.file
+                ? normalizeConfigFilePath(reference.file)
+                : null,
         }));
     } catch {
         return [];
@@ -226,7 +279,10 @@ export async function listResourceConfigReferences(
 
 // Files are the source of truth for resource configuration, so a copy
 // brings them along to the new resource in the target workspace.
-export async function copyResourceFiles(sourceResourceId: string, targetResourceId: string) {
+export async function copyResourceFiles(
+    sourceResourceId: string,
+    targetResourceId: string
+) {
     const source = await listResourceFiles(sourceResourceId);
 
     if (source.length === 0) {
@@ -240,7 +296,7 @@ export async function copyResourceFiles(sourceResourceId: string, targetResource
                 content: file.content,
                 path: file.path,
                 resourceId: targetResourceId,
-            })),
+            }))
         )
         .returning();
 }

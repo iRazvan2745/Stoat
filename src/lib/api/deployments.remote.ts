@@ -2,14 +2,25 @@
 import { setTimeout as wait } from "node:timers/promises";
 
 import { command, getRequestEvent, query } from "$app/server";
+import { error as kitError } from "@sveltejs/kit";
 import { and, asc, desc, eq, gt } from "drizzle-orm";
+import { Stream } from "effect";
 import * as v from "valibot";
 
-import { requireDeploymentAccess, requireResourceAccess } from "#lib/api/guard";
-import { withRemoteLiveLogging, withRemoteLogging } from "#lib/api/remote-logging";
+import {
+    requireDeploymentAccess,
+    requireResourceAccess,
+    requireSession,
+} from "#lib/api/guard";
+import {
+    withRemoteLiveLogging,
+    withRemoteLogging,
+} from "#lib/api/remote-logging";
 import { db } from "#lib/db";
 import { deploymentLogs, deployments } from "#lib/db/schema";
+import { getOrganizationIdForUser } from "#lib/server/access";
 import {
+    deploymentsStream,
     cancelDeployment as runCancelDeployment,
     deleteDeployment as runDeleteDeployment,
 } from "#lib/server/deployments/deployments";
@@ -27,7 +38,9 @@ const DeploymentLogBatchInput = v.object({
     deploymentId: v.string(),
 });
 
-const streamDeployments = async function* streamDeployments(resourceId: string) {
+const streamDeployments = async function* streamDeployments(
+    resourceId: string
+) {
     await requireResourceAccess(resourceId);
     const { request } = getRequestEvent();
     const { signal } = request;
@@ -75,7 +88,12 @@ const fetchDeploymentLogBatch = async ({
     const logs = await db
         .select()
         .from(deploymentLogs)
-        .where(and(eq(deploymentLogs.deploymentId, deploymentId), gt(deploymentLogs.id, afterId)))
+        .where(
+            and(
+                eq(deploymentLogs.deploymentId, deploymentId),
+                gt(deploymentLogs.id, afterId)
+            )
+        )
         .orderBy(asc(deploymentLogs.id))
         .limit(DEPLOYMENT_LOG_BATCH_SIZE);
 
@@ -95,22 +113,30 @@ export const getLatestSuccessfulDeployment = query(
                 .select()
                 .from(deployments)
                 .where(
-                    and(eq(deployments.resourceId, resourceId), eq(deployments.outcome, "success")),
+                    and(
+                        eq(deployments.resourceId, resourceId),
+                        eq(deployments.outcome, "success")
+                    )
                 )
                 .orderBy(desc(deployments.finishedAt), desc(deployments.id))
                 .limit(1);
 
             return deployment ?? null;
         },
-        { inputKey: "resourceId" },
-    ),
+        { inputKey: "resourceId" }
+    )
 );
 
 export const getDeploymentLogBatch = query(
     DeploymentLogBatchInput,
-    withRemoteLogging("deployments.getDeploymentLogBatch", "query", fetchDeploymentLogBatch, {
-        inputKey: "deploymentId",
-    }),
+    withRemoteLogging(
+        "deployments.getDeploymentLogBatch",
+        "query",
+        fetchDeploymentLogBatch,
+        {
+            inputKey: "deploymentId",
+        }
+    )
 );
 
 // Live queries
@@ -118,7 +144,7 @@ export const listDeployments = query.live(
     ResourceIdInput,
     withRemoteLiveLogging("deployments.listDeployments", streamDeployments, {
         inputKey: "resourceId",
-    }),
+    })
 );
 
 // Commands
@@ -131,8 +157,8 @@ export const cancelDeployment = command(
             await requireDeploymentAccess(deploymentId);
             await runCancelDeployment(deploymentId);
         },
-        { inputKey: "deploymentId" },
-    ),
+        { inputKey: "deploymentId" }
+    )
 );
 
 export const deleteDeployment = command(
@@ -144,6 +170,39 @@ export const deleteDeployment = command(
             await requireDeploymentAccess(deploymentId);
             await runDeleteDeployment(deploymentId);
         },
-        { inputKey: "deploymentId" },
-    ),
+        { inputKey: "deploymentId" }
+    )
+);
+
+const streamOrganizationDeployments =
+    async function* streamOrganizationDeployments() {
+        const session = requireSession();
+        const { request } = getRequestEvent();
+        const organizationId = await getOrganizationIdForUser(
+            session.user.id,
+            session.session.activeOrganizationId
+        );
+
+        if (!organizationId) {
+            kitError(403, "No organization membership");
+        }
+
+        for await (const deploymentsPage of Stream.toAsyncIterable(
+            deploymentsStream(organizationId)
+        )) {
+            if (request.signal.aborted) {
+                return;
+            }
+
+            yield deploymentsPage;
+        }
+    };
+
+// Stream all deployments visible to the active organization for the global
+// deployments page. The server-side stream owns the database query so no
+// queue payloads or credentials cross the remote-function boundary.
+export const liveDeployments = query.live(
+    withRemoteLiveLogging("deployments.liveDeployments", () =>
+        streamOrganizationDeployments()
+    )
 );

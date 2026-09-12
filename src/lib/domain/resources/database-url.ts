@@ -28,7 +28,7 @@ export function encodeConnectionComponent(value: string): string {
 
 export function buildPostgresUrl(
     parts: PostgresConnectionParts,
-    target: PostgresConnectionTarget,
+    target: PostgresConnectionTarget
 ): string {
     const user = encodeConnectionComponent(parts.user);
     const password = encodeConnectionComponent(parts.password);
@@ -62,7 +62,10 @@ export function splitPostgresUrl(url: string): DisplayableConnectionUrl {
         };
     }
 
-    const beforePassword = url.slice(0, schemeSeparator + 3 + passwordSeparator + 1);
+    const beforePassword = url.slice(
+        0,
+        schemeSeparator + 3 + passwordSeparator + 1
+    );
     const password = credentials.slice(passwordSeparator + 1);
 
     return {
@@ -100,7 +103,8 @@ export function wrapUrlSegments(url: string): string[] {
     const schemeMatch = URL_SCHEME.exec(url);
     const scheme = schemeMatch?.groups?.scheme ?? "";
     const rest = schemeMatch?.groups?.rest ?? url;
-    const pieces = rest.length === 0 ? [] : rest.split(URL_WRAP).filter(Boolean);
+    const pieces =
+        rest.length === 0 ? [] : rest.split(URL_WRAP).filter(Boolean);
 
     return scheme ? [scheme, ...pieces] : pieces;
 }
@@ -108,13 +112,15 @@ export function wrapUrlSegments(url: string): string[] {
 export function envValue(
     variables: readonly { name: string; value: string }[],
     name: string,
-    fallback: string,
+    fallback: string
 ): string {
-    return variables.find((variable) => variable.name === name)?.value ?? fallback;
+    return (
+        variables.find((variable) => variable.name === name)?.value ?? fallback
+    );
 }
 
 export function postgresConnectionParts(
-    variables: readonly { name: string; value: string }[],
+    variables: readonly { name: string; value: string }[]
 ): PostgresConnectionParts {
     return {
         database: envValue(variables, "POSTGRES_DB", "postgres"),

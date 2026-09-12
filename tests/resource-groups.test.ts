@@ -1,7 +1,10 @@
 import * as v from "valibot";
 import { expect, it } from "vite-plus/test";
 
-import { ResourceGroupNameInput, toResourceFlow } from "#lib/domain/resources/groups";
+import {
+    ResourceGroupNameInput,
+    toResourceFlow,
+} from "#lib/domain/resources/groups";
 
 it("keeps the caller's arrangement: boxes appear at their first member's spot and ungrouped resources stay inline", () => {
     const resources = [
@@ -26,7 +29,14 @@ it("keeps the caller's arrangement: boxes appear at their first member's spot an
         },
         { kind: "resource", resource: resources[4] },
     ]);
-    expect(resources.map((resource) => resource.id)).toEqual(["1", "2", "3", "4", "5", "6"]);
+    expect(resources.map((resource) => resource.id)).toEqual([
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+    ]);
 });
 
 it("handles empty workspaces and names that resemble object properties", () => {
@@ -36,9 +46,13 @@ it("handles empty workspaces and names that resemble object properties", () => {
             { groupName: "__proto__" },
             { groupName: "Ungrouped" },
             { groupName: null },
-        ]),
+        ])
     ).toEqual([
-        { kind: "group", name: "__proto__", resources: [{ groupName: "__proto__" }] },
+        {
+            kind: "group",
+            name: "__proto__",
+            resources: [{ groupName: "__proto__" }],
+        },
         {
             kind: "group",
             name: "Ungrouped",
@@ -49,8 +63,14 @@ it("handles empty workspaces and names that resemble object properties", () => {
 });
 
 it("normalizes group names and rejects empty or oversized names", () => {
-    expect(v.parse(ResourceGroupNameInput, "  Production  ")).toBe("Production");
+    expect(v.parse(ResourceGroupNameInput, "  Production  ")).toBe(
+        "Production"
+    );
     expect(v.safeParse(ResourceGroupNameInput, "  ").success).toBe(false);
-    expect(v.safeParse(ResourceGroupNameInput, "a".repeat(81)).success).toBe(false);
-    expect(v.safeParse(ResourceGroupNameInput, "a".repeat(80)).success).toBe(true);
+    expect(v.safeParse(ResourceGroupNameInput, "a".repeat(81)).success).toBe(
+        false
+    );
+    expect(v.safeParse(ResourceGroupNameInput, "a".repeat(80)).success).toBe(
+        true
+    );
 });

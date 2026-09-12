@@ -1,7 +1,7 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import backIcon from "@ktibow/iconset-material-symbols/arrow-back";
     import addIcon from "@ktibow/iconset-material-symbols/add";
+    import backIcon from "@ktibow/iconset-material-symbols/arrow-back";
     import codeIcon from "@ktibow/iconset-material-symbols/code";
     import deleteIcon from "@ktibow/iconset-material-symbols/delete";
     import variablesIcon from "@ktibow/iconset-material-symbols/variables-outline";

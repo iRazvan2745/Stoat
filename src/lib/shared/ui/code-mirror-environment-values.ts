@@ -16,7 +16,8 @@ class MaskedEnvironmentValue extends WidgetType {
 
     override eq(other: WidgetType): boolean {
         return (
-            other instanceof MaskedEnvironmentValue && other.characterCount === this.characterCount
+            other instanceof MaskedEnvironmentValue &&
+            other.characterCount === this.characterCount
         );
     }
 
@@ -38,7 +39,11 @@ class MaskedEnvironmentValue extends WidgetType {
 const environmentValueRanges = (view: EditorView): EnvironmentValueRange[] => {
     const ranges: EnvironmentValueRange[] = [];
 
-    for (let lineNumber = 1; lineNumber <= view.state.doc.lines; lineNumber += 1) {
+    for (
+        let lineNumber = 1;
+        lineNumber <= view.state.doc.lines;
+        lineNumber += 1
+    ) {
         const line = view.state.doc.line(lineNumber);
         const leadingWhitespace = line.text.search(/\S|$/u);
         const candidate = line.text.slice(leadingWhitespace);
@@ -69,7 +74,7 @@ const environmentValueRanges = (view: EditorView): EnvironmentValueRange[] => {
 
 const isEnvironmentValueBeingEdited = (
     view: EditorView,
-    valueRange: EnvironmentValueRange,
+    valueRange: EnvironmentValueRange
 ): boolean => {
     if (!view.hasFocus) {
         return false;
@@ -77,24 +82,34 @@ const isEnvironmentValueBeingEdited = (
 
     return view.state.selection.ranges.some((selection) => {
         if (selection.empty) {
-            return selection.from >= valueRange.from && selection.from <= valueRange.to;
+            return (
+                selection.from >= valueRange.from &&
+                selection.from <= valueRange.to
+            );
         }
 
         return selection.from < valueRange.to && selection.to > valueRange.from;
     });
 };
 
-const createDecorations = (view: EditorView, showValues: boolean): DecorationSet => {
+const createDecorations = (
+    view: EditorView,
+    showValues: boolean
+): DecorationSet => {
     if (showValues) {
         return Decoration.none;
     }
 
     const decorations = environmentValueRanges(view)
-        .filter((valueRange) => !isEnvironmentValueBeingEdited(view, valueRange))
+        .filter(
+            (valueRange) => !isEnvironmentValueBeingEdited(view, valueRange)
+        )
         .map((valueRange) =>
             Decoration.replace({
-                widget: new MaskedEnvironmentValue(valueRange.to - valueRange.from),
-            }).range(valueRange.from, valueRange.to),
+                widget: new MaskedEnvironmentValue(
+                    valueRange.to - valueRange.from
+                ),
+            }).range(valueRange.from, valueRange.to)
         );
 
     return Decoration.set(decorations);
@@ -106,8 +121,15 @@ export function maskEnvironmentValues(showValues: boolean) {
             const plugin = {
                 decorations: createDecorations(view, showValues),
                 update(update: ViewUpdate): void {
-                    if (update.docChanged || update.selectionSet || update.focusChanged) {
-                        plugin.decorations = createDecorations(update.view, showValues);
+                    if (
+                        update.docChanged ||
+                        update.selectionSet ||
+                        update.focusChanged
+                    ) {
+                        plugin.decorations = createDecorations(
+                            update.view,
+                            showValues
+                        );
                     }
                 },
             };
@@ -116,6 +138,6 @@ export function maskEnvironmentValues(showValues: boolean) {
         },
         {
             decorations: (plugin) => plugin.decorations,
-        },
+        }
     );
 }

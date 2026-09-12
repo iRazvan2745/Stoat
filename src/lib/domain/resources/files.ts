@@ -40,7 +40,9 @@ export function assertSafeResourceFilePath(path: string): string {
     }
 
     if (path !== path.trim()) {
-        throw new Error(`File path "${path}" must not have leading or trailing whitespace`);
+        throw new Error(
+            `File path "${path}" must not have leading or trailing whitespace`
+        );
     }
 
     if (path.includes("\\")) {
@@ -53,7 +55,7 @@ export function assertSafeResourceFilePath(path: string): string {
 
     if (path.length > MAX_RESOURCE_FILE_PATH_LENGTH) {
         throw new Error(
-            `File path "${path}" is too long (max ${MAX_RESOURCE_FILE_PATH_LENGTH} characters)`,
+            `File path "${path}" is too long (max ${MAX_RESOURCE_FILE_PATH_LENGTH} characters)`
         );
     }
 
@@ -69,11 +71,15 @@ export function assertSafeResourceFilePath(path: string): string {
 
     for (const segment of segments) {
         if (segment === "" || segment === "." || segment === "..") {
-            throw new Error(`File path "${path}" must not contain "${segment}" segments`);
+            throw new Error(
+                `File path "${path}" must not contain "${segment}" segments`
+            );
         }
 
         if (segment === ".git") {
-            throw new Error(`File path "${path}" must not contain ".git" segments`);
+            throw new Error(
+                `File path "${path}" must not contain ".git" segments`
+            );
         }
     }
 
@@ -86,11 +92,15 @@ export function assertSafeResourceFileContent(content: string): string {
     }
 
     if (content.includes("\0")) {
-        throw new Error("File looks binary (NUL byte found); only text files are supported");
+        throw new Error(
+            "File looks binary (NUL byte found); only text files are supported"
+        );
     }
 
     if (resourceFileByteLength(content) > MAX_RESOURCE_FILE_BYTES) {
-        throw new Error(`File is too large (max ${MAX_RESOURCE_FILE_BYTES} bytes)`);
+        throw new Error(
+            `File is too large (max ${MAX_RESOURCE_FILE_BYTES} bytes)`
+        );
     }
 
     return content;
@@ -100,30 +110,39 @@ const ResourceFilePathSchema = v.pipe(
     v.string(),
     v.minLength(1, "File path is required"),
     v.maxLength(MAX_RESOURCE_FILE_PATH_LENGTH, "File path is too long"),
-    v.regex(RESOURCE_FILE_PATH_PATTERN, "File path contains invalid characters"),
-    v.check((path) => !path.includes("\\"), "File path must not contain backslashes"),
+    v.regex(
+        RESOURCE_FILE_PATH_PATTERN,
+        "File path contains invalid characters"
+    ),
+    v.check(
+        (path) => !path.includes("\\"),
+        "File path must not contain backslashes"
+    ),
     v.check((path) => !path.startsWith("/"), "File path must be relative"),
     v.check(
         (path) => !path.split("/").some((segment) => segment === ".."),
-        'File path must not contain ".." segments',
+        'File path must not contain ".." segments'
     ),
     v.check(
         (path) => !path.split("/").some((segment) => segment === ".git"),
-        'File path must not contain ".git" segments',
+        'File path must not contain ".git" segments'
     ),
-    v.check((path) => normalizeResourceFilePath(path) === path, "File path is not normalized"),
+    v.check(
+        (path) => normalizeResourceFilePath(path) === path,
+        "File path is not normalized"
+    )
 );
 
 const ResourceFileContentSchema = v.pipe(
     v.string(),
     v.check(
         (content) => !content.includes("\0"),
-        "File looks binary (NUL byte found); only text files are supported",
+        "File looks binary (NUL byte found); only text files are supported"
     ),
     v.check(
         (content) => resourceFileByteLength(content) <= MAX_RESOURCE_FILE_BYTES,
-        `File is too large (max ${MAX_RESOURCE_FILE_BYTES} bytes)`,
-    ),
+        `File is too large (max ${MAX_RESOURCE_FILE_BYTES} bytes)`
+    )
 );
 
 export const ResourceFileInputSchema = v.object({

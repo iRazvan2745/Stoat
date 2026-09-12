@@ -32,7 +32,10 @@ export interface SshGitAuthentication {
     username?: string;
 }
 
-export type GitAuthentication = NoGitAuthentication | HttpsGitAuthentication | SshGitAuthentication;
+export type GitAuthentication =
+    | NoGitAuthentication
+    | HttpsGitAuthentication
+    | SshGitAuthentication;
 
 export interface GitSourceAuthenticationRecord {
     authMethod: GitAuthMethod;
@@ -65,9 +68,18 @@ export interface ValidatedGitSource {
 
 // oxlint-disable-next-line no-control-regex -- Git URLs must reject every ASCII control byte.
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001F\u007F]/u;
-const SCP_URL_PATTERN = /^(?:([^/@:\s]+)@)?(\[[^\]]+\]|[^/:\s]+):(.+)$/u;
-const URL_SENSITIVE_PARAMETER_PATTERN = /(?:auth|credential|key|pass(?:word)?|secret|token)/iu;
+const SCP_URL_PATTERN =
+    /^(?:(?<user>[^/@:\s]+)@)?(?<host>\[[^\]]+\]|[^/:\s]+):(?<path>.+)$/u;
+const SCP_CREDENTIALS_PATTERN = /^(?:[^/@:\s]+):[^/@\s]+@(?<target>.+)$/u;
+const URL_CREDENTIALS_PATTERN = /\/\/[^/@\s]+(?::[^/@\s]*)?@/u;
+const URL_SENSITIVE_PARAMETER_PATTERN =
+    /(?:auth|credential|key|pass(?:word)?|secret|token)/iu;
+const SENSITIVE_QUERY_PARAMETER_PATTERN =
+    /(?<prefix>[?&])[^=&#\s]*(?:token|secret|password|key|auth)[^=&#\s]*=[^&#\s]*/giu;
+const REDACTED_QUERY_PARAMETER_PATTERN =
+    /(?<parameter>[?&][^=&#\s]*(?:token|secret|password|key|auth)[^=&#\s]*=)[^&#\s]*/giu;
 const PRIVATE_KEY_HEADER_PATTERN = /^-----BEGIN [A-Z0-9 ]+PRIVATE KEY-----/u;
+const noopCleanup = (): Promise<void> => Promise.resolve();
 
 const emptyAuthentication = (): NoGitAuthentication => ({ method: "none" });
 
@@ -77,22 +89,99 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const nonEmptyString = (value: unknown): string | undefined =>
     typeof value === "string" && value.trim() ? value.trim() : undefined;
 
+const validateHttpsAuthentication = (
+    method: "basic" | "token",
+    input: Record<string, unknown>
+): HttpsGitAuthentication => {
+    const token = nonEmptyString(input.token);
+    const password = nonEmptyString(input.password);
+    const username = nonEmptyString(input.username);
+
+    if (token && password) {
+        throw new Error(
+            "HTTPS Git authentication accepts a token or password, not both"
+        );
+    }
+
+    if (method === "token" && !token) {
+        throw new Error("Token Git authentication requires a token");
+    }
+
+    if (method === "basic" && (!password || !username)) {
+        throw new Error(
+            "Basic Git authentication requires a username and password"
+        );
+    }
+
+    if (method === "token" && password) {
+        throw new Error("Token Git authentication cannot include a password");
+    }
+
+    if (method === "basic" && token) {
+        throw new Error("Basic Git authentication cannot include a token");
+    }
+
+    return {
+        ...(method === "basic" ? { password } : { token }),
+        method,
+        ...(username ? { username } : {}),
+    };
+};
+
+const validateSshAuthentication = (
+    input: Record<string, unknown>
+): SshGitAuthentication => {
+    const privateKey = nonEmptyString(input.privateKey);
+
+    // An SSH agent is a supported deployment configuration. In that case a
+    // private key is intentionally omitted and git uses SSH_AUTH_SOCK.
+    if (privateKey && !PRIVATE_KEY_HEADER_PATTERN.test(privateKey)) {
+        throw new Error("SSH private key must be a PEM or OpenSSH private key");
+    }
+
+    const passphrase = nonEmptyString(input.passphrase);
+
+    if (passphrase && !privateKey) {
+        throw new Error("An SSH passphrase requires a private key");
+    }
+
+    const knownHosts = nonEmptyString(input.knownHosts);
+    const username = nonEmptyString(input.username);
+
+    return {
+        method: "ssh",
+        ...(knownHosts ? { knownHosts } : {}),
+        ...(passphrase ? { passphrase } : {}),
+        ...(privateKey ? { privateKey } : {}),
+        ...(username ? { username } : {}),
+    };
+};
+
 const normalizeMethod = (value: unknown): GitAuthMethod => {
     if (value === undefined || value === null || value === "") {
         return "none";
     }
 
-    if (value === "none" || value === "token" || value === "basic" || value === "ssh") {
+    if (
+        value === "none" ||
+        value === "token" ||
+        value === "basic" ||
+        value === "ssh"
+    ) {
         return value;
     }
 
     // Accept the old single HTTPS mode at the server boundary while storing
     // the more explicit token/basic mode used by Git Sources.
     if (value === "https") {
-        throw new Error("HTTPS Git authentication must specify token or basic mode");
+        throw new Error(
+            "HTTPS Git authentication must specify token or basic mode"
+        );
     }
 
-    throw new Error("Git authentication method must be none, token, basic, or ssh");
+    throw new Error(
+        "Git authentication method must be none, token, basic, or ssh"
+    );
 };
 
 /**
@@ -100,7 +189,9 @@ const normalizeMethod = (value: unknown): GitAuthMethod => {
  * Git.  This function accepts unknown input intentionally so it can be used at
  * the server boundary without trusting a client-side type assertion.
  */
-export const validateGitAuthentication = (input?: unknown): GitAuthentication => {
+export const validateGitAuthentication = (
+    input?: unknown
+): GitAuthentication => {
     if (!isRecord(input)) {
         if (input === undefined || input === null) {
             return emptyAuthentication();
@@ -116,64 +207,15 @@ export const validateGitAuthentication = (input?: unknown): GitAuthentication =>
     }
 
     if (method === "token" || method === "basic") {
-        const token = nonEmptyString(input.token);
-        const password = nonEmptyString(input.password);
-
-        if (token && password) {
-            throw new Error("HTTPS Git authentication accepts a token or password, not both");
-        }
-
-        if (method === "token" && !token) {
-            throw new Error("Token Git authentication requires a token");
-        }
-
-        if (method === "basic" && (!password || !nonEmptyString(input.username))) {
-            throw new Error("Basic Git authentication requires a username and password");
-        }
-
-        if (method === "token" && password) {
-            throw new Error("Token Git authentication cannot include a password");
-        }
-
-        if (method === "basic" && token) {
-            throw new Error("Basic Git authentication cannot include a token");
-        }
-
-        return {
-            ...(method === "basic" ? { password } : { token }),
-            method,
-            ...(nonEmptyString(input.username) ? { username: nonEmptyString(input.username) } : {}),
-        };
+        return validateHttpsAuthentication(method, input);
     }
 
-    const privateKey = nonEmptyString(input.privateKey);
-
-    // An SSH agent is a supported deployment configuration.  In that case a
-    // private key is intentionally omitted and git uses SSH_AUTH_SOCK.
-    if (privateKey && !PRIVATE_KEY_HEADER_PATTERN.test(privateKey)) {
-        throw new Error("SSH private key must be a PEM or OpenSSH private key");
-    }
-
-    const passphrase = nonEmptyString(input.passphrase);
-
-    if (passphrase && !privateKey) {
-        throw new Error("An SSH passphrase requires a private key");
-    }
-
-    const knownHosts = nonEmptyString(input.knownHosts);
-
-    return {
-        method,
-        ...(knownHosts ? { knownHosts } : {}),
-        ...(passphrase ? { passphrase } : {}),
-        ...(privateKey ? { privateKey } : {}),
-        ...(nonEmptyString(input.username) ? { username: nonEmptyString(input.username) } : {}),
-    };
+    return validateSshAuthentication(input);
 };
 
 /** Converts the server-only Git Source row into credentials for Git. */
 export const gitAuthenticationFromSource = (
-    source: GitSourceAuthenticationRecord,
+    source: GitSourceAuthenticationRecord
 ): GitAuthentication =>
     validateGitAuthentication({
         knownHosts: source.sshKnownHosts,
@@ -195,7 +237,8 @@ const parseGitUrl = (value: string): GitUrlDetails => {
     const scpMatch = SCP_URL_PATTERN.exec(url);
 
     if (scpMatch && !url.includes("://")) {
-        const [, , host, repositoryPath] = scpMatch;
+        const host = scpMatch.groups?.host;
+        const repositoryPath = scpMatch.groups?.path;
 
         if (!host || !repositoryPath || repositoryPath === "/") {
             throw new Error("Git URL must include a repository path");
@@ -222,7 +265,12 @@ const parseGitUrl = (value: string): GitUrlDetails => {
 
     const protocol = parsed.protocol.slice(0, -1);
 
-    if (protocol !== "git" && protocol !== "http" && protocol !== "https" && protocol !== "ssh") {
+    if (
+        protocol !== "git" &&
+        protocol !== "http" &&
+        protocol !== "https" &&
+        protocol !== "ssh"
+    ) {
         throw new Error("Git URL must use HTTPS, SSH, git, or SCP syntax");
     }
 
@@ -231,7 +279,8 @@ const parseGitUrl = (value: string): GitUrlDetails => {
     }
 
     return {
-        hasEmbeddedCredentials: parsed.username !== "" || parsed.password !== "",
+        hasEmbeddedCredentials:
+            parsed.username !== "" || parsed.password !== "",
         host: parsed.host,
         path: parsed.pathname,
         protocol: protocol as GitUrlDetails["protocol"],
@@ -246,49 +295,6 @@ export const validateGitUrl = (value: unknown): GitUrlDetails => {
     }
 
     return parseGitUrl(value);
-};
-
-/**
- * Validates the URL/authentication pairing used by a Git Source and returns
- * the credential-free URL that should be persisted. HTTPS secrets are only
- * allowed over HTTPS; SSH credentials require SSH or SCP transport.
- */
-export const validateGitSource = (input: {
-    authentication: unknown;
-    url: unknown;
-}): ValidatedGitSource => {
-    const details = validateGitUrl(input.url);
-    const authentication = validateGitAuthentication(input.authentication);
-
-    if (authentication.method === "token" || authentication.method === "basic") {
-        if (details.protocol !== "https") {
-            throw new Error("Token and basic Git authentication require an HTTPS URL");
-        }
-
-        if (details.hasEmbeddedCredentials) {
-            throw new Error(
-                "Git URL must not contain credentials; enter them in the authentication fields",
-            );
-        }
-    }
-
-    if (
-        authentication.method === "ssh" &&
-        details.protocol !== "ssh" &&
-        details.protocol !== "scp"
-    ) {
-        throw new Error("SSH Git authentication requires an SSH or SCP URL");
-    }
-
-    if (authentication.method === "none" && details.hasEmbeddedCredentials) {
-        throw new Error("Git URL contains credentials; choose an authentication method instead");
-    }
-
-    return {
-        authentication,
-        details,
-        url: removeGitUrlCredentials(details.url),
-    };
 };
 
 const removeSensitiveSearchParameters = (parsed: URL): void => {
@@ -307,7 +313,7 @@ const removeSensitiveSearchParameters = (parsed: URL): void => {
 
 /**
  * Removes URL credentials and sensitive query parameters before a URL is
- * stored or passed to a child process.  SSH's `git@host:path` user is a
+ * stored or passed to a child process. SSH's `git@host:path` user is a
  * transport selector rather than a secret, so SCP syntax is preserved.
  */
 export const removeGitUrlCredentials = (value: string): string => {
@@ -315,9 +321,10 @@ export const removeGitUrlCredentials = (value: string): string => {
 
     // `new URL` treats the first component of `user:password@host:path` as
     // a custom scheme, so strip credential-bearing SCP syntax explicitly.
-    const scpCredentials = /^(?:[^/@:\s]+):[^/@\s]+@(.+)$/u.exec(url);
-    if (scpCredentials?.[1]) {
-        return scpCredentials[1];
+    const scpCredentials = SCP_CREDENTIALS_PATTERN.exec(url);
+    const scpTarget = scpCredentials?.groups?.target;
+    if (scpTarget) {
+        return scpTarget;
     }
 
     try {
@@ -333,24 +340,72 @@ export const removeGitUrlCredentials = (value: string): string => {
         removeSensitiveSearchParameters(parsed);
         return parsed.toString();
     } catch {
-        const withoutCredentials = url.replace(/\/\/[^/@\s]+(?::[^/@\s]*)?@/u, "//");
+        const withoutCredentials = url.replace(URL_CREDENTIALS_PATTERN, "//");
         return withoutCredentials
             .replace(/^[^/@:\s]+:[^/@\s]+@/u, "")
-            .replaceAll(
-                /([?&])[^=&#\s]*(?:token|secret|password|key|auth)[^=&#\s]*=[^&#\s]*/giu,
-                "$1",
-            )
+            .replaceAll(SENSITIVE_QUERY_PARAMETER_PATTERN, "$<prefix>")
             .replace(/[?&]$/u, "");
     }
+};
+
+/**
+ * Validates the URL/authentication pairing used by a Git Source and returns
+ * the credential-free URL that should be persisted. HTTPS secrets are only
+ * allowed over HTTPS; SSH credentials require SSH or SCP transport.
+ */
+export const validateGitSource = (input: {
+    authentication: unknown;
+    url: unknown;
+}): ValidatedGitSource => {
+    const details = validateGitUrl(input.url);
+    const authentication = validateGitAuthentication(input.authentication);
+
+    if (
+        authentication.method === "token" ||
+        authentication.method === "basic"
+    ) {
+        if (details.protocol !== "https") {
+            throw new Error(
+                "Token and basic Git authentication require an HTTPS URL"
+            );
+        }
+
+        if (details.hasEmbeddedCredentials) {
+            throw new Error(
+                "Git URL must not contain credentials; enter them in the authentication fields"
+            );
+        }
+    }
+
+    if (
+        authentication.method === "ssh" &&
+        details.protocol !== "ssh" &&
+        details.protocol !== "scp"
+    ) {
+        throw new Error("SSH Git authentication requires an SSH or SCP URL");
+    }
+
+    if (authentication.method === "none" && details.hasEmbeddedCredentials) {
+        throw new Error(
+            "Git URL contains credentials; choose an authentication method instead"
+        );
+    }
+
+    return {
+        authentication,
+        details,
+        url: removeGitUrlCredentials(details.url),
+    };
 };
 
 /** Returns a log-safe URL while retaining the fact that userinfo existed. */
 export const redactGitUrl = (value: string): string => {
     const url = value.trim();
 
-    const scpCredentials = /^(?:[^/@:\s]+):[^/@\s]+@(.+)$/u.exec(url);
-    if (scpCredentials?.[1]) {
-        return `***@${scpCredentials[1]}`;
+    const scpCredentials = SCP_CREDENTIALS_PATTERN.exec(url);
+    const scpTarget = scpCredentials?.groups?.target;
+    if (scpTarget) {
+        return `***@${scpTarget}`;
     }
 
     try {
@@ -372,27 +427,36 @@ export const redactGitUrl = (value: string): string => {
         return parsed.toString();
     } catch {
         return url
-            .replace(/\/\/[^/@\s]+(?::[^/@\s]*)?@/u, "//***@")
+            .replace(URL_CREDENTIALS_PATTERN, "//***@")
             .replaceAll(
-                /([?&][^=&#\s]*(?:token|secret|password|key|auth)[^=&#\s]*=)[^&#\s]*/giu,
-                "$1[REDACTED]",
+                REDACTED_QUERY_PARAMETER_PATTERN,
+                "$<parameter>[REDACTED]"
             );
     }
 };
 
-const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`;
+const shellQuote = (value: string): string =>
+    `'${value.replaceAll("'", "'\\''")}'`;
 
-const base64UrlEncode = (value: Uint8Array): string => Buffer.from(value).toString("base64url");
+const base64UrlEncode = (value: Uint8Array): string =>
+    Buffer.from(value).toString("base64url");
 
-const base64UrlDecode = (value: string): Uint8Array => Buffer.from(value, "base64url");
+const base64UrlDecode = (value: string): Uint8Array =>
+    Buffer.from(value, "base64url");
 
 const deriveEncryptionKey = async (secret: string): Promise<CryptoKey> => {
     if (!secret.trim()) {
         throw new Error("Git credential encryption key must not be empty");
     }
 
-    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(secret));
-    return await crypto.subtle.importKey("raw", digest, "AES-GCM", false, ["encrypt", "decrypt"]);
+    const digest = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(secret)
+    );
+    return await crypto.subtle.importKey("raw", digest, "AES-GCM", false, [
+        "encrypt",
+        "decrypt",
+    ]);
 };
 
 /**
@@ -402,7 +466,7 @@ const deriveEncryptionKey = async (secret: string): Promise<CryptoKey> => {
  */
 export const encryptGitAuthentication = async (
     authentication: GitAuthentication,
-    encryptionSecret: string,
+    encryptionSecret: string
 ): Promise<string> => {
     const normalized = validateGitAuthentication(authentication);
     const key = await deriveEncryptionKey(encryptionSecret);
@@ -411,7 +475,7 @@ export const encryptGitAuthentication = async (
     const ciphertext = await crypto.subtle.encrypt(
         { iv: iv as BufferSource, name: "AES-GCM" },
         key,
-        plaintext as BufferSource,
+        plaintext as BufferSource
     );
 
     return `v1.${base64UrlEncode(iv)}.${base64UrlEncode(new Uint8Array(ciphertext))}`;
@@ -420,7 +484,7 @@ export const encryptGitAuthentication = async (
 /** Decrypts and validates a database value created by encryptGitAuthentication. */
 export const decryptGitAuthentication = async (
     encrypted: string,
-    encryptionSecret: string,
+    encryptionSecret: string
 ): Promise<GitAuthentication> => {
     const [version, encodedIv, encodedCiphertext] = encrypted.split(".");
 
@@ -433,17 +497,40 @@ export const decryptGitAuthentication = async (
         const plaintext = await crypto.subtle.decrypt(
             { iv: base64UrlDecode(encodedIv) as BufferSource, name: "AES-GCM" },
             key,
-            base64UrlDecode(encodedCiphertext) as BufferSource,
+            base64UrlDecode(encodedCiphertext) as BufferSource
         );
         const value: unknown = JSON.parse(new TextDecoder().decode(plaintext));
         return validateGitAuthentication(value);
     } catch (error) {
-        if (error instanceof Error && error.message === "Unsupported encrypted Git credentials") {
+        if (
+            error instanceof Error &&
+            error.message === "Unsupported encrypted Git credentials"
+        ) {
             throw error;
         }
 
         throw new Error("Unable to decrypt Git credentials", { cause: error });
     }
+};
+
+const hasGitAuthenticationCredentials = (
+    authentication: GitAuthentication
+): boolean => {
+    if (
+        authentication.method === "token" ||
+        authentication.method === "basic"
+    ) {
+        return Boolean(authentication.token || authentication.password);
+    }
+
+    if (authentication.method === "ssh") {
+        return (
+            Boolean(authentication.privateKey) ||
+            Boolean(process.env.SSH_AUTH_SOCK)
+        );
+    }
+
+    return false;
 };
 
 /**
@@ -452,32 +539,31 @@ export const decryptGitAuthentication = async (
  * authentication object into a remote response.
  */
 export const redactGitAuthentication = (
-    authentication: GitAuthentication,
+    authentication: GitAuthentication
 ): {
     hasCredentials: boolean;
     method: GitAuthMethod;
     username: string | null;
 } => {
     const normalized = validateGitAuthentication(authentication);
+    const username =
+        normalized.method === "token" ||
+        normalized.method === "basic" ||
+        normalized.method === "ssh"
+            ? (normalized.username ?? null)
+            : null;
 
     return {
-        hasCredentials:
-            normalized.method === "token" || normalized.method === "basic"
-                ? Boolean(normalized.token || normalized.password)
-                : normalized.method === "ssh"
-                  ? Boolean(normalized.privateKey) || Boolean(process.env.SSH_AUTH_SOCK)
-                  : false,
+        hasCredentials: hasGitAuthenticationCredentials(normalized),
         method: normalized.method,
-        username:
-            normalized.method === "token" ||
-            normalized.method === "basic" ||
-            normalized.method === "ssh"
-                ? (normalized.username ?? null)
-                : null,
+        username,
     };
 };
 
-const authenticationUrl = (url: string, authentication: GitAuthentication): string => {
+const authenticationUrl = (
+    url: string,
+    authentication: GitAuthentication
+): string => {
     const cleanUrl = removeGitUrlCredentials(url);
 
     if (authentication.method !== "ssh" || !authentication.username) {
@@ -498,9 +584,10 @@ const authenticationUrl = (url: string, authentication: GitAuthentication): stri
         return parsed.toString();
     } catch {
         const match = SCP_URL_PATTERN.exec(cleanUrl);
+        const groups = match?.groups;
 
-        if (match && !match[1]) {
-            return `${authentication.username}@${match[2]}:${match[3]}`;
+        if (groups?.host && groups.path && !groups.user) {
+            return `${authentication.username}@${groups.host}:${groups.path}`;
         }
 
         return cleanUrl;
@@ -513,25 +600,30 @@ const authenticationUrl = (url: string, authentication: GitAuthentication): stri
  * SSH keys are written with mode 0600 and removed by cleanup.
  */
 export const createGitAuthenticationEnvironment = async (
-    authentication: GitAuthentication,
+    authentication: GitAuthentication
 ): Promise<GitAuthenticationEnvironment> => {
     const normalized = validateGitAuthentication(authentication);
 
     if (normalized.method === "none") {
-        return { cleanup: async () => {}, env: { GIT_TERMINAL_PROMPT: "0" } };
+        return { cleanup: noopCleanup, env: { GIT_TERMINAL_PROMPT: "0" } };
     }
 
     if (normalized.method === "token" || normalized.method === "basic") {
         const secret = normalized.token ?? normalized.password;
         if (!secret) {
-            throw new Error("HTTPS Git authentication requires a token or password");
+            throw new Error(
+                "HTTPS Git authentication requires a token or password"
+            );
         }
 
-        const username = normalized.username ?? (normalized.token ? "oauth2" : "git");
-        const encoded = Buffer.from(`${username}:${secret}`, "utf-8").toString("base64");
+        const username =
+            normalized.username ?? (normalized.token ? "oauth2" : "git");
+        const encoded = Buffer.from(`${username}:${secret}`, "utf-8").toString(
+            "base64"
+        );
 
         return {
-            cleanup: async () => {},
+            cleanup: noopCleanup,
             env: {
                 GIT_CONFIG_COUNT: "1",
                 GIT_CONFIG_KEY_0: "http.extraHeader",
@@ -551,13 +643,13 @@ export const createGitAuthenticationEnvironment = async (
 
     if (sshAuthentication.passphrase) {
         throw new Error(
-            "Passphrase-protected SSH keys require an SSH agent; configure SSH_AUTH_SOCK or use an agent-backed key",
+            "Passphrase-protected SSH keys require an SSH agent; configure SSH_AUTH_SOCK or use an agent-backed key"
         );
     }
 
     if (!sshAuthentication.privateKey) {
         return {
-            cleanup: async () => {},
+            cleanup: noopCleanup,
             env: { GIT_TERMINAL_PROMPT: "0" },
         };
     }
@@ -569,16 +661,24 @@ export const createGitAuthenticationEnvironment = async (
         : undefined;
 
     try {
-        await writeFile(privateKeyPath, `${sshAuthentication.privateKey.trimEnd()}\n`, {
-            encoding: "utf-8",
-            mode: 0o600,
-        });
-
-        if (knownHostsPath && sshAuthentication.knownHosts) {
-            await writeFile(knownHostsPath, `${sshAuthentication.knownHosts.trimEnd()}\n`, {
+        await writeFile(
+            privateKeyPath,
+            `${sshAuthentication.privateKey.trimEnd()}\n`,
+            {
                 encoding: "utf-8",
                 mode: 0o600,
-            });
+            }
+        );
+
+        if (knownHostsPath && sshAuthentication.knownHosts) {
+            await writeFile(
+                knownHostsPath,
+                `${sshAuthentication.knownHosts.trimEnd()}\n`,
+                {
+                    encoding: "utf-8",
+                    mode: 0o600,
+                }
+            );
         }
     } catch (error) {
         await rm(temporaryDirectory, { force: true, recursive: true });

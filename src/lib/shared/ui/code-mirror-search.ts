@@ -70,7 +70,10 @@ const createM3SearchPanel = (view: EditorView): Panel => {
         },
         target: dom,
     });
-    dom.querySelector('input[name="search"]')?.setAttribute("main-field", "true");
+    dom.querySelector('input[name="search"]')?.setAttribute(
+        "main-field",
+        "true"
+    );
 
     const onKeydown = (event: KeyboardEvent): void => {
         if (runScopeHandlers(view, event, "search-panel")) {

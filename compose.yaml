@@ -26,7 +26,15 @@ services:
             sidecar:
                 condition: service_healthy
         healthcheck:
-            test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/healthz"]
+            test:
+                [
+                    "CMD",
+                    "wget",
+                    "-q",
+                    "-O",
+                    "/dev/null",
+                    "http://127.0.0.1:3000/healthz",
+                ]
             interval: 10s
             timeout: 3s
             retries: 5
@@ -65,7 +73,15 @@ services:
             - /:/host
         pull_policy: always
         healthcheck:
-            test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:80/readyz"]
+            test:
+                [
+                    "CMD",
+                    "wget",
+                    "-q",
+                    "-O",
+                    "/dev/null",
+                    "http://127.0.0.1:80/readyz",
+                ]
             interval: 10s
             timeout: 3s
             retries: 5

@@ -28,7 +28,7 @@ export const requireSession = (): AuthenticatedSession => {
 
 const requireAccess = async (
     resourceId: string,
-    checkAccess: AccessCheck,
+    checkAccess: AccessCheck
 ): Promise<AuthenticatedSession> => {
     const session = requireSession();
 
@@ -39,20 +39,28 @@ const requireAccess = async (
     return session;
 };
 
-export const requireDataSourceAccess = (dataSourceId: string): Promise<AuthenticatedSession> =>
+export const requireDataSourceAccess = (
+    dataSourceId: string
+): Promise<AuthenticatedSession> =>
     requireAccess(dataSourceId, hasAccessToThisDataSource);
 
-export const requireGitSourceAccess = (gitSourceId: string): Promise<AuthenticatedSession> =>
+export const requireGitSourceAccess = (
+    gitSourceId: string
+): Promise<AuthenticatedSession> =>
     requireAccess(gitSourceId, hasAccessToThisGitSource);
 
-export const requireWorkspaceAccess = (workspaceId: string): Promise<AuthenticatedSession> =>
+export const requireWorkspaceAccess = (
+    workspaceId: string
+): Promise<AuthenticatedSession> =>
     requireAccess(workspaceId, hasAccessToThisWorkspace);
 
-export const requireResourceAccess = (resourceId: string): Promise<AuthenticatedSession> =>
+export const requireResourceAccess = (
+    resourceId: string
+): Promise<AuthenticatedSession> =>
     requireAccess(resourceId, hasAccessToThisResource);
 
 export const requireDeploymentAccess = async (
-    deploymentId: string,
+    deploymentId: string
 ): Promise<AuthenticatedSession> => {
     const session = requireSession();
     const [deployment] = await db
@@ -64,7 +72,9 @@ export const requireDeploymentAccess = async (
         error(404, "Deployment not found");
     }
 
-    if (!(await hasAccessToThisResource(session.user.id, deployment.resourceId))) {
+    if (
+        !(await hasAccessToThisResource(session.user.id, deployment.resourceId))
+    ) {
         error(403, "Forbidden");
     }
 

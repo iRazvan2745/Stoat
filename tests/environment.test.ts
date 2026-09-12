@@ -51,7 +51,9 @@ describe("serializeEnvFile", () => {
             { name: "HASH", value: "keep # hash" },
         ]);
 
-        expect(source).toBe('PLAIN=ok\nSPACED="hello world"\nHASH="keep # hash"');
+        expect(source).toBe(
+            'PLAIN=ok\nSPACED="hello world"\nHASH="keep # hash"'
+        );
         expect(parseEnvFile(source)).toEqual({
             errors: [],
             variables: [
@@ -71,7 +73,7 @@ describe("validateEnvironmentVariables", () => {
                 { name: "FOO", value: "2" },
                 { name: "1NO", value: "3" },
                 { name: "  ", value: "skip" },
-            ]),
+            ])
         ).toEqual(['Duplicate name "FOO"', 'Invalid name "1NO"']);
     });
 });
