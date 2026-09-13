@@ -1,0 +1,28 @@
+// Better-T-Stack project metadata
+//
+// Keep this file to use the `add` command.
+// Add addons: pnpm dlx create-better-t-stack@latest add
+//
+// Docs: https://better-t-stack.dev/docs
+// Stack Builder: https://better-t-stack.dev/new
+
+{
+  "$schema": "https://r2.better-t-stack.dev/schema.json",
+  "version": "3.43.0",
+  "createdAt": "2026-09-13T08:30:59.442Z",
+  "reproducibleCommand": "pnpm create better-t-stack@latest stoat --frontend svelte --backend self --runtime none --database postgres --orm drizzle --api orpc --auth better-auth --payments none --addons evlog mcp oxlint skills vite-plus --examples none --db-setup docker --web-deploy docker --server-deploy none --git --package-manager pnpm --install",
+  "database": "postgres",
+  "orm": "drizzle",
+  "backend": "self",
+  "runtime": "none",
+  "frontend": ["svelte"],
+  "addons": ["evlog", "mcp", "oxlint", "skills", "vite-plus"],
+  "examples": [],
+  "auth": "better-auth",
+  "payments": "none",
+  "packageManager": "pnpm",
+  "dbSetup": "docker",
+  "api": "orpc",
+  "webDeploy": "docker",
+  "serverDeploy": "none",
+}

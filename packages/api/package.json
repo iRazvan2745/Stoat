@@ -1,0 +1,32 @@
+{
+  "name": "@stoat/api",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "types": "./dist/src/*.d.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "check-types": "tsc -b",
+    "dev": "tsc -b --watch"
+  },
+  "dependencies": {
+    "@orpc/client": "catalog:",
+    "@orpc/openapi": "catalog:",
+    "@orpc/server": "catalog:",
+    "@orpc/zod": "catalog:",
+    "@stoat/auth": "workspace:*",
+    "@stoat/db": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@stoat/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

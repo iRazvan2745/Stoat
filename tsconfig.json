@@ -1,0 +1,3 @@
+{
+  "extends": "@stoat/config/tsconfig.base.json"
+}
