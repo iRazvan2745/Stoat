@@ -27,22 +27,22 @@ When these errors reach your logs or monitoring, you have no idea:
 import { createError } from "evlog";
 
 throw createError({
-  message: "Payment failed", // What happened
-  status: 402, // HTTP status code
-  why: "Card declined by issuer", // Why it happened
-  fix: "Try a different payment method", // How to fix it
-  link: "https://docs.example.com/...", // More information
-  cause: originalError, // Original error
-  data: {
-    // Optional: extra payload for the client
-    orderId: "ord_8x2k",
-    retryAfter: 30,
-  },
-  internal: {
-    // Optional: backend / logs only
-    correlationId: "pay_abc",
-    processorCode: "card_declined",
-  },
+    message: "Payment failed", // What happened
+    status: 402, // HTTP status code
+    why: "Card declined by issuer", // Why it happened
+    fix: "Try a different payment method", // How to fix it
+    link: "https://docs.example.com/...", // More information
+    cause: originalError, // Original error
+    data: {
+        // Optional: extra payload for the client
+        orderId: "ord_8x2k",
+        retryAfter: 30,
+    },
+    internal: {
+        // Optional: backend / logs only
+        correlationId: "pay_abc",
+        processorCode: "card_declined",
+    },
 });
 ```
 
@@ -75,20 +75,20 @@ Caused by: StripeCardError: card_declined
 
 ```json
 {
-  "name": "EvlogError",
-  "message": "Payment failed",
-  "status": 402,
-  "data": {
-    "orderId": "ord_8x2k",
-    "retryAfter": 30,
-    "why": "Card declined by issuer",
-    "fix": "Try a different payment method",
-    "link": "https://docs.example.com/payments/declined"
-  },
-  "cause": {
-    "name": "StripeCardError",
-    "message": "card_declined"
-  }
+    "name": "EvlogError",
+    "message": "Payment failed",
+    "status": 402,
+    "data": {
+        "orderId": "ord_8x2k",
+        "retryAfter": 30,
+        "why": "Card declined by issuer",
+        "fix": "Try a different payment method",
+        "link": "https://docs.example.com/payments/declined"
+    },
+    "cause": {
+        "name": "StripeCardError",
+        "message": "card_declined"
+    }
 }
 ```
 
@@ -177,31 +177,31 @@ try {
 ```typescript
 // Rate limiting
 throw createError({
-  message: "GitHub sync temporarily unavailable",
-  status: 429,
-  why: "API rate limit exceeded (5000/hour)",
-  fix: "Wait until rate limit resets or use authenticated requests",
-  link: "https://docs.github.com/en/rest/rate-limit",
-  cause: error,
+    message: "GitHub sync temporarily unavailable",
+    status: 429,
+    why: "API rate limit exceeded (5000/hour)",
+    fix: "Wait until rate limit resets or use authenticated requests",
+    link: "https://docs.github.com/en/rest/rate-limit",
+    cause: error,
 });
 
 // Authentication
 throw createError({
-  message: "Unable to connect to Stripe",
-  status: 503,
-  why: "Invalid API key provided",
-  fix: "Check STRIPE_SECRET_KEY environment variable",
-  link: "https://docs.stripe.com/keys",
-  cause: error,
+    message: "Unable to connect to Stripe",
+    status: 503,
+    why: "Invalid API key provided",
+    fix: "Check STRIPE_SECRET_KEY environment variable",
+    link: "https://docs.stripe.com/keys",
+    cause: error,
 });
 
 // Network
 throw createError({
-  message: "Failed to fetch user data",
-  status: 504,
-  why: "Connection timeout after 30s",
-  fix: "Check network connectivity and try again",
-  cause: error,
+    message: "Failed to fetch user data",
+    status: 504,
+    why: "Connection timeout after 30s",
+    fix: "Check network connectivity and try again",
+    cause: error,
 });
 ```
 
@@ -210,27 +210,27 @@ throw createError({
 ```typescript
 // Missing required field
 throw createError({
-  message: "Invalid checkout request",
-  status: 400,
-  why: 'Required field "email" is missing',
-  fix: "Include a valid email address in the request body",
-  link: "https://your-api.com/docs/checkout#request-body",
+    message: "Invalid checkout request",
+    status: 400,
+    why: 'Required field "email" is missing',
+    fix: "Include a valid email address in the request body",
+    link: "https://your-api.com/docs/checkout#request-body",
 });
 
 // Invalid format
 throw createError({
-  message: "Invalid email format",
-  status: 422,
-  why: `"${email}" is not a valid email address`,
-  fix: "Provide an email in the format user@example.com",
+    message: "Invalid email format",
+    status: 422,
+    why: `"${email}" is not a valid email address`,
+    fix: "Provide an email in the format user@example.com",
 });
 
 // Business rule violation
 throw createError({
-  message: "Cannot cancel subscription",
-  status: 409,
-  why: "Subscription has already been cancelled",
-  fix: "No action needed - subscription is already inactive",
+    message: "Cannot cancel subscription",
+    status: 409,
+    why: "Subscription has already been cancelled",
+    fix: "No action needed - subscription is already inactive",
 });
 ```
 
@@ -239,28 +239,28 @@ throw createError({
 ```typescript
 // Not found
 throw createError({
-  message: "User not found",
-  status: 404,
-  why: `No user with ID "${userId}" exists`,
-  fix: "Verify the user ID is correct",
+    message: "User not found",
+    status: 404,
+    why: `No user with ID "${userId}" exists`,
+    fix: "Verify the user ID is correct",
 });
 
 // Constraint violation
 throw createError({
-  message: "Cannot create duplicate account",
-  status: 409,
-  why: `User with email "${email}" already exists`,
-  fix: "Use a different email or log in to existing account",
-  link: "https://your-app.com/login",
+    message: "Cannot create duplicate account",
+    status: 409,
+    why: `User with email "${email}" already exists`,
+    fix: "Use a different email or log in to existing account",
+    link: "https://your-app.com/login",
 });
 
 // Connection
 throw createError({
-  message: "Database unavailable",
-  status: 503,
-  why: "Connection pool exhausted",
-  fix: "Reduce concurrent connections or increase pool size",
-  cause: error,
+    message: "Database unavailable",
+    status: 503,
+    why: "Connection pool exhausted",
+    fix: "Reduce concurrent connections or increase pool size",
+    cause: error,
 });
 ```
 
@@ -268,11 +268,11 @@ throw createError({
 
 ```typescript
 throw createError({
-  message: "Access denied",
-  status: 403,
-  why: 'User lacks "admin" role required for this action',
-  fix: "Contact an administrator to request access",
-  link: "https://your-app.com/docs/permissions",
+    message: "Access denied",
+    status: 403,
+    why: 'User lacks "admin" role required for this action',
+    fix: "Contact an administrator to request access",
+    link: "https://your-app.com/docs/permissions",
 });
 ```
 
@@ -282,15 +282,15 @@ throw createError({
 
 ```typescript
 async function processPayment(cart, user) {
-  try {
-    return await stripe.charges.create({
-      amount: cart.total,
-      currency: "usd",
-      source: user.paymentMethodId,
-    });
-  } catch (error) {
-    throw new Error("Payment failed"); // ❌ No context
-  }
+    try {
+        return await stripe.charges.create({
+            amount: cart.total,
+            currency: "usd",
+            source: user.paymentMethodId,
+        });
+    } catch (error) {
+        throw new Error("Payment failed"); // ❌ No context
+    }
 }
 ```
 
@@ -298,41 +298,41 @@ async function processPayment(cart, user) {
 
 ```typescript
 async function processPayment(cart, user) {
-  try {
-    return await stripe.charges.create({
-      amount: cart.total,
-      currency: "usd",
-      source: user.paymentMethodId,
-    });
-  } catch (error) {
-    throw createError({
-      message: "Payment failed",
-      why: getStripeErrorReason(error),
-      fix: getStripeErrorFix(error),
-      link: "https://docs.stripe.com/declines/codes",
-      cause: error,
-    });
-  }
+    try {
+        return await stripe.charges.create({
+            amount: cart.total,
+            currency: "usd",
+            source: user.paymentMethodId,
+        });
+    } catch (error) {
+        throw createError({
+            message: "Payment failed",
+            why: getStripeErrorReason(error),
+            fix: getStripeErrorFix(error),
+            link: "https://docs.stripe.com/declines/codes",
+            cause: error,
+        });
+    }
 }
 
 function getStripeErrorReason(error) {
-  const reasons = {
-    card_declined: "Card was declined by the issuer",
-    insufficient_funds: "Card has insufficient funds",
-    expired_card: "Card has expired",
-    // ...
-  };
-  return reasons[error.code] ?? `Stripe error: ${error.code}`;
+    const reasons = {
+        card_declined: "Card was declined by the issuer",
+        insufficient_funds: "Card has insufficient funds",
+        expired_card: "Card has expired",
+        // ...
+    };
+    return reasons[error.code] ?? `Stripe error: ${error.code}`;
 }
 
 function getStripeErrorFix(error) {
-  const fixes = {
-    card_declined: "Try a different payment method or contact your bank",
-    insufficient_funds: "Use a different card or add funds",
-    expired_card: "Update your card details with a valid expiration date",
-    // ...
-  };
-  return fixes[error.code] ?? "Contact support with error code";
+    const fixes = {
+        card_declined: "Try a different payment method or contact your bank",
+        insufficient_funds: "Use a different card or add funds",
+        expired_card: "Update your card details with a valid expiration date",
+        // ...
+    };
+    return fixes[error.code] ?? "Contact support with error code";
 }
 ```
 
@@ -348,20 +348,20 @@ Structured errors integrate seamlessly with wide events:
 import { createError } from "evlog";
 
 export default defineEventHandler(async (event) => {
-  const log = useLogger(event);
+    const log = useLogger(event);
 
-  try {
-    // ... business logic ...
-  } catch (error) {
-    // EvlogError fields are automatically captured
-    log.error(error, { step: "payment" });
-    throw createError({
-      message: "Payment failed",
-      why: error.message,
-      fix: "Try a different payment method",
-    });
-  }
-  // emit() called automatically
+    try {
+        // ... business logic ...
+    } catch (error) {
+        // EvlogError fields are automatically captured
+        log.error(error, { step: "payment" });
+        throw createError({
+            message: "Payment failed",
+            why: error.message,
+            fix: "Try a different payment method",
+        });
+    }
+    // emit() called automatically
 });
 ```
 
@@ -369,17 +369,17 @@ The wide event will include:
 
 ```json
 {
-  "error": {
-    "name": "EvlogError",
-    "message": "Payment failed",
-    "why": "Card declined by issuer",
-    "fix": "Try a different payment method",
-    "link": "https://docs.stripe.com/declines/codes",
-    "internal": {
-      "stripeRequestId": "req_123"
-    }
-  },
-  "step": "payment"
+    "error": {
+        "name": "EvlogError",
+        "message": "Payment failed",
+        "why": "Card declined by issuer",
+        "fix": "Try a different payment method",
+        "link": "https://docs.stripe.com/declines/codes",
+        "internal": {
+            "stripeRequestId": "req_123"
+        }
+    },
+    "step": "payment"
 }
 ```
 
@@ -412,11 +412,11 @@ evlog errors work with any Nitro-powered framework. When thrown in an API route,
 ```typescript
 // Backend - just throw
 throw createError({
-  message: "Payment failed",
-  status: 402,
-  why: "Card declined",
-  fix: "Try another card",
-  link: "https://docs.example.com/payments",
+    message: "Payment failed",
+    status: 402,
+    why: "Card declined",
+    fix: "Try another card",
+    link: "https://docs.example.com/payments",
 });
 
 // HTTP Response:
@@ -436,21 +436,21 @@ Use `parseError()` to extract all fields at the top level:
 import { parseError } from "evlog";
 
 try {
-  await $fetch("/api/checkout");
+    await $fetch("/api/checkout");
 } catch (err) {
-  const error = parseError(err);
+    const error = parseError(err);
 
-  // Direct access: error.message, error.why, error.fix, error.link
-  toast.add({
-    title: error.message,
-    description: error.why,
-    color: "error",
-    actions: error.link
-      ? [{ label: "Learn more", onClick: () => window.open(error.link) }]
-      : undefined,
-  });
+    // Direct access: error.message, error.why, error.fix, error.link
+    toast.add({
+        title: error.message,
+        description: error.why,
+        color: "error",
+        actions: error.link
+            ? [{ label: "Learn more", onClick: () => window.open(error.link) }]
+            : undefined,
+    });
 
-  if (error.fix) console.info(`💡 Fix: ${error.fix}`);
+    if (error.fix) console.info(`💡 Fix: ${error.fix}`);
 }
 ```
 

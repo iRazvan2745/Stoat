@@ -1,0 +1,5 @@
+# Binaries
+/sidecar
+*.exe
+*.test
+*.out

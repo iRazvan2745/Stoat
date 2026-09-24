@@ -1,0 +1,91 @@
+<script lang="ts">
+  import { getContext } from 'svelte';
+  import type { HTMLInputAttributes } from 'svelte/elements';
+  import { cn } from '$lib/utils';
+  import { NUMBER_FIELD_CONTEXT_KEY, type NumberFieldContext } from './number-field.svelte';
+
+  type Props = Omit<
+    HTMLInputAttributes,
+    'id' | 'type' | 'value' | 'min' | 'max' | 'step' | 'disabled'
+  > & {
+    /** Formats the numeric value for display when the input isn't focused. Defaults to the raw number. */
+    format?: (value: number) => string;
+    /** Parses the edited text back into a number on change. Defaults to parseFloat. */
+    parse?: (display: string) => number | undefined;
+  };
+
+  let { class: className, format, parse, ...restProps }: Props = $props();
+
+  const ctx = getContext<NumberFieldContext>(NUMBER_FIELD_CONTEXT_KEY);
+
+  let focused = $state(false);
+
+  let displayValue = $derived(
+    ctx?.value === undefined ? '' : focused || !format ? ctx.value : format(ctx.value)
+  );
+
+  function handleFocus() {
+    focused = true;
+  }
+
+  function handleBlur() {
+    focused = false;
+  }
+
+  function handleChange(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const v = (parse ?? parseFloat)(input.value);
+    if (v !== undefined && !Number.isNaN(v)) {
+      ctx?.setValue(v);
+    }
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (!ctx) return;
+
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      ctx.increment();
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      ctx.decrement();
+    } else if (e.key === 'Home' && ctx.min !== undefined) {
+      e.preventDefault();
+      ctx.setValue(ctx.min);
+    } else if (e.key === 'End' && ctx.max !== undefined) {
+      e.preventDefault();
+      ctx.setValue(ctx.max);
+    } else if (e.key === 'PageUp') {
+      e.preventDefault();
+      ctx.applyDelta(ctx.step * 10);
+    } else if (e.key === 'PageDown') {
+      e.preventDefault();
+      ctx.applyDelta(-ctx.step * 10);
+    }
+  }
+</script>
+
+<input
+  type="text"
+  inputmode="decimal"
+  role="spinbutton"
+  id={ctx?.fieldId}
+  value={displayValue}
+  min={ctx?.min}
+  max={ctx?.max}
+  step={ctx?.step}
+  disabled={ctx?.disabled}
+  aria-valuenow={ctx?.value}
+  aria-valuemin={ctx?.min}
+  aria-valuemax={ctx?.max}
+  class={cn(
+    'h-8.5 in-data-[size=lg]:h-9.5 in-data-[size=sm]:h-7.5 w-full min-w-0 grow bg-transparent in-data-[size=sm]:px-[calc(--spacing(2.5)-1px)] px-[calc(--spacing(3)-1px)] text-center text-foreground tabular-nums in-data-[size=lg]:leading-9.5 in-data-[size=sm]:leading-7.5 leading-8.5 outline-none sm:h-7.5 sm:in-data-[size=lg]:h-8.5 sm:in-data-[size=sm]:h-6.5 sm:in-data-[size=lg]:leading-8.5 sm:in-data-[size=sm]:leading-8.5 sm:leading-7.5',
+    className
+  )}
+  data-slot="number-field-input"
+  onchange={handleChange}
+  onkeydown={handleKeydown}
+  onfocus={handleFocus}
+  onblur={handleBlur}
+  {...restProps}
+>

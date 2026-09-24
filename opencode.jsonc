@@ -1,26 +1,27 @@
 {
-  "mcp": {
-    "better-t-stack": {
-      "type": "local",
-      "command": ["pnpm", "dlx", "create-better-t-stack@latest", "mcp"],
-      "environment": {},
-      "enabled": true,
+    "$schema": "https://opencode.ai/config.json",
+    "mcp": {
+        "better-t-stack": {
+            "type": "local",
+            "command": ["pnpm", "dlx", "create-better-t-stack@latest", "mcp"],
+            "environment": {},
+            "enabled": true,
+        },
+        "context7": {
+            "type": "local",
+            "command": ["npx", "-y", "@upstash/context7-mcp"],
+            "environment": {},
+            "enabled": true,
+        },
+        "svelte": {
+            "type": "remote",
+            "url": "https://mcp.svelte.dev/mcp",
+            "enabled": true,
+        },
+        "better-auth": {
+            "type": "remote",
+            "url": "https://mcp.better-auth.com/mcp",
+            "enabled": true,
+        },
     },
-    "context7": {
-      "type": "local",
-      "command": ["npx", "-y", "@upstash/context7-mcp"],
-      "environment": {},
-      "enabled": true,
-    },
-    "svelte": {
-      "type": "remote",
-      "url": "https://mcp.svelte.dev/mcp",
-      "enabled": true,
-    },
-    "better-auth": {
-      "type": "remote",
-      "url": "https://mcp.better-auth.com/mcp",
-      "enabled": true,
-    },
-  },
 }

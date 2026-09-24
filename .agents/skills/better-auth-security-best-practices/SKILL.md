@@ -11,7 +11,7 @@ description: Configure rate limiting, manage auth secrets, set up CSRF protectio
 import { betterAuth } from "better-auth";
 
 export const auth = betterAuth({
-  secret: process.env.BETTER_AUTH_SECRET, // or via `BETTER_AUTH_SECRET` env
+    secret: process.env.BETTER_AUTH_SECRET, // or via `BETTER_AUTH_SECRET` env
 });
 ```
 
@@ -38,11 +38,11 @@ Enabled in production by default. Applies to all endpoints. Plugins can override
 import { betterAuth } from "better-auth";
 
 export const auth = betterAuth({
-  rateLimit: {
-    enabled: true, // Default: true in production
-    window: 10, // Time window in seconds (default: 10)
-    max: 100, // Max requests per window (default: 100)
-  },
+    rateLimit: {
+        enabled: true, // Default: true in production
+        window: 10, // Time window in seconds (default: 10)
+        max: 100, // Max requests per window (default: 100)
+    },
 });
 ```
 
@@ -99,9 +99,9 @@ Multi-layer protection: origin header validation, Fetch Metadata checks, and fir
 import { betterAuth } from "better-auth";
 
 export const auth = betterAuth({
-  advanced: {
-    disableCSRFCheck: false, // Default: false (keep enabled)
-  },
+    advanced: {
+        disableCSRFCheck: false, // Default: false (keep enabled)
+    },
 });
 ```
 
@@ -115,8 +115,8 @@ Only disable for testing or with an alternative CSRF mechanism.
 import { betterAuth } from "better-auth";
 
 export const auth = betterAuth({
-  baseURL: "https://api.example.com",
-  trustedOrigins: ["https://app.example.com", "https://admin.example.com"],
+    baseURL: "https://api.example.com",
+    trustedOrigins: ["https://app.example.com", "https://admin.example.com"],
 });
 ```
 
@@ -126,9 +126,9 @@ The `baseURL` origin is automatically trusted. Also configurable via env: `BETTE
 
 ```ts
 trustedOrigins: [
-  "*.example.com", // Matches any subdomain
-  "https://*.example.com", // Protocol-specific wildcard
-  "exp://192.168.*.*:*/*", // Custom schemes (e.g., Expo)
+    "*.example.com", // Matches any subdomain
+    "https://*.example.com", // Protocol-specific wildcard
+    "exp://192.168.*.*:*/*", // Custom schemes (e.g., Expo)
 ];
 ```
 
@@ -138,9 +138,9 @@ Compute trusted origins based on the request:
 
 ```ts
 trustedOrigins: async (request) => {
-  // Validate against database, header, etc.
-  const tenant = getTenantFromRequest(request);
-  return [`https://${tenant}.myapp.com`];
+    // Validate against database, header, etc.
+    const tenant = getTenantFromRequest(request);
+    return [`https://${tenant}.myapp.com`];
 };
 ```
 
@@ -154,10 +154,10 @@ Validates `callbackURL`, `redirectTo`, `errorCallbackURL`, `newUserCallbackURL`,
 import { betterAuth } from "better-auth";
 
 export const auth = betterAuth({
-  session: {
-    expiresIn: 60 * 60 * 24 * 7, // 7 days (default)
-    updateAge: 60 * 60 * 24, // Refresh session every 24 hours (default)
-  },
+    session: {
+        expiresIn: 60 * 60 * 24 * 7, // 7 days (default)
+        updateAge: 60 * 60 * 24, // Refresh session every 24 hours (default)
+    },
 });
 ```
 
@@ -187,14 +187,14 @@ Defaults: `secure: true` (HTTPS/production), `sameSite: "lax"`, `httpOnly: true`
 import { betterAuth } from "better-auth";
 
 export const auth = betterAuth({
-  advanced: {
-    useSecureCookies: true, // Force secure cookies
-    cookiePrefix: "myapp", // Custom prefix (default: "better-auth")
-    defaultCookieAttributes: {
-      sameSite: "strict", // Stricter CSRF protection
-      path: "/auth", // Limit cookie scope
+    advanced: {
+        useSecureCookies: true, // Force secure cookies
+        cookiePrefix: "myapp", // Custom prefix (default: "better-auth")
+        defaultCookieAttributes: {
+            sameSite: "strict", // Stricter CSRF protection
+            path: "/auth", // Limit cookie scope
+        },
     },
-  },
 });
 ```
 
@@ -222,9 +222,9 @@ PKCE is automatic for all OAuth flows. State tokens are 32-char random strings e
 import { betterAuth } from "better-auth";
 
 export const auth = betterAuth({
-  account: {
-    storeStateStrategy: "cookie", // Options: "cookie" (default), "database"
-  },
+    account: {
+        storeStateStrategy: "cookie", // Options: "cookie" (default), "database"
+    },
 });
 ```
 
@@ -246,12 +246,12 @@ Enable if storing OAuth tokens for API access on behalf of users. Use `skipState
 import { betterAuth } from "better-auth";
 
 export const auth = betterAuth({
-  advanced: {
-    ipAddress: {
-      ipAddressHeaders: ["x-forwarded-for", "x-real-ip"], // Headers to check
-      disableIpTracking: false, // Keep enabled for rate limiting
+    advanced: {
+        ipAddress: {
+            ipAddressHeaders: ["x-forwarded-for", "x-real-ip"], // Headers to check
+            disableIpTracking: false, // Keep enabled for rate limiting
+        },
     },
-  },
 });
 ```
 
@@ -263,47 +263,47 @@ Set `ipv6Subnet` (128, 64, 48, 32; default 64) to group IPv6 addresses. Enable `
 import { betterAuth } from "better-auth";
 
 export const auth = betterAuth({
-  databaseHooks: {
-    session: {
-      create: {
-        after: async ({ data, ctx }) => {
-          await auditLog("session.created", {
-            userId: data.userId,
-            ip: ctx?.request?.headers.get("x-forwarded-for"),
-            userAgent: ctx?.request?.headers.get("user-agent"),
-          });
+    databaseHooks: {
+        session: {
+            create: {
+                after: async ({ data, ctx }) => {
+                    await auditLog("session.created", {
+                        userId: data.userId,
+                        ip: ctx?.request?.headers.get("x-forwarded-for"),
+                        userAgent: ctx?.request?.headers.get("user-agent"),
+                    });
+                },
+            },
+            delete: {
+                before: async ({ data }) => {
+                    await auditLog("session.revoked", { sessionId: data.id });
+                },
+            },
         },
-      },
-      delete: {
-        before: async ({ data }) => {
-          await auditLog("session.revoked", { sessionId: data.id });
+        user: {
+            update: {
+                after: async ({ data, oldData }) => {
+                    if (oldData?.email !== data.email) {
+                        await auditLog("user.email_changed", {
+                            userId: data.id,
+                            oldEmail: oldData?.email,
+                            newEmail: data.email,
+                        });
+                    }
+                },
+            },
         },
-      },
+        account: {
+            create: {
+                after: async ({ data }) => {
+                    await auditLog("account.linked", {
+                        userId: data.userId,
+                        provider: data.providerId,
+                    });
+                },
+            },
+        },
     },
-    user: {
-      update: {
-        after: async ({ data, oldData }) => {
-          if (oldData?.email !== data.email) {
-            await auditLog("user.email_changed", {
-              userId: data.id,
-              oldEmail: oldData?.email,
-              newEmail: data.email,
-            });
-          }
-        },
-      },
-    },
-    account: {
-      create: {
-        after: async ({ data }) => {
-          await auditLog("account.linked", {
-            userId: data.userId,
-            provider: data.providerId,
-          });
-        },
-      },
-    },
-  },
 });
 ```
 
@@ -315,16 +315,16 @@ Return `false` from a `before` hook to prevent an operation.
 import { betterAuth } from "better-auth";
 
 export const auth = betterAuth({
-  advanced: {
-    backgroundTasks: {
-      handler: (promise) => {
-        // Platform-specific handler
-        // Vercel: waitUntil(promise)
-        // Cloudflare: ctx.waitUntil(promise)
-        waitUntil(promise);
-      },
+    advanced: {
+        backgroundTasks: {
+            handler: (promise) => {
+                // Platform-specific handler
+                // Vercel: waitUntil(promise)
+                // Cloudflare: ctx.waitUntil(promise)
+                waitUntil(promise);
+            },
+        },
     },
-  },
 });
 ```
 
@@ -340,73 +340,73 @@ Built-in: consistent response messages, dummy operations on invalid requests, ba
 import { betterAuth } from "better-auth";
 
 export const auth = betterAuth({
-  secret: process.env.BETTER_AUTH_SECRET,
-  baseURL: "https://api.example.com",
-  trustedOrigins: ["https://app.example.com", "https://*.preview.example.com"],
+    secret: process.env.BETTER_AUTH_SECRET,
+    baseURL: "https://api.example.com",
+    trustedOrigins: ["https://app.example.com", "https://*.preview.example.com"],
 
-  // Rate limiting
-  rateLimit: {
-    enabled: true,
-    storage: "secondary-storage",
-    customRules: {
-      "/api/auth/sign-in/email": { window: 60, max: 5 },
-      "/api/auth/sign-up/email": { window: 60, max: 3 },
+    // Rate limiting
+    rateLimit: {
+        enabled: true,
+        storage: "secondary-storage",
+        customRules: {
+            "/api/auth/sign-in/email": { window: 60, max: 5 },
+            "/api/auth/sign-up/email": { window: 60, max: 3 },
+        },
     },
-  },
 
-  // Session security
-  session: {
-    expiresIn: 60 * 60 * 24 * 7, // 7 days
-    updateAge: 60 * 60 * 24, // 24 hours
-    freshAge: 60 * 60, // 1 hour for sensitive actions
-    cookieCache: {
-      enabled: true,
-      maxAge: 300,
-      strategy: "jwe", // Encrypted session data
-    },
-  },
-
-  // OAuth security
-  account: {
-    encryptOAuthTokens: true,
-    storeStateStrategy: "cookie",
-  },
-
-  // Advanced settings
-  advanced: {
-    useSecureCookies: true,
-    cookiePrefix: "myapp",
-    defaultCookieAttributes: {
-      sameSite: "lax",
-    },
-    ipAddress: {
-      ipAddressHeaders: ["x-forwarded-for"],
-      ipv6Subnet: 64,
-    },
-    backgroundTasks: {
-      handler: (promise) => waitUntil(promise),
-    },
-  },
-
-  // Security auditing
-  databaseHooks: {
+    // Session security
     session: {
-      create: {
-        after: async ({ data, ctx }) => {
-          console.log(`New session for user ${data.userId}`);
+        expiresIn: 60 * 60 * 24 * 7, // 7 days
+        updateAge: 60 * 60 * 24, // 24 hours
+        freshAge: 60 * 60, // 1 hour for sensitive actions
+        cookieCache: {
+            enabled: true,
+            maxAge: 300,
+            strategy: "jwe", // Encrypted session data
         },
-      },
     },
-    user: {
-      update: {
-        after: async ({ data, oldData }) => {
-          if (oldData?.email !== data.email) {
-            console.log(`Email changed for user ${data.id}`);
-          }
+
+    // OAuth security
+    account: {
+        encryptOAuthTokens: true,
+        storeStateStrategy: "cookie",
+    },
+
+    // Advanced settings
+    advanced: {
+        useSecureCookies: true,
+        cookiePrefix: "myapp",
+        defaultCookieAttributes: {
+            sameSite: "lax",
         },
-      },
+        ipAddress: {
+            ipAddressHeaders: ["x-forwarded-for"],
+            ipv6Subnet: 64,
+        },
+        backgroundTasks: {
+            handler: (promise) => waitUntil(promise),
+        },
     },
-  },
+
+    // Security auditing
+    databaseHooks: {
+        session: {
+            create: {
+                after: async ({ data, ctx }) => {
+                    console.log(`New session for user ${data.userId}`);
+                },
+            },
+        },
+        user: {
+            update: {
+                after: async ({ data, oldData }) => {
+                    if (oldData?.email !== data.email) {
+                        console.log(`Email changed for user ${data.id}`);
+                    }
+                },
+            },
+        },
+    },
 });
 ```
 

@@ -2,22 +2,41 @@ import type { Database } from "@stoat/db";
 import * as schema from "@stoat/db/schema/auth";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { admin } from "better-auth/plugins/admin";
+import { organization } from "better-auth/plugins/organization";
+import { listUserOrganizations } from "@stoat/db/organizations";
 
 export type AuthConfig = {
-  BETTER_AUTH_URL: string;
-  BETTER_AUTH_SECRET: string;
+    BETTER_AUTH_URL: string;
+    BETTER_AUTH_SECRET: string;
 };
 
 export function createAuth(env: AuthConfig, database: Database) {
-  return betterAuth({
-    database: drizzleAdapter(database, {
-      provider: "pg",
-      schema,
-    }),
-    trustedOrigins: [env.BETTER_AUTH_URL],
-    emailAndPassword: { enabled: true },
-    secret: env.BETTER_AUTH_SECRET,
-    baseURL: env.BETTER_AUTH_URL,
-    plugins: [],
-  });
+    return betterAuth({
+        database: drizzleAdapter(database, {
+            provider: "pg",
+            schema,
+        }),
+        databaseHooks: {
+            session: {
+                create: {
+                    before: async (session) => {
+                        const [organization] = await listUserOrganizations(
+                            database,
+                            session.userId,
+                        );
+
+                        return {
+                            data: { ...session, activeOrganizationId: organization?.id ?? null },
+                        };
+                    },
+                },
+            },
+        },
+        trustedOrigins: [env.BETTER_AUTH_URL],
+        emailAndPassword: { enabled: true },
+        secret: env.BETTER_AUTH_SECRET,
+        baseURL: env.BETTER_AUTH_URL,
+        plugins: [organization(), admin()],
+    });
 }

@@ -1,1 +1,1 @@
-export { ENV as env } from "./env";
+export { ENV as env } from "./generated-env";

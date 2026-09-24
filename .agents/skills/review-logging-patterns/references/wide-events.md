@@ -33,16 +33,16 @@ Production (JSON format):
 
 ```json
 {
-  "timestamp": "2025-01-24T10:23:45.235Z",
-  "level": "error",
-  "service": "api",
-  "method": "POST",
-  "path": "/checkout",
-  "duration": "234ms",
-  "user": { "id": "user_123", "plan": "premium", "accountAge": 847 },
-  "cart": { "items": 3, "total": 9999 },
-  "payment": { "provider": "stripe", "method": "card" },
-  "error": { "code": "card_declined", "retriable": false }
+    "timestamp": "2025-01-24T10:23:45.235Z",
+    "level": "error",
+    "service": "api",
+    "method": "POST",
+    "path": "/checkout",
+    "duration": "234ms",
+    "user": { "id": "user_123", "plan": "premium", "accountAge": 847 },
+    "cart": { "items": 3, "total": 9999 },
+    "payment": { "provider": "stripe", "method": "card" },
+    "error": { "code": "card_declined", "retriable": false }
 }
 ```
 
@@ -65,10 +65,10 @@ Every wide event should include:
 
 ```typescript
 log.set({
-  method: "POST",
-  path: "/api/checkout",
-  requestId: "req_abc123", // For tracing
-  traceId: "trace_xyz", // Distributed tracing
+    method: "POST",
+    path: "/api/checkout",
+    requestId: "req_abc123", // For tracing
+    traceId: "trace_xyz", // Distributed tracing
 });
 ```
 
@@ -76,12 +76,12 @@ log.set({
 
 ```typescript
 log.set({
-  user: {
-    id: "user_123",
-    plan: "premium", // Business-relevant
-    accountAge: 847, // Days since signup
-    subscription: "annual",
-  },
+    user: {
+        id: "user_123",
+        plan: "premium", // Business-relevant
+        accountAge: 847, // Days since signup
+        subscription: "annual",
+    },
 });
 ```
 
@@ -92,27 +92,27 @@ Add domain-specific data relevant to the operation:
 ```typescript
 // E-commerce checkout
 log.set({
-  cart: { id: "cart_xyz", items: 3, total: 9999 },
-  payment: { method: "card", provider: "stripe" },
-  order: { id: "order_123", status: "created" },
+    cart: { id: "cart_xyz", items: 3, total: 9999 },
+    payment: { method: "card", provider: "stripe" },
+    order: { id: "order_123", status: "created" },
 });
 
 // API rate limiting
 log.set({
-  rateLimit: {
-    limit: 1000,
-    remaining: 42,
-    resetAt: "2025-01-24T11:00:00Z",
-  },
+    rateLimit: {
+        limit: 1000,
+        remaining: 42,
+        resetAt: "2025-01-24T11:00:00Z",
+    },
 });
 
 // File upload
 log.set({
-  upload: {
-    filename: "document.pdf",
-    size: 1024000,
-    mimeType: "application/pdf",
-  },
+    upload: {
+        filename: "document.pdf",
+        size: 1024000,
+        mimeType: "application/pdf",
+    },
 });
 ```
 
@@ -121,14 +121,14 @@ log.set({
 ```typescript
 // Success
 log.set({
-  status: 200,
-  // duration is added automatically by emit()
+    status: 200,
+    // duration is added automatically by emit()
 });
 
 // Error
 log.error(error, {
-  step: "payment",
-  retriable: false,
+    step: "payment",
+    retriable: false,
 });
 ```
 
@@ -146,31 +146,31 @@ With the evlog module, use `useLogger(event)` - it's auto-created and auto-emitt
 import { createError } from "evlog";
 
 export default defineEventHandler(async (event) => {
-  const log = useLogger(event); // Auto-created by evlog
+    const log = useLogger(event); // Auto-created by evlog
 
-  const user = await requireAuth(event);
-  log.set({ user: { id: user.id, plan: user.plan } });
+    const user = await requireAuth(event);
+    log.set({ user: { id: user.id, plan: user.plan } });
 
-  const cart = await getCart(user.id);
-  log.set({ cart: { items: cart.items.length, total: cart.total } });
+    const cart = await getCart(user.id);
+    log.set({ cart: { items: cart.items.length, total: cart.total } });
 
-  try {
-    const payment = await processPayment(cart, user);
-    log.set({ payment: { id: payment.id, method: payment.method } });
-  } catch (error) {
-    log.error(error, { step: "payment" });
-    throw createError({
-      message: "Payment failed",
-      why: error.message,
-      fix: "Try a different payment method",
-    });
-  }
+    try {
+        const payment = await processPayment(cart, user);
+        log.set({ payment: { id: payment.id, method: payment.method } });
+    } catch (error) {
+        log.error(error, { step: "payment" });
+        throw createError({
+            message: "Payment failed",
+            why: error.message,
+            fix: "Try a different payment method",
+        });
+    }
 
-  const order = await createOrder(cart, user);
-  log.set({ order: { id: order.id, status: order.status } });
+    const order = await createOrder(cart, user);
+    log.set({ order: { id: order.id, status: order.status } });
 
-  return order;
-  // log.emit() is called automatically at request end
+    return order;
+    // log.emit() is called automatically at request end
 });
 ```
 
@@ -185,21 +185,21 @@ import { initLogger, createRequestLogger } from "evlog";
 initLogger({ env: { service: "sync-worker", environment: "production" } });
 
 async function processJob(job: Job) {
-  const log = createRequestLogger({ jobId: job.id, type: "sync" });
+    const log = createRequestLogger({ jobId: job.id, type: "sync" });
 
-  try {
-    log.set({ source: job.source, target: job.target });
+    try {
+        log.set({ source: job.source, target: job.target });
 
-    const result = await performSync(job);
-    log.set({ recordsSynced: result.count });
+        const result = await performSync(job);
+        log.set({ recordsSynced: result.count });
 
-    return result;
-  } catch (error) {
-    log.error(error, { step: "sync" });
-    throw error;
-  } finally {
-    log.emit(); // Manual emit required
-  }
+        return result;
+    } catch (error) {
+        log.error(error, { step: "sync" });
+        throw error;
+    } finally {
+        log.emit(); // Manual emit required
+    }
 }
 ```
 
@@ -211,22 +211,22 @@ async function processJob(job: Job) {
 // server/api/checkout.post.ts
 
 export default defineEventHandler(async (event) => {
-  console.log("Checkout started");
+    console.log("Checkout started");
 
-  const user = await getUser(event);
-  console.log("User loaded:", user.id);
+    const user = await getUser(event);
+    console.log("User loaded:", user.id);
 
-  const cart = await getCart(user.id);
-  console.log("Cart loaded:", cart.items.length, "items");
+    const cart = await getCart(user.id);
+    console.log("Cart loaded:", cart.items.length, "items");
 
-  try {
-    const payment = await processPayment(cart);
-    console.log("Payment successful:", payment.id);
-    return { orderId: payment.orderId };
-  } catch (error) {
-    console.error("Payment failed:", error.message);
-    throw error;
-  }
+    try {
+        const payment = await processPayment(cart);
+        console.log("Payment successful:", payment.id);
+        return { orderId: payment.orderId };
+    } catch (error) {
+        console.error("Payment failed:", error.message);
+        throw error;
+    }
 });
 ```
 
@@ -240,28 +240,28 @@ export default defineEventHandler(async (event) => {
 import { createError } from "evlog";
 
 export default defineEventHandler(async (event) => {
-  const log = useLogger(event);
+    const log = useLogger(event);
 
-  const user = await getUser(event);
-  log.set({ user: { id: user.id, plan: user.plan } });
+    const user = await getUser(event);
+    log.set({ user: { id: user.id, plan: user.plan } });
 
-  const cart = await getCart(user.id);
-  log.set({ cart: { items: cart.items.length, total: cart.total } });
+    const cart = await getCart(user.id);
+    log.set({ cart: { items: cart.items.length, total: cart.total } });
 
-  try {
-    const payment = await processPayment(cart);
-    log.set({ payment: { id: payment.id }, order: { id: payment.orderId } });
+    try {
+        const payment = await processPayment(cart);
+        log.set({ payment: { id: payment.id }, order: { id: payment.orderId } });
 
-    return { orderId: payment.orderId };
-  } catch (error) {
-    log.error(error, { step: "payment" });
-    throw createError({
-      message: "Payment failed",
-      why: error.message,
-      fix: "Try a different payment method",
-    });
-  }
-  // emit() called automatically
+        return { orderId: payment.orderId };
+    } catch (error) {
+        log.error(error, { step: "payment" });
+        throw createError({
+            message: "Payment failed",
+            why: error.message,
+            fix: "Try a different payment method",
+        });
+    }
+    // emit() called automatically
 });
 ```
 
@@ -291,11 +291,11 @@ log.set({ user: body });
 
 // ✅ SAFE - explicitly select fields
 log.set({
-  user: {
-    id: body.id,
-    email: maskEmail(body.email),
-    // password: body.password ← NEVER include
-  },
+    user: {
+        id: body.id,
+        email: maskEmail(body.email),
+        // password: body.password ← NEVER include
+    },
 });
 ```
 
@@ -306,13 +306,13 @@ log.set({
 ```typescript
 // server/utils/sanitize.ts
 export function maskEmail(email: string): string {
-  const [local, domain] = email.split("@");
-  if (!domain) return "***";
-  return `${local[0]}***@${domain[0]}***.${domain.split(".")[1]}`;
+    const [local, domain] = email.split("@");
+    if (!domain) return "***";
+    return `${local[0]}***@${domain[0]}***.${domain.split(".")[1]}`;
 }
 
 export function maskCard(card: string): string {
-  return `****${card.slice(-4)}`;
+    return `****${card.slice(-4)}`;
 }
 ```
 
@@ -325,16 +325,16 @@ Use consistent, descriptive field names:
 ```typescript
 // ✅ Good - grouped, descriptive
 log.set({
-  user: { id, plan, accountAge },
-  cart: { items, total },
-  payment: { method, provider },
+    user: { id, plan, accountAge },
+    cart: { items, total },
+    payment: { method, provider },
 });
 
 // ❌ Bad - flat, abbreviated
 log.set({
-  uid: "123",
-  n: 3,
-  t: 9999,
-  pm: "card",
+    uid: "123",
+    n: 3,
+    t: 9999,
+    pm: "card",
 });
 ```

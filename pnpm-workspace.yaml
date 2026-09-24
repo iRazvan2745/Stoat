@@ -1,15 +1,48 @@
 packages:
-  - apps/*
-  - packages/*
+    - apps/*
+    - packages/*
 allowBuilds:
-  esbuild: true
-  sharp: true
+    cpu-features: false
+    esbuild: true
+    protobufjs: false
+    sharp: true
+    ssh2: false
 catalog:
-  zod: ^4.5.4
-  typescript: ^6.0.3
-  varlock: 1.18.0
-  "@orpc/server": ^1.15.0
-  "@orpc/client": ^1.15.0
-  "@orpc/openapi": ^1.15.0
-  "@orpc/zod": ^1.15.0
-  better-auth: 1.7.3
+    zod: ^4.5.4
+    typescript: ^6.0.3
+    varlock: 1.18.0
+    "@orpc/server": 2.0.0-beta.35
+    "@orpc/client": 2.0.0-beta.35
+    "@orpc/openapi": 2.0.0-beta.35
+    "@orpc/zod": 2.0.0-beta.35
+    "@orpc/valibot": 2.0.0-beta.35
+    "@orpc/tanstack-query": 2.0.0-beta.35
+    valibot: ^1.5.0
+    yaml: ^2.9.0
+    better-auth: 1.7.3
+    "@orpc/experimental-effect": "beta"
+    effect: "beta"
+    vite: npm:@voidzero-dev/vite-plus-core@0.3.1
+    vite-plus: 0.3.1
+    ofetch: latest
+minimumReleaseAgeExclude:
+    - "@effect/sql-pg@4.0.0-rc.116"
+    - effect@4.0.0-rc.116
+overrides:
+    vite@*: "catalog:"
+    "@esbuild-kit/core-utils>esbuild": ^0.28.2
+    "@sveltejs/kit>cookie": ^0.7.2
+    # better-auth's drizzle peer allows v1 RCs (^0.45.2 || >=1.0.0-rc.1 <2.0.0).
+    # Since @stoat/workflows legitimately pulls drizzle-orm v1 into the graph,
+    # pnpm would otherwise resolve these peers to v1, whose StringChunk layout
+    # crashes the 0.45.2 query builder used by our db driver. Pin to 0.45.2.
+    better-auth>drizzle-orm: 0.45.2
+    "@better-auth/drizzle-adapter>drizzle-orm": 0.45.2
+patchedDependencies:
+    effect-mq@0.7.0: patches/effect-mq@0.7.0.patch
+    nuqs-svelte@1.2.2: patches/nuqs-svelte@1.2.2.patch
+peerDependencyRules:
+    allowAny:
+        - vite
+    allowedVersions:
+        vite: "*"

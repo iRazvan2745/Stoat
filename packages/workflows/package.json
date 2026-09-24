@@ -1,0 +1,32 @@
+{
+    "name": "@stoat/workflows",
+    "private": true,
+    "type": "module",
+    "exports": {
+        ".": {
+            "types": "./src/runtime.ts",
+            "default": "./src/runtime.ts"
+        },
+        "./*": {
+            "types": "./src/*.ts",
+            "default": "./src/*.ts"
+        }
+    },
+    "scripts": {
+        "build": "tsc -b",
+        "check-types": "tsc -b"
+    },
+    "dependencies": {
+        "@effect/sql-pg": "4.0.0-rc.116",
+        "@stoat/db": "workspace:*",
+        "@stoat/uncloud": "workspace:*",
+        "drizzle-orm": "1.0.0-rc.5-5935859",
+        "effect": "4.0.0-rc.116",
+        "effect-mq": "0.7.0",
+        "yaml": "^2.8.1"
+    },
+    "devDependencies": {
+        "@stoat/config": "workspace:*",
+        "typescript": "catalog:"
+    }
+}

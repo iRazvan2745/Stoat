@@ -1,0 +1,6 @@
+**/.git
+**/.github
+**/.forgejo
+sidecar
+.env
+.env.*

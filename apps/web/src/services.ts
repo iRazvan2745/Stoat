@@ -3,9 +3,15 @@ import { type Database, createDb } from "@stoat/db";
 
 import { env } from "./env.server";
 
-const db = createDb(env);
+let db: Database | undefined;
 
+let auth: ReturnType<typeof createConfiguredAuth> | undefined;
+
+// Dynamic configuration is only available at runtime, not during build analysis.
 export function getDb(): Database {
-  return db;
+    return (db ??= createDb(env));
 }
-export const auth = createConfiguredAuth(env, db);
+
+export function getAuth() {
+    return (auth ??= createConfiguredAuth(env, getDb()));
+}

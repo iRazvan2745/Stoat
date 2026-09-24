@@ -1,0 +1,17 @@
+diff --git a/dist/drizzle-postgres/DrizzleJobStore.js b/dist/drizzle-postgres/DrizzleJobStore.js
+index 3261b4b05f03315e8858d9ae20c619b99ace118c..b555bdbe60ca7aebee4ea315dd62f8b291aa5dfa 100644
+--- a/dist/drizzle-postgres/DrizzleJobStore.js
++++ b/dist/drizzle-postgres/DrizzleJobStore.js
+@@ -247,7 +247,11 @@ export const make = (options) => Effect.gen(function* () {
+     };
+     // Resubscribe forever: if the LISTEN stream ends or fails, wake-ups
+     // degrade to the worker's pollInterval until the next attempt succeeds.
+-    yield* client.listen(wakeChannel).pipe(Stream.runForEach((payload) => Effect.sync(() => signalWake(payload === "*" ? undefined : JobStore.QueueName(payload)))), Effect.catchCause((cause) => Effect.logWarning("effect-mq: LISTEN subscription failed; wake-ups degraded to polling until resubscribe", cause)), Effect.andThen(Effect.sleep("1 second")), Effect.forever, Effect.forkScoped);
++    // Patched (stoat): @effect/sql-pg >=4.0.0-rc.113 changed `listen` to return
++    // `Effect<Queue<Notification>>` instead of a directly consumable stream, so
++    // unwrap the queue first and read `notification.payload`. Remove when
++    // effect-mq ships support for the new shape upstream.
++    yield* Effect.flatMap(client.listen(wakeChannel), (queue) => Stream.fromQueue(queue).pipe(Stream.runForEach((notification) => Effect.sync(() => signalWake(notification.payload === "*" ? undefined : JobStore.QueueName(notification.payload)))), Effect.catchCause((cause) => Effect.logWarning("effect-mq: LISTEN subscription failed; wake-ups degraded to polling until resubscribe", cause)), Effect.andThen(Effect.sleep("1 second")), Effect.forever, Effect.forkScoped));
+     // Automatic retention (the store-level sweep and per-job `keep`) never
+     // prunes a flow parent that still owes cascade cancels: its dependency
+     // rows marked `cancelled` and not `cascaded` are the only record that

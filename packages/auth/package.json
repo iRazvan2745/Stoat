@@ -1,27 +1,27 @@
 {
-  "name": "@stoat/auth",
-  "type": "module",
-  "exports": {
-    ".": {
-      "types": "./dist/src/index.d.ts",
-      "default": "./src/index.ts"
+    "name": "@stoat/auth",
+    "type": "module",
+    "exports": {
+        ".": {
+            "types": "./src/index.ts",
+            "default": "./src/index.ts"
+        },
+        "./*": {
+            "types": "./src/*.ts",
+            "default": "./src/*.ts"
+        }
     },
-    "./*": {
-      "types": "./dist/src/*.d.ts",
-      "default": "./src/*.ts"
+    "scripts": {
+        "build": "tsc -b",
+        "check-types": "tsc -b"
+    },
+    "dependencies": {
+        "@stoat/db": "workspace:*",
+        "better-auth": "catalog:",
+        "zod": "catalog:"
+    },
+    "devDependencies": {
+        "@stoat/config": "workspace:*",
+        "typescript": "catalog:"
     }
-  },
-  "scripts": {
-    "build": "tsc -b",
-    "check-types": "tsc -b"
-  },
-  "dependencies": {
-    "@stoat/db": "workspace:*",
-    "better-auth": "catalog:",
-    "zod": "catalog:"
-  },
-  "devDependencies": {
-    "@stoat/config": "workspace:*",
-    "typescript": "catalog:"
-  }
 }

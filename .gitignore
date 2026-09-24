@@ -4,6 +4,7 @@ node_modules
 .pnp.js
 
 # Build outputs
+.svelte-kit
 dist
 build
 *.tsbuildinfo
@@ -31,6 +32,7 @@ local.db-*
 
 # Logs
 logs
+!apps/web/src/routes/**/logs/
 .evlog/
 *.log
 npm-debug.log*

@@ -1,20 +1,19 @@
 import type { Context as ApiContext } from "@stoat/api/context";
 
-import { getDb } from "./services";
-import { auth } from "./services";
+import { getAuth, getDb } from "./services";
 
 export type CreateContextOptions = {
-  headers: Headers;
+    headers: Headers;
 };
 
 export async function createContext({ headers }: CreateContextOptions): Promise<ApiContext> {
-  const db = await getDb();
-  const session = await auth.api.getSession({ headers });
-  return {
-    db,
-    auth: null,
-    session,
-  };
+    const db = await getDb();
+    const session = await getAuth().api.getSession({ headers });
+
+    return {
+        db,
+        session,
+    };
 }
 
 export type Context = Awaited<ReturnType<typeof createContext>>;

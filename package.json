@@ -1,52 +1,64 @@
 {
-  "name": "stoat",
-  "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
-  "type": "module",
-  "scripts": {
-    "dev": "vp run -r dev",
-    "build": "vp run -r build",
-    "check-types": "vp run -r check-types",
-    "postinstall": "tsc -b packages/api && varlock codegen --path ./apps/web/ && varlock codegen --path ./packages/db/",
-    "dev:types": "tsc -b packages/api --watch",
-    "check": "oxlint && oxfmt --write",
-    "lint": "vp lint",
-    "format": "vp fmt",
-    "staged": "vp staged",
-    "hooks:setup": "vp config",
-    "dev:web": "vp run --filter web dev",
-    "db:push": "vp run --filter @stoat/db db:push",
-    "db:studio": "vp run --filter @stoat/db db:studio",
-    "db:generate": "vp run --filter @stoat/db db:generate",
-    "db:migrate": "vp run --filter @stoat/db db:migrate",
-    "db:start": "docker compose up -d postgres",
-    "db:watch": "docker compose up postgres",
-    "db:stop": "docker compose stop postgres",
-    "db:down": "docker compose down postgres",
-    "docker:build": "docker compose build",
-    "docker:up": "docker compose up -d --build",
-    "docker:down": "docker compose down",
-    "docker:logs": "docker compose logs -f",
-    "env:generate": "varlock codegen --path ./apps/web/ && varlock codegen --path ./packages/db/"
-  },
-  "dependencies": {
-    "zod": "catalog:"
-  },
-  "devDependencies": {
-    "@stoat/config": "workspace:*",
-    "@types/node": "^26.4.1",
-    "oxfmt": "^0.66.0",
-    "oxlint": "^1.81.0",
-    "rolldown": "1.2.7",
-    "typescript": "catalog:",
-    "varlock": "catalog:",
-    "vite-plus": "0.3.1"
-  },
-  "overrides": {
-    "vite": "npm:@voidzero-dev/vite-plus-core@0.3.1"
-  },
-  "packageManager": "pnpm@11.15.0"
+    "name": "stoat",
+    "private": true,
+    "workspaces": [
+        "apps/*",
+        "packages/*"
+    ],
+    "type": "module",
+    "scripts": {
+        "build": "vp run -r build",
+        "check": "vp lint && vp fmt --write",
+        "check-types": "vp run -r check-types",
+        "db:down": "docker compose down postgres",
+        "db:generate": "vp run --filter @stoat/db db:generate",
+        "db:migrate": "vp run --filter @stoat/db db:migrate",
+        "db:push": "vp run --filter @stoat/db db:push",
+        "db:start": "docker compose up -d postgres",
+        "db:stop": "docker compose stop postgres",
+        "db:studio": "vp run --filter @stoat/db db:studio",
+        "db:watch": "docker compose up postgres",
+        "dev": "vp run -r dev",
+        "dev:types": "tsc -b packages/api --watch",
+        "dev:web": "vp run --filter web dev",
+        "docker:build": "docker compose build",
+        "docker:down": "docker compose down",
+        "docker:logs": "docker compose logs -f",
+        "docker:up": "docker compose up -d --build",
+        "env:generate": "varlock codegen --path ./apps/web/ && varlock codegen --path ./packages/db/",
+        "format": "vp fmt",
+        "hooks:setup": "vp config",
+        "lint": "vp lint",
+        "postinstall": "varlock codegen --path ./apps/web/ && varlock codegen --path ./packages/db/",
+        "staged": "vp staged",
+        "test": "vp test run && pnpm --dir apps/web exec vp test run",
+        "uc:refresh": "pnpm --filter @stoat/uncloud generate-spec && pnpm --filter @stoat/uncloud generate"
+    },
+    "dependencies": {
+        "zod": "catalog:"
+    },
+    "devDependencies": {
+        "@orpc/server": "catalog:",
+        "@oxlint/plugins": "1.81.0",
+        "@stoat/config": "workspace:*",
+        "@stoat/db": "workspace:*",
+        "@stoat/uncloud": "workspace:*",
+        "@stoat/workflows": "workspace:*",
+        "@testcontainers/postgresql": "^12.1.0",
+        "@types/node": "^26.4.1",
+        "drizzle-orm": "^0.45.2",
+        "effect": "4.0.0-rc.116",
+        "oxlint": "1.81.0",
+        "rolldown": "1.2.7",
+        "svelte": "^5.57.0",
+        "typescript": "catalog:",
+        "varlock": "catalog:",
+        "vite": "catalog:",
+        "vite-plus": "catalog:",
+        "yaml": "catalog:"
+    },
+    "overrides": {
+        "vite": "npm:@voidzero-dev/vite-plus-core@0.3.1"
+    },
+    "packageManager": "pnpm@12.4.2"
 }

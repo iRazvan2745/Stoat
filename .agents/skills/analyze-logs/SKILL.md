@@ -3,8 +3,8 @@ name: analyze-logs
 description: Analyze application logs from the .evlog/logs/ directory. Use when debugging errors, investigating slow requests, understanding request patterns, or answering questions about application behavior. Reads structured NDJSON wide events written by evlog's file system drain.
 license: MIT
 metadata:
-  author: HugoRCD
-  version: "0.3"
+    author: HugoRCD
+    version: "0.3"
 ---
 
 # Analyze application logs
@@ -67,7 +67,7 @@ import { createFsDrain } from "evlog/fs";
 
 // Nuxt / Nitro: server/plugins/evlog-drain.ts
 export default defineNitroPlugin((nitroApp) => {
-  nitroApp.hooks.hook("evlog:drain", createFsDrain());
+    nitroApp.hooks.hook("evlog:drain", createFsDrain());
 });
 
 // Hono / Express / Elysia: pass in middleware options

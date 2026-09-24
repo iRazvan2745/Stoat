@@ -1,0 +1,115 @@
+diff --git a/dist/adapters/svelte-kit/adapter.svelte b/dist/adapters/svelte-kit/adapter.svelte
+index 10ce141e9be7678fd0dd23e6f1e08bcdafc0290b..6b08ffbc182bd8ac5b2bbbc621bba51951a3bdfa 100644
+--- a/dist/adapters/svelte-kit/adapter.svelte
++++ b/dist/adapters/svelte-kit/adapter.svelte
+@@ -1,12 +1,14 @@
+ <script lang="ts">
+   import { browser } from "$app/environment";
+-  import { goto, pushState, replaceState } from "$app/navigation";
++  import { afterNavigate, goto, pushState, replaceState } from "$app/navigation";
+   import { page } from "$app/state";
+   import type { Snippet } from "svelte";
++  import { onMount } from "svelte";
+   import type { AdapterInterface, AdapterOptions } from "../types";
+   import NuqsContext from "../NuqsContext.svelte";
+   import { renderQueryString } from "../../url-encoding";
+   import { SvelteURL } from "svelte/reactivity";
++  import { cancelPendingUpdates } from "../../update-queue";
+ 
+   type Props = {
+     children?: Snippet;
+@@ -21,6 +23,24 @@
+   // Using page.url directly will update the URL without invalidating the loaders dependent on it.
+   let url = $derived(new SvelteURL(page.url));
+ 
++  afterNavigate(({ from, to }) => {
++    if (from && to && from.url.href !== to.url.href) {
++      cancelPendingUpdates(new URLSearchParams(to.url.search));
++      // Hooks may have read queued values before afterNavigate ran.
++      url = new SvelteURL(page.url);
++    }
++  });
++
++  onMount(() => {
++    const cancel = () => cancelPendingUpdates(new URLSearchParams(window.location.search));
++    // Clear queued values before SvelteKit restores shallow history entries.
++    window.addEventListener("popstate", cancel, true);
++    return () => {
++      window.removeEventListener("popstate", cancel, true);
++      cancel();
++    };
++  });
++
+   const adapter: AdapterInterface = {
+     get options() {
+       return options;
+diff --git a/dist/update-queue.d.ts b/dist/update-queue.d.ts
+index 5b235d60ae619f3c9ed7ac17f2ae46abe58d296b..077b3d34d6273f2d2086c8028ab919a171fe2e86 100644
+--- a/dist/update-queue.d.ts
++++ b/dist/update-queue.d.ts
+@@ -3,6 +3,7 @@ import type { Options } from "./types";
+ export declare const FLUSH_RATE_LIMIT_MS: number;
+ export declare function getQueuedValue(key: string): string | null | undefined;
+ export declare function resetQueue(): void;
++export declare function cancelPendingUpdates(search: URLSearchParams): void;
+ export declare function enqueueQueryStringUpdate<Value>(key: string, value: Value | null, serialize: (value: Value) => string, options: Pick<Options, "history" | "scroll" | "shallow" | "throttleMs">): string | null;
+ /**
+  * Eventually flush the update queue to the URL query string.
+diff --git a/dist/update-queue.js b/dist/update-queue.js
+index 4fec6695657f50d7568f582822fb1a4387a76364..6984531afddc975b370b1d8d65bf25eb38ac0175 100644
+--- a/dist/update-queue.js
++++ b/dist/update-queue.js
+@@ -11,6 +11,17 @@ const queueOptions = {
+ };
+ let lastFlushTimestamp = 0;
+ let flushPromiseCache = null;
++let flushTimeout;
++let resolveFlush = null;
++export function cancelPendingUpdates(search) {
++    clearTimeout(flushTimeout);
++    flushTimeout = undefined;
++    resetQueue();
++    const resolve = resolveFlush;
++    resolveFlush = null;
++    flushPromiseCache = null;
++    resolve?.(search);
++}
+ export function getQueuedValue(key) {
+     return updateQueue.get(key);
+ }
+@@ -54,16 +65,21 @@ function getSearchParamsSnapshotFromLocation() {
+ export function scheduleFlushToURL({ getSearchParamsSnapshot = getSearchParamsSnapshotFromLocation, updateUrl, rateLimitFactor = 1, }) {
+     if (flushPromiseCache === null) {
+         flushPromiseCache = new Promise((resolve, reject) => {
++            resolveFlush = resolve;
+             if (!Number.isFinite(queueOptions.throttleMs)) {
+                 debug("[nuqs queue] Skipping flush due to throttleMs=Infinity");
+                 resolve(getSearchParamsSnapshot());
+                 // Let the promise be returned before clearing the cached value
+-                setTimeout(() => {
++                flushTimeout = setTimeout(() => {
++                    flushTimeout = undefined;
++                    resolveFlush = null;
+                     flushPromiseCache = null;
+                 }, 0);
+                 return;
+             }
+             function flushNow() {
++                flushTimeout = undefined;
++                resolveFlush = null;
+                 lastFlushTimestamp = performance.now();
+                 const [search, error] = flushUpdateQueue({
+                     updateUrl,
+@@ -91,10 +107,10 @@ export function scheduleFlushToURL({ getSearchParamsSnapshot = getSearchParamsSn
+                     flushNow();
+                 }
+                 else {
+-                    setTimeout(flushNow, flushInMs);
++                    flushTimeout = setTimeout(flushNow, flushInMs);
+                 }
+             }
+-            setTimeout(runOnNextTick, 0);
++            flushTimeout = setTimeout(runOnNextTick, 0);
+         });
+     }
+     return flushPromiseCache;

@@ -18,11 +18,11 @@ import { createDrainPipeline } from "evlog/pipeline";
 import { createAxiomDrain } from "evlog/axiom";
 
 export default defineNitroPlugin((nitroApp) => {
-  const pipeline = createDrainPipeline<DrainContext>();
-  const drain = pipeline(createAxiomDrain());
+    const pipeline = createDrainPipeline<DrainContext>();
+    const drain = pipeline(createAxiomDrain());
 
-  nitroApp.hooks.hook("evlog:drain", drain);
-  nitroApp.hooks.hook("close", () => drain.flush());
+    nitroApp.hooks.hook("evlog:drain", drain);
+    nitroApp.hooks.hook("close", () => drain.flush());
 });
 ```
 
@@ -32,21 +32,21 @@ export default defineNitroPlugin((nitroApp) => {
 
 ```typescript
 const pipeline = createDrainPipeline<DrainContext>({
-  batch: {
-    size: 50, // Max events per batch (default: 50)
-    intervalMs: 5000, // Max wait before flushing partial batch (default: 5000)
-  },
-  retry: {
-    maxAttempts: 3, // Total attempts including first (default: 3)
-    backoff: "exponential", // 'exponential' | 'linear' | 'fixed' (default: 'exponential')
-    initialDelayMs: 1000, // Base delay for first retry (default: 1000)
-    maxDelayMs: 30000, // Upper bound for any retry delay (default: 30000)
-  },
-  maxBufferSize: 1000, // Max buffered events; oldest dropped on overflow (default: 1000)
-  onDropped: (events, error) => {
-    // Called when events are dropped (overflow or retry exhaustion)
-    console.error(`[evlog] Dropped ${events.length} events:`, error?.message);
-  },
+    batch: {
+        size: 50, // Max events per batch (default: 50)
+        intervalMs: 5000, // Max wait before flushing partial batch (default: 5000)
+    },
+    retry: {
+        maxAttempts: 3, // Total attempts including first (default: 3)
+        backoff: "exponential", // 'exponential' | 'linear' | 'fixed' (default: 'exponential')
+        initialDelayMs: 1000, // Base delay for first retry (default: 1000)
+        maxDelayMs: 30000, // Upper bound for any retry delay (default: 30000)
+    },
+    maxBufferSize: 1000, // Max buffered events; oldest dropped on overflow (default: 1000)
+    onDropped: (events, error) => {
+        // Called when events are dropped (overflow or retry exhaustion)
+        console.error(`[evlog] Dropped ${events.length} events:`, error?.message);
+    },
 });
 ```
 
@@ -94,7 +94,7 @@ const otlp = createOTLPDrain();
 
 const pipeline = createDrainPipeline<DrainContext>();
 const drain = pipeline(async (batch) => {
-  await Promise.allSettled([axiom(batch), otlp(batch)]);
+    await Promise.allSettled([axiom(batch), otlp(batch)]);
 });
 ```
 
@@ -103,11 +103,11 @@ const drain = pipeline(async (batch) => {
 ```typescript
 const pipeline = createDrainPipeline<DrainContext>({ batch: { size: 100 } });
 const drain = pipeline(async (batch) => {
-  await fetch("https://your-service.com/logs", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(batch.map((ctx) => ctx.event)),
-  });
+    await fetch("https://your-service.com/logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(batch.map((ctx) => ctx.event)),
+    });
 });
 ```
 
@@ -115,7 +115,7 @@ const drain = pipeline(async (batch) => {
 
 ```typescript
 const pipeline = createDrainPipeline<DrainContext>({
-  batch: { size: 10, intervalMs: 30000 }, // Flush every 30s or 10 events
+    batch: { size: 10, intervalMs: 30000 }, // Flush every 30s or 10 events
 });
 ```
 

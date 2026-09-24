@@ -93,7 +93,7 @@ For each API route/handler, check:
 ```typescript
 // ❌ Missing request context
 export default defineEventHandler(async (event) => {
-  // No logging at all, or scattered console.logs
+    // No logging at all, or scattered console.logs
 });
 ```
 
@@ -131,9 +131,9 @@ console.log("Total:", cart.total);
 
 // ✅ After
 log.info({
-  action: "checkout",
-  user: { id: user.id },
-  cart: { items: cart.items.length, total: cart.total },
+    action: "checkout",
+    user: { id: user.id },
+    cart: { items: cart.items.length, total: cart.total },
 });
 ```
 
@@ -144,12 +144,12 @@ log.info({
 
 // ❌ Before
 export default defineEventHandler(async (event) => {
-  console.log("Request started");
-  const user = await getUser(event);
-  console.log("User loaded");
-  const result = await processData(user);
-  console.log("Processing complete");
-  return result;
+    console.log("Request started");
+    const user = await getUser(event);
+    console.log("User loaded");
+    const result = await processData(user);
+    console.log("Processing complete");
+    return result;
 });
 
 // ✅ After (Nuxt - auto-imported, no import needed)
@@ -157,16 +157,16 @@ export default defineEventHandler(async (event) => {
 // For Nitro v2: import { useLogger } from 'evlog/nitro'
 
 export default defineEventHandler(async (event) => {
-  const log = useLogger(event);
+    const log = useLogger(event);
 
-  const user = await getUser(event);
-  log.set({ user: { id: user.id } });
+    const user = await getUser(event);
+    log.set({ user: { id: user.id } });
 
-  const result = await processData(user);
-  log.set({ result: { id: result.id } });
+    const result = await processData(user);
+    log.set({ result: { id: result.id } });
 
-  return result;
-  // emit() called automatically
+    return result;
+    // emit() called automatically
 });
 ```
 
@@ -180,10 +180,10 @@ throw new Error("Failed to create user");
 
 // ✅ After
 throw createError({
-  message: "Failed to create user",
-  why: "Email address already registered",
-  fix: "Use a different email or log in to existing account",
-  link: "https://your-app.com/docs/registration",
+    message: "Failed to create user",
+    why: "Email address already registered",
+    fix: "Use a different email or log in to existing account",
+    link: "https://your-app.com/docs/registration",
 });
 ```
 
@@ -192,22 +192,22 @@ throw createError({
 ```typescript
 // ❌ Before
 try {
-  await externalApi.call();
+    await externalApi.call();
 } catch (error) {
-  throw new Error("API call failed");
+    throw new Error("API call failed");
 }
 
 // ✅ After
 try {
-  await externalApi.call();
+    await externalApi.call();
 } catch (error) {
-  throw createError({
-    message: "External API call failed",
-    why: `API returned: ${error.message}`,
-    fix: "Check API credentials and try again",
-    link: "https://api-docs.example.com/errors",
-    cause: error,
-  });
+    throw createError({
+        message: "External API call failed",
+        why: `API returned: ${error.message}`,
+        fix: "Check API credentials and try again",
+        link: "https://api-docs.example.com/errors",
+        cause: error,
+    });
 }
 ```
 
@@ -216,23 +216,23 @@ try {
 ```typescript
 // ❌ Before
 try {
-  await riskyOperation();
+    await riskyOperation();
 } catch (error) {
-  console.error("Operation failed:", error);
-  throw error;
+    console.error("Operation failed:", error);
+    throw error;
 }
 
 // ✅ After
 try {
-  await riskyOperation();
+    await riskyOperation();
 } catch (error) {
-  log.error(error, { step: "riskyOperation" });
-  throw createError({
-    message: "Operation failed",
-    why: error.message,
-    fix: "Check input and retry",
-    cause: error,
-  });
+    log.error(error, { step: "riskyOperation" });
+    throw createError({
+        message: "Operation failed",
+        why: error.message,
+        fix: "Check input and retry",
+        cause: error,
+    });
 }
 ```
 
@@ -245,9 +245,9 @@ try {
 
 // ❌ Before
 export default defineEventHandler(async (event) => {
-  const body = await readBody(event);
-  const result = await processOrder(body);
-  return result;
+    const body = await readBody(event);
+    const result = await processOrder(body);
+    return result;
 });
 
 // ✅ After (Nuxt - auto-imported, no import needed)
@@ -256,24 +256,24 @@ export default defineEventHandler(async (event) => {
 import { createError } from "evlog";
 
 export default defineEventHandler(async (event) => {
-  const log = useLogger(event);
+    const log = useLogger(event);
 
-  const body = await readBody(event);
-  log.set({ order: { items: body.items?.length } });
+    const body = await readBody(event);
+    log.set({ order: { items: body.items?.length } });
 
-  try {
-    const result = await processOrder(body);
-    log.set({ result: { orderId: result.id, status: result.status } });
-    return result;
-  } catch (error) {
-    log.error(error, { step: "processOrder" });
-    throw createError({
-      message: "Order processing failed",
-      why: error.message,
-      fix: "Check the order data and try again",
-    });
-  }
-  // emit() called automatically
+    try {
+        const result = await processOrder(body);
+        log.set({ result: { orderId: result.id, status: result.status } });
+        return result;
+    } catch (error) {
+        log.error(error, { step: "processOrder" });
+        throw createError({
+            message: "Order processing failed",
+            why: error.message,
+            fix: "Check the order data and try again",
+        });
+    }
+    // emit() called automatically
 });
 ```
 

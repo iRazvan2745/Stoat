@@ -1,32 +1,35 @@
 {
-  "name": "@stoat/api",
-  "type": "module",
-  "exports": {
-    ".": {
-      "types": "./dist/src/index.d.ts",
-      "default": "./src/index.ts"
+    "name": "@stoat/api",
+    "type": "module",
+    "exports": {
+        ".": {
+            "types": "./src/index.ts",
+            "default": "./src/index.ts"
+        },
+        "./*": {
+            "types": "./src/*.ts",
+            "default": "./src/*.ts"
+        }
     },
-    "./*": {
-      "types": "./dist/src/*.d.ts",
-      "default": "./src/*.ts"
+    "scripts": {
+        "build": "tsc -b",
+        "check-types": "tsc -b"
+    },
+    "dependencies": {
+        "@orpc/server": "catalog:",
+        "@stoat/auth": "workspace:*",
+        "@stoat/db": "workspace:*",
+        "@stoat/uncloud": "workspace:*",
+        "@stoat/workflows": "workspace:*",
+        "drizzle-orm": "^0.45.2",
+        "effect": "4.0.0-rc.116",
+        "ofetch": "catalog:",
+        "valibot": "catalog:",
+        "yaml": "catalog:",
+        "zod": "catalog:"
+    },
+    "devDependencies": {
+        "@stoat/config": "workspace:*",
+        "typescript": "catalog:"
     }
-  },
-  "scripts": {
-    "build": "tsc -b",
-    "check-types": "tsc -b",
-    "dev": "tsc -b --watch"
-  },
-  "dependencies": {
-    "@orpc/client": "catalog:",
-    "@orpc/openapi": "catalog:",
-    "@orpc/server": "catalog:",
-    "@orpc/zod": "catalog:",
-    "@stoat/auth": "workspace:*",
-    "@stoat/db": "workspace:*",
-    "zod": "catalog:"
-  },
-  "devDependencies": {
-    "@stoat/config": "workspace:*",
-    "typescript": "catalog:"
-  }
 }

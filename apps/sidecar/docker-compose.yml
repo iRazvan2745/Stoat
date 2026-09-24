@@ -1,0 +1,30 @@
+services:
+    sidecar:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        image: ghcr.io/irazvan2745/sidecar
+        # Uncloud does not propagate Compose group_add. The sidecar needs
+        # root-equivalent access to the host's Uncloud control socket.
+        user: root
+        env_file: .env
+        environment:
+            # Bearer token required by every endpoint except /healthz. The sidecar
+            # refuses to start without it, so deployment fails loudly rather than
+            # exposing a privileged API.
+            SIDECAR_TOKEN: ${SIDECAR_TOKEN:?set SIDECAR_TOKEN to a random secret, e.g. openssl rand -hex 32}
+        volumes:
+            # Bind-mount host's Uncloud socket directory so both
+            # /run/uncloud/api/uncloud.sock and the legacy
+            # /run/uncloud/uncloud.sock are visible.
+            - /run/uncloud:/run/uncloud:ro
+            # Required for host namespace access from the sidecar.
+            - /:/host
+        restart: unless-stopped
+        privileged: true
+        # Required: host command execution enters the namespaces of PID 1, and the
+        # sidecar refuses to exec on a machine whose container is not in the host
+        # PID namespace. If uncloud merges
+        pid: host
+        deploy:
+            mode: global

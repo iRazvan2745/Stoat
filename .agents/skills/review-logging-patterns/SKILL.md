@@ -3,8 +3,8 @@ name: review-logging-patterns
 description: Review code for logging patterns and suggest evlog adoption. Optionally use @evlog/cli (`evlog init` to wire evlog, `evlog agents` to write the conventions into AGENTS.md, `evlog map` to score entry-point coverage, `--baseline` to gate regressions in CI) on Nuxt, Nitro, Next.js, TanStack Start, and Hono. Guides setup on those plus SvelteKit, React Router, NestJS, Express, Fastify, Elysia, oRPC, Cloudflare Workers, AWS Lambda, Astro, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog, Loki, ClickHouse, NuxtHub, Memory), sampling, enrichers, and AI SDK integration.
 license: MIT
 metadata:
-  author: HugoRCD
-  version: "0.9"
+    author: HugoRCD
+    version: "0.9"
 ---
 
 # Review logging patterns
@@ -39,10 +39,10 @@ For security-sensitive actions (auth, billing, admin, data export), use evlog's 
 
 ```typescript
 log.audit({
-  action: "invoice.refund",
-  actor: { type: "user", id: user.id },
-  target: { type: "invoice", id: invoice.id },
-  outcome: "success",
+    action: "invoice.refund",
+    actor: { type: "user", id: user.id },
+    target: { type: "invoice", id: invoice.id },
+    outcome: "success",
 });
 ```
 
@@ -117,11 +117,11 @@ Early days: adapters and rules are still evolving; expect scores to move between
 ```typescript
 // nuxt.config.ts
 export default defineNuxtConfig({
-  modules: ["evlog/nuxt"],
-  evlog: {
-    env: { service: "my-app" },
-    include: ["/api/**"],
-  },
+    modules: ["evlog/nuxt"],
+    evlog: {
+        env: { service: "my-app" },
+        include: ["/api/**"],
+    },
 });
 ```
 
@@ -130,9 +130,9 @@ export default defineNuxtConfig({
 ```typescript
 // server/api/checkout.post.ts — no imports needed
 export default defineEventHandler(async (event) => {
-  const log = useLogger(event);
-  log.set({ user: { id: user.id, plan: user.plan } });
-  return { success: true };
+    const log = useLogger(event);
+    log.set({ user: { id: user.id, plan: user.plan } });
+    return { success: true };
 });
 ```
 
@@ -143,7 +143,7 @@ Drain, enrich, and tail sampling use Nitro hooks in server plugins:
 import { createAxiomDrain } from "evlog/axiom";
 
 export default defineNitroPlugin((nitroApp) => {
-  nitroApp.hooks.hook("evlog:drain", createAxiomDrain());
+    nitroApp.hooks.hook("evlog:drain", createAxiomDrain());
 });
 ```
 
@@ -174,23 +174,23 @@ const pipeline = createDrainPipeline<DrainContext>({ batch: { size: 50, interval
 const drain = pipeline(createAxiomDrain({ dataset: "logs", apiKey: process.env.AXIOM_API_KEY! }));
 
 export const { withEvlog, useLogger, log, createError } = createEvlog({
-  service: "my-app",
-  sampling: {
-    rates: { info: 10 },
-    keep: [{ status: 400 }, { duration: 1000 }],
-  },
-  routes: {
-    "/api/auth/**": { service: "auth-service" },
-    "/api/checkout/**": { service: "checkout-service" },
-  },
-  keep: (ctx) => {
-    const user = ctx.context.user as { premium?: boolean } | undefined;
-    if (user?.premium) ctx.shouldKeep = true;
-  },
-  enrich: (ctx) => {
-    for (const enricher of enrichers) enricher(ctx);
-  },
-  drain,
+    service: "my-app",
+    sampling: {
+        rates: { info: 10 },
+        keep: [{ status: 400 }, { duration: 1000 }],
+    },
+    routes: {
+        "/api/auth/**": { service: "auth-service" },
+        "/api/checkout/**": { service: "checkout-service" },
+    },
+    keep: (ctx) => {
+        const user = ctx.context.user as { premium?: boolean } | undefined;
+        if (user?.premium) ctx.shouldKeep = true;
+    },
+    enrich: (ctx) => {
+        for (const enricher of enrichers) enricher(ctx);
+    },
+    drain,
 });
 ```
 
@@ -201,10 +201,10 @@ export const { withEvlog, useLogger, log, createError } = createEvlog({
 import { withEvlog, useLogger } from "@/lib/evlog";
 
 export const POST = withEvlog(async (request: Request) => {
-  const log = useLogger(); // Zero arguments — uses AsyncLocalStorage
-  log.set({ user: { id: "user_123", plan: "enterprise" } });
-  log.set({ cart: { items: 3, total: 14999 } });
-  return Response.json({ success: true });
+    const log = useLogger(); // Zero arguments — uses AsyncLocalStorage
+    log.set({ user: { id: "user_123", plan: "enterprise" } });
+    log.set({ cart: { items: 3, total: 14999 } });
+    return Response.json({ success: true });
 });
 ```
 
@@ -216,9 +216,9 @@ export const POST = withEvlog(async (request: Request) => {
 import { withEvlog, useLogger } from "@/lib/evlog";
 
 export const checkout = withEvlog(async (formData: FormData) => {
-  const log = useLogger();
-  log.set({ action: "checkout", source: "server-action" });
-  return { success: true };
+    const log = useLogger();
+    log.set({ action: "checkout", source: "server-action" });
+    return { success: true };
 });
 ```
 
@@ -238,18 +238,18 @@ export const config = { matcher: ["/api/:path*"] };
 import { EvlogProvider } from "evlog/next/client";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <body>
-        <EvlogProvider
-          service="my-app"
-          transport={{ enabled: true, endpoint: "/api/evlog/ingest" }}
-        >
-          {children}
-        </EvlogProvider>
-      </body>
-    </html>
-  );
+    return (
+        <html lang="en">
+            <body>
+                <EvlogProvider
+                    service="my-app"
+                    transport={{ enabled: true, endpoint: "/api/evlog/ingest" }}
+                >
+                    {children}
+                </EvlogProvider>
+            </body>
+        </html>
+    );
 }
 ```
 
@@ -277,21 +277,21 @@ import { NextRequest } from "next/server";
 const VALID_LEVELS = ["info", "error", "warn", "debug"] as const;
 
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  const host = request.headers.get("host");
-  if (origin && new URL(origin).host !== host) {
-    return Response.json({ error: "Invalid origin" }, { status: 403 });
-  }
-  const body = await request.json();
-  if (!body?.timestamp || !body?.level || !VALID_LEVELS.includes(body.level)) {
-    return Response.json({ error: "Invalid payload" }, { status: 400 });
-  }
-  const { service: _, ...sanitized } = body;
-  console.log(
-    "[CLIENT LOG]",
-    JSON.stringify({ ...sanitized, service: "my-app", source: "client" }),
-  );
-  return new Response(null, { status: 204 });
+    const origin = request.headers.get("origin");
+    const host = request.headers.get("host");
+    if (origin && new URL(origin).host !== host) {
+        return Response.json({ error: "Invalid origin" }, { status: 403 });
+    }
+    const body = await request.json();
+    if (!body?.timestamp || !body?.level || !VALID_LEVELS.includes(body.level)) {
+        return Response.json({ error: "Invalid payload" }, { status: 400 });
+    }
+    const { service: _, ...sanitized } = body;
+    console.log(
+        "[CLIENT LOG]",
+        JSON.stringify({ ...sanitized, service: "my-app", source: "client" }),
+    );
+    return new Response(null, { status: 204 });
 }
 ```
 
@@ -314,8 +314,8 @@ Access the logger via `event.locals.log` in route handlers or `useLogger()` from
 import { json } from "@sveltejs/kit";
 
 export const GET = ({ locals, params }) => {
-  locals.log.set({ user: { id: params.id } });
-  return json({ id: params.id });
+    locals.log.set({ user: { id: params.id } });
+    return json({ id: params.id });
 };
 ```
 
@@ -323,8 +323,8 @@ export const GET = ({ locals, params }) => {
 import { useLogger } from "evlog/sveltekit";
 
 async function findUsers() {
-  const log = useLogger();
-  log.set({ db: { query: "SELECT * FROM users" } });
+    const log = useLogger();
+    log.set({ db: { query: "SELECT * FROM users" } });
 }
 ```
 
@@ -334,14 +334,14 @@ Full pipeline with drain, enrich, and tail sampling:
 import { createAxiomDrain } from "evlog/axiom";
 
 export const { handle, handleError } = createEvlogHooks({
-  include: ["/api/**"],
-  drain: createAxiomDrain(),
-  enrich: (ctx) => {
-    ctx.event.region = process.env.FLY_REGION;
-  },
-  keep: (ctx) => {
-    if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true;
-  },
+    include: ["/api/**"],
+    drain: createAxiomDrain(),
+    enrich: (ctx) => {
+        ctx.event.region = process.env.FLY_REGION;
+    },
+    keep: (ctx) => {
+        if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true;
+    },
 });
 ```
 
@@ -353,7 +353,7 @@ import { defineConfig } from "nitro";
 import evlog from "evlog/nitro/v3";
 
 export default defineConfig({
-  modules: [evlog({ env: { service: "my-api" } })],
+    modules: [evlog({ env: { service: "my-api" } })],
 });
 ```
 
@@ -363,9 +363,9 @@ import { defineHandler } from "nitro/h3";
 import { useLogger } from "evlog/nitro/v3";
 
 export default defineHandler(async (event) => {
-  const log = useLogger(event);
-  log.set({ action: "checkout" });
-  return { ok: true };
+    const log = useLogger(event);
+    log.set({ action: "checkout" });
+    return { ok: true };
 });
 ```
 
@@ -379,8 +379,8 @@ import { defineConfig } from "nitro";
 import evlog from "evlog/nitro/v3";
 
 export default defineConfig({
-  experimental: { asyncContext: true },
-  modules: [evlog({ env: { service: "my-app" } })],
+    experimental: { asyncContext: true },
+    modules: [evlog({ env: { service: "my-app" } })],
 });
 ```
 
@@ -392,9 +392,9 @@ import { createMiddleware } from "@tanstack/react-start";
 import { evlogErrorHandler } from "evlog/nitro/v3";
 
 export const Route = createRootRoute({
-  server: {
-    middleware: [createMiddleware().server(evlogErrorHandler)],
-  },
+    server: {
+        middleware: [createMiddleware().server(evlogErrorHandler)],
+    },
 });
 ```
 
@@ -417,7 +417,7 @@ import { defineNitroConfig } from "nitropack/config";
 import evlog from "evlog/nitro";
 
 export default defineNitroConfig({
-  modules: [evlog({ env: { service: "my-api" } })],
+    modules: [evlog({ env: { service: "my-api" } })],
 });
 ```
 
@@ -431,7 +431,7 @@ import { Module } from "@nestjs/common";
 import { EvlogModule } from "evlog/nestjs";
 
 @Module({
-  imports: [EvlogModule.forRoot()],
+    imports: [EvlogModule.forRoot()],
 })
 export class AppModule {}
 ```
@@ -442,8 +442,8 @@ export class AppModule {}
 import { useLogger } from "evlog/nestjs";
 
 async function findUsers() {
-  const log = useLogger();
-  log.set({ db: { query: "SELECT * FROM users" } });
+    const log = useLogger();
+    log.set({ db: { query: "SELECT * FROM users" } });
 }
 ```
 
@@ -453,14 +453,14 @@ Full pipeline with drain, enrich, and tail sampling:
 import { createAxiomDrain } from "evlog/axiom";
 
 EvlogModule.forRoot({
-  include: ["/api/**"],
-  drain: createAxiomDrain(),
-  enrich: (ctx) => {
-    ctx.event.region = process.env.FLY_REGION;
-  },
-  keep: (ctx) => {
-    if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true;
-  },
+    include: ["/api/**"],
+    drain: createAxiomDrain(),
+    enrich: (ctx) => {
+        ctx.event.region = process.env.FLY_REGION;
+    },
+    keep: (ctx) => {
+        if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true;
+    },
 });
 ```
 
@@ -468,11 +468,11 @@ For async configuration with NestJS DI, use `forRootAsync()`:
 
 ```typescript
 EvlogModule.forRootAsync({
-  imports: [ConfigModule],
-  inject: [ConfigService],
-  useFactory: (config) => ({
-    drain: createAxiomDrain({ apiKey: config.get("AXIOM_API_KEY") }),
-  }),
+    imports: [ConfigModule],
+    inject: [ConfigService],
+    useFactory: (config) => ({
+        drain: createAxiomDrain({ apiKey: config.get("AXIOM_API_KEY") }),
+    }),
 });
 ```
 
@@ -489,8 +489,8 @@ const app = express();
 app.use(evlog());
 
 app.get("/api/users", (req, res) => {
-  req.log.set({ users: { count: 42 } });
-  res.json({ users: [] });
+    req.log.set({ users: { count: 42 } });
+    res.json({ users: [] });
 });
 ```
 
@@ -500,8 +500,8 @@ Use `useLogger()` to access the logger from anywhere in the call stack without p
 import { useLogger } from "evlog/express";
 
 async function findUsers() {
-  const log = useLogger();
-  log.set({ db: { query: "SELECT * FROM users" } });
+    const log = useLogger();
+    log.set({ db: { query: "SELECT * FROM users" } });
 }
 ```
 
@@ -511,16 +511,16 @@ Full pipeline with drain, enrich, and tail sampling:
 import { createAxiomDrain } from "evlog/axiom";
 
 app.use(
-  evlog({
-    include: ["/api/**"],
-    drain: createAxiomDrain(),
-    enrich: (ctx) => {
-      ctx.event.region = process.env.FLY_REGION;
-    },
-    keep: (ctx) => {
-      if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true;
-    },
-  }),
+    evlog({
+        include: ["/api/**"],
+        drain: createAxiomDrain(),
+        enrich: (ctx) => {
+            ctx.event.region = process.env.FLY_REGION;
+        },
+        keep: (ctx) => {
+            if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true;
+        },
+    }),
 );
 ```
 
@@ -537,9 +537,9 @@ const app = new Hono<EvlogVariables>();
 app.use(evlog());
 
 app.get("/api/users", (c) => {
-  const log = c.get("log");
-  log.set({ users: { count: 42 } });
-  return c.json({ users: [] });
+    const log = c.get("log");
+    log.set({ users: { count: 42 } });
+    return c.json({ users: [] });
 });
 ```
 
@@ -549,8 +549,8 @@ Access the logger via `c.get('log')` in handlers. Use `useLogger()` from `evlog/
 import { useLogger } from "evlog/hono";
 
 async function findUsers() {
-  const log = useLogger();
-  log.set({ db: { query: "SELECT * FROM users" } });
+    const log = useLogger();
+    log.set({ db: { query: "SELECT * FROM users" } });
 }
 ```
 
@@ -563,12 +563,12 @@ import { createError, parseError } from "evlog";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 app.onError((error, c) => {
-  c.get("log").error(error);
-  const parsed = parseError(error);
-  return c.json(
-    { message: parsed.message, why: parsed.why, fix: parsed.fix, link: parsed.link },
-    parsed.status as ContentfulStatusCode,
-  );
+    c.get("log").error(error);
+    const parsed = parseError(error);
+    return c.json(
+        { message: parsed.message, why: parsed.why, fix: parsed.fix, link: parsed.link },
+        parsed.status as ContentfulStatusCode,
+    );
 });
 ```
 
@@ -578,16 +578,16 @@ Full pipeline with drain, enrich, and tail sampling:
 import { createAxiomDrain } from "evlog/axiom";
 
 app.use(
-  evlog({
-    include: ["/api/**"],
-    drain: createAxiomDrain(),
-    enrich: (ctx) => {
-      ctx.event.region = process.env.FLY_REGION;
-    },
-    keep: (ctx) => {
-      if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true;
-    },
-  }),
+    evlog({
+        include: ["/api/**"],
+        drain: createAxiomDrain(),
+        enrich: (ctx) => {
+            ctx.event.region = process.env.FLY_REGION;
+        },
+        keep: (ctx) => {
+            if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true;
+        },
+    }),
 );
 ```
 
@@ -604,8 +604,8 @@ const app = Fastify({ logger: false });
 await app.register(evlog);
 
 app.get("/api/users", async (request) => {
-  request.log.set({ users: { count: 42 } });
-  return { users: [] };
+    request.log.set({ users: { count: 42 } });
+    return { users: [] };
 });
 ```
 
@@ -617,8 +617,8 @@ Use `useLogger()` to access the logger from anywhere in the call stack without p
 import { useLogger } from "evlog/fastify";
 
 async function findUsers() {
-  const log = useLogger();
-  log.set({ db: { query: "SELECT * FROM users" } });
+    const log = useLogger();
+    log.set({ db: { query: "SELECT * FROM users" } });
 }
 ```
 
@@ -628,14 +628,14 @@ Full pipeline with drain, enrich, and tail sampling:
 import { createAxiomDrain } from "evlog/axiom";
 
 await app.register(evlog, {
-  include: ["/api/**"],
-  drain: createAxiomDrain(),
-  enrich: (ctx) => {
-    ctx.event.region = process.env.FLY_REGION;
-  },
-  keep: (ctx) => {
-    if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true;
-  },
+    include: ["/api/**"],
+    drain: createAxiomDrain(),
+    enrich: (ctx) => {
+        ctx.event.region = process.env.FLY_REGION;
+    },
+    keep: (ctx) => {
+        if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true;
+    },
 });
 ```
 
@@ -649,12 +649,12 @@ import { evlog, useLogger } from "evlog/elysia";
 initLogger({ env: { service: "my-api" } });
 
 const app = new Elysia()
-  .use(evlog())
-  .get("/api/users", ({ log }) => {
-    log.set({ users: { count: 42 } });
-    return { users: [] };
-  })
-  .listen(3000);
+    .use(evlog())
+    .get("/api/users", ({ log }) => {
+        log.set({ users: { count: 42 } });
+        return { users: [] };
+    })
+    .listen(3000);
 ```
 
 Use `useLogger()` to access the logger from anywhere in the call stack:
@@ -663,8 +663,8 @@ Use `useLogger()` to access the logger from anywhere in the call stack:
 import { useLogger } from "evlog/elysia";
 
 async function findUsers() {
-  const log = useLogger();
-  log.set({ db: { query: "SELECT * FROM users" } });
+    const log = useLogger();
+    log.set({ db: { query: "SELECT * FROM users" } });
 }
 ```
 
@@ -674,16 +674,16 @@ Full pipeline with drain, enrich, and tail sampling:
 import { createAxiomDrain } from "evlog/axiom";
 
 app.use(
-  evlog({
-    include: ["/api/**"],
-    drain: createAxiomDrain(),
-    enrich: (ctx) => {
-      ctx.event.region = process.env.FLY_REGION;
-    },
-    keep: (ctx) => {
-      if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true;
-    },
-  }),
+    evlog({
+        include: ["/api/**"],
+        drain: createAxiomDrain(),
+        enrich: (ctx) => {
+            ctx.event.region = process.env.FLY_REGION;
+        },
+        keep: (ctx) => {
+            if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true;
+        },
+    }),
 );
 ```
 
@@ -694,9 +694,9 @@ app.use(
 import type { Config } from "@react-router/dev/config";
 
 export default {
-  future: {
-    v8_middleware: true,
-  },
+    future: {
+        v8_middleware: true,
+    },
 } satisfies Config;
 ```
 
@@ -717,9 +717,9 @@ Access the logger via `context.get(loggerContext)` in loaders and actions:
 import { loggerContext } from "evlog/react-router";
 
 export async function loader({ params, context }: Route.LoaderArgs) {
-  const log = context.get(loggerContext);
-  log.set({ user: { id: params.id } });
-  return { users: [] };
+    const log = context.get(loggerContext);
+    log.set({ user: { id: params.id } });
+    return { users: [] };
 }
 ```
 
@@ -729,8 +729,8 @@ Use `useLogger()` to access the logger from anywhere in the call stack without p
 import { useLogger } from "evlog/react-router";
 
 async function findUsers() {
-  const log = useLogger();
-  log.set({ db: { query: "SELECT * FROM users" } });
+    const log = useLogger();
+    log.set({ db: { query: "SELECT * FROM users" } });
 }
 ```
 
@@ -740,16 +740,16 @@ Full pipeline with drain, enrich, and tail sampling:
 import { createAxiomDrain } from "evlog/axiom";
 
 export const middleware: Route.MiddlewareFunction[] = [
-  evlog({
-    include: ["/api/**"],
-    drain: createAxiomDrain(),
-    enrich: (ctx) => {
-      ctx.event.region = process.env.FLY_REGION;
-    },
-    keep: (ctx) => {
-      if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true;
-    },
-  }),
+    evlog({
+        include: ["/api/**"],
+        drain: createAxiomDrain(),
+        enrich: (ctx) => {
+            ctx.event.region = process.env.FLY_REGION;
+        },
+        keep: (ctx) => {
+            if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true;
+        },
+    }),
 ];
 ```
 
@@ -766,17 +766,17 @@ initLogger({ env: { service: "my-rpc" } });
 const base = os.$context<EvlogOrpcContext>().use(evlog());
 
 const router = {
-  ping: base.handler(({ context }) => {
-    context.log.set({ pinged: true });
-    return { ok: true };
-  }),
+    ping: base.handler(({ context }) => {
+        context.log.set({ pinged: true });
+        return { ok: true };
+    }),
 };
 
 const handler = withEvlog(new RPCHandler(router));
 
 export default async function fetch(request: Request) {
-  const { matched, response } = await handler.handle(request, { prefix: "/rpc" });
-  return matched ? response : new Response("Not Found", { status: 404 });
+    const { matched, response } = await handler.handle(request, { prefix: "/rpc" });
+    return matched ? response : new Response("Not Found", { status: 404 });
 }
 ```
 
@@ -788,8 +788,8 @@ Use `useLogger()` to access the logger from utility modules:
 import { useLogger } from "evlog/orpc";
 
 async function chargeCard(amount: number) {
-  const log = useLogger();
-  log.set({ payment: { amount } });
+    const log = useLogger();
+    log.set({ payment: { amount } });
 }
 ```
 
@@ -799,14 +799,14 @@ Full pipeline with drain, enrich, and tail sampling:
 import { createAxiomDrain } from "evlog/axiom";
 
 const handler = withEvlog(new RPCHandler(router), {
-  include: ["/rpc/**"],
-  drain: createAxiomDrain(),
-  enrich: (ctx) => {
-    ctx.event.region = process.env.FLY_REGION;
-  },
-  keep: (ctx) => {
-    if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true;
-  },
+    include: ["/rpc/**"],
+    drain: createAxiomDrain(),
+    enrich: (ctx) => {
+        ctx.event.region = process.env.FLY_REGION;
+    },
+    keep: (ctx) => {
+        if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true;
+    },
 });
 ```
 
@@ -818,8 +818,8 @@ import { initWorkersLogger, withEvlog } from "evlog/workers";
 initWorkersLogger({ env: { service: "edge-api" } });
 
 export default withEvlog(async (request, _env, _ctx, log) => {
-  log.set({ action: "handle_request" });
-  return Response.json({ ok: true });
+    log.set({ action: "handle_request" });
+    return Response.json({ ok: true });
 });
 ```
 
@@ -835,18 +835,18 @@ import { initLogger, createLogger } from "evlog";
 initLogger({ env: { service: "my-fn" } }); // once at module load (cold start)
 
 export async function handler(event: SQSEvent) {
-  for (const record of event.Records) {
-    const log = createLogger({ messageId: record.messageId });
-    try {
-      log.set({ queue: { source: record.eventSourceARN } });
-      await processMessage(record);
-    } catch (error) {
-      log.error(error as Error);
-      throw error;
-    } finally {
-      log.emit();
+    for (const record of event.Records) {
+        const log = createLogger({ messageId: record.messageId });
+        try {
+            log.set({ queue: { source: record.eventSourceARN } });
+            await processMessage(record);
+        } catch (error) {
+            log.error(error as Error);
+            throw error;
+        } finally {
+            log.emit();
+        }
     }
-  }
 }
 ```
 
@@ -860,19 +860,19 @@ import { initLogger, createRequestLogger } from "evlog";
 initLogger({ env: { service: "my-astro-app" } });
 
 export const onRequest = defineMiddleware(async ({ request, locals }, next) => {
-  const url = new URL(request.url);
-  const log = createRequestLogger({ method: request.method, path: url.pathname });
-  locals.log = log;
+    const url = new URL(request.url);
+    const log = createRequestLogger({ method: request.method, path: url.pathname });
+    locals.log = log;
 
-  try {
-    const response = await next();
-    log.emit();
-    return response;
-  } catch (error) {
-    log.error(error instanceof Error ? error : new Error(String(error)));
-    log.emit();
-    throw error;
-  }
+    try {
+        const response = await next();
+        log.emit();
+        return response;
+    } catch (error) {
+        log.error(error instanceof Error ? error : new Error(String(error)));
+        log.emit();
+        throw error;
+    }
 });
 ```
 
@@ -887,18 +887,18 @@ For any Vite-based project (SvelteKit, Astro, SolidStart, React+Vite, etc.), use
 import evlog from "evlog/vite";
 
 export default defineConfig({
-  plugins: [
-    evlog({
-      service: "my-app",
-      autoImports: true, // auto-import log, createEvlogError, parseError
-      strip: ["debug"], // remove log.debug() in production
-      sourceLocation: true, // inject file:line in dev + prod
-      client: {
-        // client-side logging
-        transport: { endpoint: "/api/logs" },
-      },
-    }),
-  ],
+    plugins: [
+        evlog({
+            service: "my-app",
+            autoImports: true, // auto-import log, createEvlogError, parseError
+            strip: ["debug"], // remove log.debug() in production
+            sourceLocation: true, // inject file:line in dev + prod
+            client: {
+                // client-side logging
+                transport: { endpoint: "/api/logs" },
+            },
+        }),
+    ],
 });
 ```
 
@@ -976,7 +976,7 @@ Setup pattern per framework:
 // Nuxt/Nitro: server/plugins/evlog-drain.ts
 import { createAxiomDrain } from "evlog/axiom";
 export default defineNitroPlugin((nitroApp) => {
-  nitroApp.hooks.hook("evlog:drain", createAxiomDrain());
+    nitroApp.hooks.hook("evlog:drain", createAxiomDrain());
 });
 
 // Hono / Express / Elysia: pass drain in middleware options
@@ -1019,18 +1019,18 @@ app.use(evlog({ enrich: createDefaultEnrichers() }));
 // Nuxt/Nitro: server/plugins/evlog-enrich.ts
 import { createUserAgentEnricher, createGeoEnricher } from "evlog/enrichers";
 export default defineNitroPlugin((nitroApp) => {
-  const enrichers = [createUserAgentEnricher(), createGeoEnricher()];
-  nitroApp.hooks.hook("evlog:enrich", (ctx) => {
-    for (const enricher of enrichers) enricher(ctx);
-  });
+    const enrichers = [createUserAgentEnricher(), createGeoEnricher()];
+    nitroApp.hooks.hook("evlog:enrich", (ctx) => {
+        for (const enricher of enrichers) enricher(ctx);
+    });
 });
 
 // Next.js: in lib/evlog.ts
 createEvlog({
-  enrich: (ctx) => {
-    for (const enricher of enrichers) enricher(ctx);
-    ctx.event.region = process.env.VERCEL_REGION;
-  },
+    enrich: (ctx) => {
+        for (const enricher of enrichers) enricher(ctx);
+        ctx.event.region = process.env.VERCEL_REGION;
+    },
 });
 ```
 
@@ -1097,8 +1097,8 @@ const log = useLogger(event); // or any RequestLogger
 const ai = createAILogger(log);
 
 const result = streamText({
-  model: ai.wrap("anthropic/claude-sonnet-4.6"), // accepts string or model object
-  messages,
+    model: ai.wrap("anthropic/claude-sonnet-4.6"), // accepts string or model object
+    messages,
 });
 ```
 
@@ -1114,12 +1114,12 @@ import { createAILogger, createEvlogIntegration } from "evlog/ai";
 const ai = createAILogger(log);
 
 const agent = new ToolLoopAgent({
-  model: ai.wrap("anthropic/claude-sonnet-4.6"),
-  tools: { searchWeb, queryDatabase },
-  stopWhen: stepCountIs(5),
-  telemetry: {
-    integrations: [createEvlogIntegration(ai)],
-  },
+    model: ai.wrap("anthropic/claude-sonnet-4.6"),
+    tools: { searchWeb, queryDatabase },
+    stopWhen: stepCountIs(5),
+    telemetry: {
+        integrations: [createEvlogIntegration(ai)],
+    },
 });
 ```
 
@@ -1144,10 +1144,10 @@ Pass a pricing map to get `ai.estimatedCost` in the wide event:
 
 ```typescript
 const ai = createAILogger(log, {
-  cost: {
-    "claude-sonnet-4.6": { input: 3, output: 15 },
-    "gpt-4o": { input: 2.5, output: 10 },
-  },
+    cost: {
+        "claude-sonnet-4.6": { input: 3, output: 15 },
+        "gpt-4o": { input: 2.5, output: 10 },
+    },
 });
 ```
 
@@ -1194,20 +1194,20 @@ throw createError({ message: "Payment failed", status: 402, why: "Card declined 
 
 // Complete
 throw createError({
-  message: "Payment failed",
-  status: 402,
-  why: "Card declined by issuer - insufficient funds",
-  fix: "Please use a different payment method or contact your bank",
-  link: "https://docs.example.com/payments/declined",
-  cause: originalError,
+    message: "Payment failed",
+    status: 402,
+    why: "Card declined by issuer - insufficient funds",
+    fix: "Please use a different payment method or contact your bank",
+    link: "https://docs.example.com/payments/declined",
+    cause: originalError,
 });
 
 // Backend-only context (wide events / drains — never HTTP body or parseError())
 throw createError({
-  message: "Not allowed",
-  status: 403,
-  why: "Insufficient permissions",
-  internal: { correlationId: "req_abc", resourceId: "proj_123" },
+    message: "Not allowed",
+    status: 403,
+    why: "Insufficient permissions",
+    internal: { correlationId: "req_abc", resourceId: "proj_123" },
 });
 ```
 

@@ -1,8 +1,8 @@
 ---
 name: build-audit-logs
 description: >-
-  Build or review audit trails in TypeScript/JavaScript apps using evlog (pipelines, typed actions,
-  denials, retention, compliance-style reviews). For application code, not for extending the evlog package.
+    Build or review audit trails in TypeScript/JavaScript apps using evlog (pipelines, typed actions,
+    denials, retention, compliance-style reviews). For application code, not for extending the evlog package.
 ---
 
 # Build or Review an Audit System with evlog
@@ -165,21 +165,21 @@ import { createAxiomDrain } from "evlog/axiom";
 import { createFsDrain } from "evlog/fs";
 
 export default defineNitroPlugin((nitroApp) => {
-  const auditSink = auditOnly(
-    signed(createFsDrain({ dir: ".audit/" }), { strategy: "hash-chain" }),
-    { await: true },
-  );
-  const main = createAxiomDrain({ dataset: "logs" });
+    const auditSink = auditOnly(
+        signed(createFsDrain({ dir: ".audit/" }), { strategy: "hash-chain" }),
+        { await: true },
+    );
+    const main = createAxiomDrain({ dataset: "logs" });
 
-  nitroApp.hooks.hook(
-    "evlog:enrich",
-    auditEnricher({
-      tenantId: (ctx) => ctx.headers?.["x-tenant-id"],
-    }),
-  );
-  nitroApp.hooks.hook("evlog:drain", async (ctx) => {
-    await Promise.all([main(ctx), auditSink(ctx)]);
-  });
+    nitroApp.hooks.hook(
+        "evlog:enrich",
+        auditEnricher({
+            tenantId: (ctx) => ctx.headers?.["x-tenant-id"],
+        }),
+    );
+    nitroApp.hooks.hook("evlog:drain", async (ctx) => {
+        await Promise.all([main(ctx), auditSink(ctx)]);
+    });
 });
 ```
 
@@ -194,8 +194,8 @@ Audits get queried and alerted on by `audit.action`. A typo is a missing alert, 
 import { defineAuditCatalog } from "evlog";
 
 export const billingAudit = defineAuditCatalog("billing", {
-  INVOICE_REFUND: { target: "invoice" },
-  PLAN_CHANGE: { target: "subscription" },
+    INVOICE_REFUND: { target: "invoice" },
+    PLAN_CHANGE: { target: "subscription" },
 });
 ```
 
@@ -229,14 +229,14 @@ Three patterns, in order of preference:
 import { withAudit, AuditDeniedError } from "evlog";
 
 export const refundInvoice = withAudit(
-  {
-    action: "invoice.refund",
-    target: ({ id }: { id: string }) => ({ type: "invoice", id }),
-  },
-  async ({ id }, ctx) => {
-    if (!ctx.actor) throw new AuditDeniedError("Anonymous refund denied");
-    return db.invoices.refund(id);
-  },
+    {
+        action: "invoice.refund",
+        target: ({ id }: { id: string }) => ({ type: "invoice", id }),
+    },
+    async ({ id }, ctx) => {
+        if (!ctx.actor) throw new AuditDeniedError("Anonymous refund denied");
+        return db.invoices.refund(id);
+    },
 );
 ```
 
@@ -252,22 +252,22 @@ Outcome resolution:
 const log = useLogger(event);
 
 if (!user.canRefund(invoice)) {
-  log.audit.deny("Insufficient permissions", {
-    action: "invoice.refund",
-    actor: { type: "user", id: user.id },
-    target: { type: "invoice", id: invoice.id },
-  });
-  throw createError({ status: 403 });
+    log.audit.deny("Insufficient permissions", {
+        action: "invoice.refund",
+        actor: { type: "user", id: user.id },
+        target: { type: "invoice", id: invoice.id },
+    });
+    throw createError({ status: 403 });
 }
 
 const after = await db.invoices.refund(invoice.id);
 
 log.audit({
-  action: "invoice.refund",
-  actor: { type: "user", id: user.id, email: user.email },
-  target: { type: "invoice", id: after.id },
-  outcome: "success",
-  changes: auditDiff(invoice, after),
+    action: "invoice.refund",
+    actor: { type: "user", id: user.id, email: user.email },
+    target: { type: "invoice", id: after.id },
+    outcome: "success",
+    changes: auditDiff(invoice, after),
 });
 ```
 
@@ -277,10 +277,10 @@ log.audit({
 import { audit } from "evlog";
 
 audit({
-  action: "cron.cleanup",
-  actor: { type: "system", id: "cron" },
-  target: { type: "job", id: "cleanup-stale-sessions" },
-  outcome: "success",
+    action: "cron.cleanup",
+    actor: { type: "system", id: "cron" },
+    target: { type: "job", id: "cleanup-stale-sessions" },
+    outcome: "success",
 });
 ```
 
@@ -290,15 +290,15 @@ Auditors care most about denials, because they're how you prove the policy is ac
 
 ```ts
 function authorize(actor, action, resource) {
-  const allowed = policy.check(actor, action, resource);
-  if (!allowed) {
-    useLogger().audit.deny(`Policy denied ${action}`, {
-      action,
-      actor,
-      target: { type: resource.type, id: resource.id },
-    });
-    throw createError({ status: 403 });
-  }
+    const allowed = policy.check(actor, action, resource);
+    if (!allowed) {
+        useLogger().audit.deny(`Policy denied ${action}`, {
+            action,
+            actor,
+            target: { type: resource.type, id: resource.id },
+        });
+        throw createError({ status: 403 });
+    }
 }
 ```
 
@@ -310,9 +310,9 @@ Apply `auditRedactPreset` (or merge it into the existing `RedactConfig`). It red
 import { initLogger, auditRedactPreset } from "evlog";
 
 initLogger({
-  redact: {
-    paths: [...(auditRedactPreset.paths ?? [])],
-  },
+    redact: {
+        paths: [...(auditRedactPreset.paths ?? [])],
+    },
 });
 ```
 
@@ -324,35 +324,35 @@ initLogger({
 import { mockAudit } from "evlog";
 
 it("refunds the invoice and records an audit", async () => {
-  const captured = mockAudit();
+    const captured = mockAudit();
 
-  await refundInvoice({ id: "inv_889" }, { actor: { type: "user", id: "u1" } });
+    await refundInvoice({ id: "inv_889" }, { actor: { type: "user", id: "u1" } });
 
-  expect(captured.events).toHaveLength(1);
-  expect(
-    captured.toIncludeAuditOf({
-      action: "invoice.refund",
-      target: { type: "invoice", id: "inv_889" },
-      outcome: "success",
-    }),
-  ).toBe(true);
+    expect(captured.events).toHaveLength(1);
+    expect(
+        captured.toIncludeAuditOf({
+            action: "invoice.refund",
+            target: { type: "invoice", id: "inv_889" },
+            outcome: "success",
+        }),
+    ).toBe(true);
 
-  captured.restore();
+    captured.restore();
 });
 
 it("denies refund for non-owners and records the denial", async () => {
-  const captured = mockAudit();
+    const captured = mockAudit();
 
-  await expect(refundInvoice({ id: "inv_889" }, { actor: null })).rejects.toThrow();
+    await expect(refundInvoice({ id: "inv_889" }, { actor: null })).rejects.toThrow();
 
-  expect(
-    captured.toIncludeAuditOf({
-      action: "invoice.refund",
-      outcome: "denied",
-    }),
-  ).toBe(true);
+    expect(
+        captured.toIncludeAuditOf({
+            action: "invoice.refund",
+            outcome: "denied",
+        }),
+    ).toBe(true);
 
-  captured.restore();
+    captured.restore();
 });
 ```
 

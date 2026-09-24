@@ -1,0 +1,32 @@
+{
+    "name": "@stoat/uncloud",
+    "type": "module",
+    "exports": {
+        ".": {
+            "types": "./src/index.ts",
+            "default": "./src/index.ts"
+        },
+        "./*": {
+            "types": "./src/*.ts",
+            "default": "./src/*.ts"
+        }
+    },
+    "scripts": {
+        "build": "tsc -b",
+        "check-types": "tsc -b",
+        "dev:types": "tsc -b --watch",
+        "generate-spec": "node scripts/generate-spec.mjs",
+        "generate": "openapi-typescript ./openapi.json --empty-objects-unknown --output ./src/generated/schema.ts",
+        "test": "pnpm --dir ../.. exec vp test run tests/uncloud"
+    },
+    "dependencies": {
+        "ofetch": "catalog:",
+        "zod": "catalog:"
+    },
+    "devDependencies": {
+        "@stoat/config": "workspace:*",
+        "@types/node": "^26.4.1",
+        "openapi-typescript": "^7.13.0",
+        "typescript": "catalog:"
+    }
+}

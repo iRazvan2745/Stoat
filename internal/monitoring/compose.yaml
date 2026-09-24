@@ -1,0 +1,326 @@
+####################################################################################################
+# Stoat's internal-only cluster monitoring stack.
+#
+# InitializeCluster renders the credential, storage, and x-machines placeholders before sending
+# this Compose document to Uncloud. The services intentionally publish no ports: Uncloud's
+# internal service DNS is the only network path to GreptimeDB and Alloy.
+#
+# GreptimeDB's admin/health endpoint is on :4000 and its authenticated ingestion/SQL API is on
+# :4006. The service names are deliberately globally unique because Uncloud does not prefix them
+# with a Compose project name.
+####################################################################################################
+services:
+    stoat-monitoring-greptimedb:
+        image: greptime/greptimedb:v1.2.1
+        restart: unless-stopped
+
+        # InitializeCluster replaces this with the selected machine ID. GreptimeDB owns the
+        # persistent volume and must not move away from the machine that owns that data.
+        x-machines: ["${MONITORING_MACHINE_ID:?rendered by InitializeCluster}"]
+
+        command:
+            - standalone
+            - start
+            - -c
+            - /etc/greptime/greptimedb.toml
+
+        environment:
+            # InitializeCluster renders the username and password into this value before
+            # deployment. Keep the credentials out of the checked-in template.
+            GREPTIMEDB_STANDALONE__USER_PROVIDER: "static_user_provider:cmd:${GREPTIME_USERNAME:?rendered by InitializeCluster}=${GREPTIME_PASSWORD:?rendered by InitializeCluster}"
+
+        volumes:
+            - type: volume
+              source: greptime_data
+              target: /greptimedb_data
+
+        configs:
+            - source: greptime_config
+              target: /etc/greptime/greptimedb.toml
+              mode: 0444
+
+        # GreptimeDB v1.2.1 contains curl. /health is intentionally unauthenticated and is
+        # suitable for the Uncloud/Docker health monitor; SQL and ingestion remain authenticated.
+        healthcheck:
+            test:
+                [
+                    "CMD",
+                    "curl",
+                    "--fail",
+                    "--silent",
+                    "--show-error",
+                    "http://127.0.0.1:4000/health",
+                ]
+            interval: 10s
+            timeout: 5s
+            retries: 12
+            start_period: 20s
+
+    stoat-monitoring-alloy:
+        image: grafana/alloy:v1.19.2
+        restart: unless-stopped
+        deploy:
+            mode: global
+
+        # Host metrics, cAdvisor, and Docker log collection require these mounts. Alloy's
+        # upstream Docker monitoring scenario also runs privileged for this combination.
+        privileged: true
+
+        environment:
+            # Uncloud injects UNCLOUD_MACHINE_ID into every service container. Alloy reads that
+            # value in config.alloy, so do not interpolate it through Compose here.
+            CUSTOMER_ID: cluster
+            GREPTIME_URL: "${GREPTIME_URL:-http://stoat-monitoring-greptimedb:4006}"
+            GREPTIME_DB: "${GREPTIME_DB:-monitoring}"
+            GREPTIME_USERNAME: "${GREPTIME_USERNAME:?rendered by InitializeCluster}"
+            GREPTIME_PASSWORD: "${GREPTIME_PASSWORD:?rendered by InitializeCluster}"
+            RETENTION_DAYS: "${RETENTION_DAYS:-14}"
+
+        volumes:
+            # InitializeCluster may change this long mount to type: bind with an absolute source.
+            - type: volume
+              source: alloy_data
+              target: /var/lib/alloy/data
+
+            # Alloy only needs to query the Docker socket. The host filesystem mounts are
+            # read-only; /var/run is deliberately not mounted wholesale.
+            - type: bind
+              source: /var/run/docker.sock
+              target: /var/run/docker.sock
+              read_only: true
+            - type: bind
+              source: /
+              target: /rootfs
+              read_only: true
+            - type: bind
+              source: /sys
+              target: /sys
+              read_only: true
+            - type: bind
+              source: /var/lib/docker
+              target: /var/lib/docker
+              read_only: true
+            - type: bind
+              source: /dev/disk
+              target: /dev/disk
+              read_only: true
+
+        configs:
+            - source: alloy_config
+              target: /etc/alloy/config.alloy
+              mode: 0444
+
+        command:
+            - run
+            - --server.http.listen-addr=0.0.0.0:12345
+            - --storage.path=/var/lib/alloy/data
+            - /etc/alloy/config.alloy
+
+volumes:
+    alloy_data:
+    greptime_data:
+
+configs:
+    greptime_config:
+        content: |
+            [storage]
+            type = "File"
+            data_home = "/greptimedb_data"
+
+            [http]
+            # The API server is the only network-facing Greptime endpoint. Keeping the admin
+            # listener on the container network allows the workflow to poll /health without
+            # publishing it outside this internal project.
+            addr = "0.0.0.0:4000"
+            enable_api_server = true
+            api_server_addr = "0.0.0.0:4006"
+
+            [logging]
+            level = "info"
+
+    alloy_config:
+        content: |
+            logging {
+              level  = "info"
+              format = "logfmt"
+            }
+
+
+            // ----------------------------------------------------
+            // Host metrics
+            // ----------------------------------------------------
+
+            prometheus.exporter.unix "host" {
+              rootfs_path    = "/rootfs"
+              procfs_path    = "/rootfs/proc"
+              sysfs_path     = "/sys"
+              udev_data_path = "/rootfs/run/udev/data"
+            }
+
+            prometheus.scrape "host" {
+              targets         = prometheus.exporter.unix.host.targets
+              scrape_interval = "15s"
+
+              forward_to = [
+                prometheus.remote_write.greptime.receiver,
+              ]
+            }
+
+
+            // ----------------------------------------------------
+            // Docker / container metrics
+            // ----------------------------------------------------
+
+            prometheus.exporter.cadvisor "docker" {
+              docker_host = "unix:///var/run/docker.sock"
+              docker_only = true
+
+              // Avoid automatically converting every Docker label into a Prometheus label,
+              // but retain the labels Uncloud uses to identify a service instance.
+              store_container_labels = false
+
+              allowlisted_container_labels = [
+                "com.docker.compose.project",
+                "com.docker.compose.service",
+                "uncloud.service.name",
+                "uncloud.service.id",
+              ]
+            }
+
+            prometheus.scrape "containers" {
+              targets         = prometheus.exporter.cadvisor.docker.targets
+              scrape_interval = "15s"
+
+              forward_to = [
+                prometheus.remote_write.greptime.receiver,
+              ]
+            }
+
+
+            // ----------------------------------------------------
+            // Send all metrics to GreptimeDB
+            // ----------------------------------------------------
+
+            prometheus.remote_write "greptime" {
+              external_labels = {
+                machine_id  = sys.env("UNCLOUD_MACHINE_ID"),
+                customer_id = sys.env("CUSTOMER_ID"),
+              }
+
+              endpoint {
+                url = sys.env("GREPTIME_URL") +
+                      "/v1/prometheus/write?db=" +
+                      sys.env("GREPTIME_DB")
+
+                // Applies the selected retention to tables created by remote_write. The
+                // InitializeCluster SQL bootstrap also sets the monitoring database TTL.
+                headers = {
+                  "x-greptime-hints" = "ttl=" + sys.env("RETENTION_DAYS") + "d",
+                }
+
+                basic_auth {
+                  username = sys.env("GREPTIME_USERNAME")
+                  password = sys.env("GREPTIME_PASSWORD")
+                }
+              }
+            }
+
+
+            // ----------------------------------------------------
+            // Docker log discovery
+            // ----------------------------------------------------
+
+            discovery.docker "containers" {
+              host = "unix:///var/run/docker.sock"
+            }
+
+            discovery.relabel "docker_logs" {
+              targets = discovery.docker.containers.targets
+
+              // /my-container -> my-container
+              rule {
+                source_labels = ["__meta_docker_container_name"]
+                regex         = "/(.*)"
+                target_label  = "container"
+                replacement   = "$1"
+              }
+
+              rule {
+                source_labels = [
+                  "__meta_docker_container_label_com_docker_compose_service",
+                ]
+                target_label = "compose_service"
+              }
+
+              rule {
+                source_labels = [
+                  "__meta_docker_container_label_com_docker_compose_project",
+                ]
+                target_label = "compose_project"
+              }
+
+              rule {
+                source_labels = [
+                  "__meta_docker_container_label_uncloud_service_name",
+                ]
+                target_label = "uncloud_service"
+              }
+
+              rule {
+                source_labels = [
+                  "__meta_docker_container_label_uncloud_service_id",
+                ]
+                target_label = "uncloud_service_id"
+              }
+            }
+
+
+            // ----------------------------------------------------
+            // Read Docker stdout/stderr
+            // ----------------------------------------------------
+
+            loki.source.docker "containers" {
+              host    = "unix:///var/run/docker.sock"
+              targets = discovery.relabel.docker_logs.output
+              labels  = {}
+
+              forward_to = [
+                loki.process.docker.receiver,
+              ]
+            }
+
+            loki.process "docker" {
+              stage.docker {}
+
+              forward_to = [
+                loki.write.greptime.receiver,
+              ]
+            }
+
+
+            // ----------------------------------------------------
+            // Send logs to GreptimeDB
+            // ----------------------------------------------------
+
+            loki.write "greptime" {
+              external_labels = {
+                machine_id  = sys.env("UNCLOUD_MACHINE_ID"),
+                customer_id = sys.env("CUSTOMER_ID"),
+              }
+
+              endpoint {
+                url = sys.env("GREPTIME_URL") +
+                      "/v1/loki/api/v1/push"
+
+                headers = {
+                  "X-Greptime-DB-Name"        = sys.env("GREPTIME_DB"),
+                  "X-Greptime-Log-Table-Name" = "docker_logs",
+                  "x-greptime-hints"          = "ttl=" + sys.env("RETENTION_DAYS") + "d",
+                }
+
+                basic_auth {
+                  username = sys.env("GREPTIME_USERNAME")
+                  password = sys.env("GREPTIME_PASSWORD")
+                }
+              }
+            }

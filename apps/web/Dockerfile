@@ -1,4 +1,5 @@
-FROM node:24 AS base
+FROM node:24-trixie AS base
+RUN apt-get update && apt-get install -y --no-install-recommends git openssh-client && rm -rf /var/lib/apt/lists/*
 RUN npm install -g pnpm@11
 WORKDIR /app
 
